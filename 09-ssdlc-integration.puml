@@ -1,0 +1,58 @@
+@startuml SSDLC_Integration
+
+' ============================================
+' Module 9: SSDLC Integration (Jira/GitHub)
+' FREQ-42, UC-09
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class Organization {
+    - organizationId: String
+}
+
+class VulnerabilityReport {
+    - reportId: String
+    - title: String
+}
+
+class ExternalIntegration {
+    - integrationId: String
+    - toolName: String
+    - apiKey: String
+    - status: Enum {Active, Inactive}
+    + configure()
+    + sync()
+}
+
+class JiraConnector {
+    - connectorId: String
+    - jiraUrl: String
+    - projectKey: String
+    + syncIssues()
+    + createIssue()
+}
+
+class GitHubConnector {
+    - connectorId: String
+    - repoUrl: String
+    - accessToken: String
+    + syncIssues()
+    + createIssue()
+}
+
+class SyncLog {
+    - logId: String
+    - syncDate: DateTime
+    - status: Enum {Success, Failed, Retry}
+    - errorMessage: String
+    + record()
+}
+
+ExternalIntegration <|-- JiraConnector
+ExternalIntegration <|-- GitHubConnector
+Organization "1" -- "0..*" ExternalIntegration : configures
+ExternalIntegration "1" -- "0..*" SyncLog : logs
+VulnerabilityReport "1" -- "0..*" ExternalIntegration : syncs
+
+@enduml

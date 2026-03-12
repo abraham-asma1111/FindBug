@@ -1,0 +1,670 @@
+@startuml Complete_Design_Class_Model
+
+' ============================================
+' COMPLETE DESIGN CLASS MODEL
+' Bug Bounty Platform - All 48 FREQs
+' ============================================
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+' ============================================
+' USER MANAGEMENT
+' ============================================
+
+class User {
+    - userId: UUID {PK}
+    - email: String {unique, max=255}
+    - passwordHash: String {bcrypt, 60}
+    - fullName: String {max=100}
+    - status: UserStatus {enum}
+    - emailVerified: Boolean
+    - createdAt: DateTime
+    + login(email, password): AuthToken
+    + logout(): void
+    + updateProfile(data): User
+}
+
+enum UserStatus {
+    PENDING
+    ACTIVE
+    SUSPENDED
+}
+
+class Researcher {
+    - researcherId: UUID {PK}
+    - reputationScore: Decimal(10,2)
+    - skills: JSON
+    - rank: Integer
+    + submitReport(data): VulnerabilityReport
+    + joinProgram(programId): void
+}
+
+class Organization {
+    - organizationId: UUID {PK}
+    - companyName: String {max=255}
+    - subscriptionType: SubscriptionType
+    + createProgram(data): BountyProgram
+    + approveReward(reportId, amount): void
+}
+
+enum SubscriptionType {
+    FREE
+    BASIC
+    PROFESSIONAL
+}
+
+class TriageSpecialist {
+    - specialistId: UUID {PK}
+    - validationCount: Integer
+    + validateReport(reportId): ValidationResult
+    + assignSeverity(reportId, severity): void
+}
+
+class FinancialOfficer {
+    - officerId: UUID {PK}
+    - approvalLimit: Decimal(15,2)
+    + approveReward(reportId, amount): void
+    + processPayment(paymentId): void
+}
+
+class Administrator {
+    - adminId: UUID {PK}
+    - accessLevel: AdminLevel
+    + manageUsers(userId, action): void
+    + configureSystem(key, value): void
+}
+
+enum AdminLevel {
+    STANDARD
+    SUPER_ADMIN
+}
+
+class KYCVerification {
+    - kycId: UUID {PK}
+    - researcherId: UUID {FK}
+    - status: KYCStatus
+    - verifiedAt: DateTime
+    + submit(documents): void
+    + verify(adminId): void
+}
+
+enum KYCStatus {
+    PENDING
+    VERIFIED
+    REJECTED
+}
+
+class IdentityDocument {
+    - documentId: UUID {PK}
+    - kycId: UUID {FK}
+    - documentType: DocumentType
+    - documentNumber: String
+    + upload(file): String
+}
+
+enum DocumentType {
+    NATIONAL_ID
+    PASSPORT
+}
+
+' ============================================
+' BUG BOUNTY CORE
+' ============================================
+
+class BountyProgram {
+    - programId: UUID {PK}
+    - organizationId: UUID {FK}
+    - name: String {max=255}
+    - type: ProgramType
+    - status: ProgramStatus
+    - createdDate: DateTime
+    + create(data): BountyProgram
+    + publish(): void
+    + pause(): void
+}
+
+enum ProgramType {
+    PUBLIC
+    PRIVATE
+    VDP
+}
+
+enum ProgramStatus {
+    DRAFT
+    ACTIVE
+    CLOSED
+}
+
+class ProgramScope {
+    - scopeId: UUID {PK}
+    - programId: UUID {FK}
+    - inScopeAssets: JSON
+    - outOfScopeAssets: JSON
+    + defineScope(data): void
+}
+
+class RewardTier {
+    - tierId: UUID {PK}
+    - programId: UUID {FK}
+    - severity: SeverityLevel
+    - minAmount: Decimal(15,2)
+    - maxAmount: Decimal(15,2)
+    + setReward(severity, min, max): void
+}
+
+enum SeverityLevel {
+    CRITICAL
+    HIGH
+    MEDIUM
+    LOW
+}
+
+class VulnerabilityReport {
+    - reportId: UUID {PK}
+    - programId: UUID {FK}
+    - researcherId: UUID {FK}
+    - title: String {max=255}
+    - description: Text
+    - status: ReportStatus
+    - submittedDate: DateTime
+    + submit(data): VulnerabilityReport
+    + update(data): void
+}
+
+enum ReportStatus {
+    NEW
+    TRIAGED
+    VALID
+    INVALID
+    DUPLICATE
+    RESOLVED
+}
+
+class Attachment {
+    - attachmentId: UUID {PK}
+    - reportId: UUID {FK}
+    - fileName: String
+    - fileUrl: String
+    + upload(file): String
+}
+
+class Comment {
+    - commentId: UUID {PK}
+    - reportId: UUID {FK}
+    - userId: UUID {FK}
+    - content: Text
+    - createdAt: DateTime
+    + add(userId, content): Comment
+}
+
+' ============================================
+' TRIAGE & VALIDATION
+' ============================================
+
+class TriageQueue {
+    - queueId: UUID {PK}
+    - pendingCount: Integer
+    + addReport(reportId): void
+    + assignToSpecialist(specialistId): void
+}
+
+class ValidationResult {
+    - validationId: UUID {PK}
+    - reportId: UUID {FK}
+    - isValid: Boolean
+    - isDuplicate: Boolean
+    - validatedDate: DateTime
+    + validate(data): ValidationResult
+}
+
+class SeverityRating {
+    - ratingId: UUID {PK}
+    - reportId: UUID {FK}
+    - severity: SeverityLevel
+    - justification: Text
+    + assignSeverity(severity, justification): void
+}
+
+' ============================================
+' PAYMENT SYSTEM
+' ============================================
+
+class BountyPayment {
+    - paymentId: UUID {PK}
+    - reportId: UUID {FK}
+    - amount: Decimal(15,2)
+    - platformCommission: Decimal(15,2)
+    - status: PaymentStatus
+    + approve(officerId, amount): void
+    + process(): void
+}
+
+enum PaymentStatus {
+    PENDING
+    APPROVED
+    PROCESSED
+}
+
+class PayoutRequest {
+    - requestId: UUID {PK}
+    - researcherId: UUID {FK}
+    - requestedAmount: Decimal(15,2)
+    - status: PayoutStatus
+    + create(amount, method): PayoutRequest
+}
+
+enum PayoutStatus {
+    PENDING
+    COMPLETED
+    FAILED
+}
+
+class Transaction {
+    - transactionId: UUID {PK}
+    - amount: Decimal(15,2)
+    - transactionType: TransactionType
+    - status: TransactionStatus
+    + record(data): Transaction
+}
+
+enum TransactionType {
+    BOUNTY_PAYMENT
+    PAYOUT
+}
+
+enum TransactionStatus {
+    PENDING
+    COMPLETED
+    FAILED
+}
+
+class PaymentGateway {
+    - gatewayId: UUID {PK}
+    - gatewayName: String
+    - apiKey: String {encrypted}
+    + processPayment(transaction): TransactionResult
+}
+
+class ResearcherBalance {
+    - balanceId: UUID {PK}
+    - researcherId: UUID {FK}
+    - availableBalance: Decimal(15,2)
+    - totalEarned: Decimal(15,2)
+    + addEarnings(amount): void
+}
+
+' ============================================
+' PTAAS
+' ============================================
+
+class PTaaSEngagement {
+    - engagementId: UUID {PK}
+    - organizationId: UUID {FK}
+    - scope: Text
+    - methodology: MethodologyType
+    - status: EngagementStatus
+    + create(data): PTaaSEngagement
+    + assignResearchers(ids): void
+}
+
+enum MethodologyType {
+    OWASP
+    PTES
+}
+
+enum EngagementStatus {
+    SCHEDULED
+    IN_PROGRESS
+    COMPLETED
+}
+
+class TestingMethodology {
+    - methodologyId: UUID {PK}
+    - engagementId: UUID {FK}
+    - checklist: JSON
+    + apply(): void
+}
+
+class RetestRequest {
+    - retestId: UUID {PK}
+    - engagementId: UUID {FK}
+    - status: RetestStatus
+    + create(findingId): RetestRequest
+}
+
+enum RetestStatus {
+    PENDING
+    COMPLETED
+}
+
+' ============================================
+' SIMULATION
+' ============================================
+
+class SimulatedEnvironment {
+    - simulationId: UUID {PK}
+    - difficultyLevel: DifficultyLevel
+    - targetName: String
+    + launch(researcherId): SimulationSession
+}
+
+enum DifficultyLevel {
+    BEGINNER
+    INTERMEDIATE
+    ADVANCED
+}
+
+class SimulationSession {
+    - sessionId: UUID {PK}
+    - simulationId: UUID {FK}
+    - researcherId: UUID {FK}
+    - score: Integer
+    + start(): void
+    + complete(): void
+}
+
+class SimulationReport {
+    - reportId: UUID {PK}
+    - sessionId: UUID {FK}
+    - findings: Text
+    - score: Integer
+    + submit(data): SimulationReport
+}
+
+' ============================================
+' CODE REVIEW
+' ============================================
+
+class CodeReviewEngagement {
+    - reviewId: UUID {PK}
+    - organizationId: UUID {FK}
+    - repositoryUrl: String
+    - status: ReviewStatus
+    + create(data): CodeReviewEngagement
+}
+
+enum ReviewStatus {
+    PENDING
+    IN_PROGRESS
+    COMPLETED
+}
+
+class CodeReviewFinding {
+    - findingId: UUID {PK}
+    - reviewId: UUID {FK}
+    - issueType: IssueType
+    - severity: SeverityLevel
+    + report(data): CodeReviewFinding
+}
+
+enum IssueType {
+    SECURITY_VULNERABILITY
+    CODE_SMELL
+    BUG
+}
+
+' ============================================
+' SSDLC INTEGRATION
+' ============================================
+
+class ExternalIntegration {
+    - integrationId: UUID {PK}
+    - toolName: String
+    - status: IntegrationStatus
+    + configure(data): ExternalIntegration
+    + sync(): SyncResult
+}
+
+enum IntegrationStatus {
+    ACTIVE
+    INACTIVE
+}
+
+class JiraConnector {
+    - connectorId: UUID {PK}
+    - jiraUrl: String
+    - projectKey: String
+    + syncIssues(): Integer
+}
+
+class GitHubConnector {
+    - connectorId: UUID {PK}
+    - repoUrl: String
+    - accessToken: String
+    + syncIssues(): Integer
+}
+
+class SyncLog {
+    - logId: UUID {PK}
+    - integrationId: UUID {FK}
+    - status: SyncStatus
+    + record(result): void
+}
+
+enum SyncStatus {
+    SUCCESS
+    FAILED
+}
+
+' ============================================
+' LIVE EVENTS
+' ============================================
+
+class LiveHackingEvent {
+    - eventId: UUID {PK}
+    - organizationId: UUID {FK}
+    - name: String
+    - startTime: DateTime
+    - endTime: DateTime
+    - status: EventStatus
+    + schedule(data): LiveHackingEvent
+}
+
+enum EventStatus {
+    SCHEDULED
+    ACTIVE
+    COMPLETED
+}
+
+class EventParticipation {
+    - participationId: UUID {PK}
+    - eventId: UUID {FK}
+    - researcherId: UUID {FK}
+    - submissionCount: Integer
+    + join(eventId, researcherId): EventParticipation
+}
+
+class EventMetrics {
+    - metricsId: UUID {PK}
+    - eventId: UUID {FK}
+    - totalBugsFound: Integer
+    + calculate(): void
+}
+
+' ============================================
+' AI RED TEAMING
+' ============================================
+
+class AIRedTeamingEngagement {
+    - engagementId: UUID {PK}
+    - organizationId: UUID {FK}
+    - targetAISystem: String
+    - status: EngagementStatus
+    + create(data): AIRedTeamingEngagement
+}
+
+class AIVulnerabilityReport {
+    - reportId: UUID {PK}
+    - engagementId: UUID {FK}
+    - inputPrompt: Text
+    - attackType: AIAttackType
+    + submit(data): AIVulnerabilityReport
+}
+
+enum AIAttackType {
+    PROMPT_INJECTION
+    JAILBREAK
+    DATA_LEAKAGE
+}
+
+class AITestingEnvironment {
+    - environmentId: UUID {PK}
+    - engagementId: UUID {FK}
+    - sandboxUrl: String
+    + setup(config): void
+}
+
+' ============================================
+' COMMUNICATION
+' ============================================
+
+class Notification {
+    - notificationId: UUID {PK}
+    - userId: UUID {FK}
+    - message: String
+    - isRead: Boolean
+    + send(): void
+}
+
+class Message {
+    - messageId: UUID {PK}
+    - senderId: UUID {FK}
+    - receiverId: UUID {FK}
+    - body: Text
+    + send(): void
+}
+
+' ============================================
+' ANALYTICS
+' ============================================
+
+class Dashboard {
+    - dashboardId: UUID {PK}
+    - userId: UUID {FK}
+    - userRole: String
+    + display(): void
+}
+
+class AnalyticsReport {
+    - reportId: UUID {PK}
+    - reportType: String
+    - data: JSON
+    + generate(): AnalyticsReport
+}
+
+class Metrics {
+    - metricId: UUID {PK}
+    - metricName: String
+    - value: Decimal
+    + calculate(): void
+}
+
+' ============================================
+' AUDIT
+' ============================================
+
+class AuditLog {
+    - logId: UUID {PK}
+    - action: String
+    - performedBy: String
+    - timestamp: DateTime
+    + record(): void
+}
+
+class ActivityLog {
+    - activityId: UUID {PK}
+    - userId: UUID {FK}
+    - activityType: String
+    + log(): void
+}
+
+' ============================================
+' MATCHING
+' ============================================
+
+class BountyMatch {
+    - matchId: UUID {PK}
+    - researcherId: UUID {FK}
+    - programId: UUID {FK}
+    - matchScore: Decimal
+    + matchResearcher(): void
+}
+
+class MatchingCriteria {
+    - criteriaId: UUID {PK}
+    - requiredSkills: JSON
+    + evaluate(): void
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+User <|-- Researcher
+User <|-- Organization
+User <|-- TriageSpecialist
+User <|-- FinancialOfficer
+User <|-- Administrator
+
+Researcher "1" -- "0..1" KYCVerification
+KYCVerification "1" -- "1..*" IdentityDocument
+
+Organization "1" -- "0..*" BountyProgram
+BountyProgram "1" -- "1" ProgramScope
+BountyProgram "1" -- "1..*" RewardTier
+BountyProgram "1" -- "0..*" VulnerabilityReport
+
+Researcher "1" -- "0..*" VulnerabilityReport
+VulnerabilityReport "1" -- "0..*" Attachment
+VulnerabilityReport "1" -- "0..*" Comment
+VulnerabilityReport "1" -- "0..1" ValidationResult
+VulnerabilityReport "1" -- "0..1" SeverityRating
+VulnerabilityReport "1" -- "0..1" BountyPayment
+
+TriageSpecialist "1" -- "0..*" TriageQueue
+TriageQueue "1" -- "0..*" VulnerabilityReport
+
+FinancialOfficer "1" -- "0..*" BountyPayment
+Researcher "1" -- "0..*" PayoutRequest
+BountyPayment "1" -- "0..1" Transaction
+PaymentGateway "1" -- "0..*" Transaction
+Researcher "1" -- "1" ResearcherBalance
+
+Organization "1" -- "0..*" PTaaSEngagement
+PTaaSEngagement "1" -- "1" TestingMethodology
+PTaaSEngagement "1" -- "0..*" RetestRequest
+
+Researcher "1" -- "0..*" SimulatedEnvironment
+SimulatedEnvironment "1" -- "0..*" SimulationSession
+SimulationSession "1" -- "0..*" SimulationReport
+
+Organization "1" -- "0..*" CodeReviewEngagement
+CodeReviewEngagement "1" -- "0..*" CodeReviewFinding
+
+Organization "1" -- "0..*" ExternalIntegration
+ExternalIntegration <|-- JiraConnector
+ExternalIntegration <|-- GitHubConnector
+ExternalIntegration "1" -- "0..*" SyncLog
+
+Organization "1" -- "0..*" LiveHackingEvent
+LiveHackingEvent "1" -- "0..*" EventParticipation
+LiveHackingEvent "1" -- "1" EventMetrics
+
+Organization "1" -- "0..*" AIRedTeamingEngagement
+AIRedTeamingEngagement "1" -- "1" AITestingEnvironment
+AIRedTeamingEngagement "1" -- "0..*" AIVulnerabilityReport
+
+User "1" -- "0..*" Notification
+User "1" -- "1" Dashboard
+Dashboard "1" -- "0..*" AnalyticsReport
+AnalyticsReport "1" -- "0..*" Metrics
+
+Administrator "1" -- "0..*" AuditLog
+User "1" -- "0..*" ActivityLog
+
+BountyMatch "1" -- "1" Researcher
+BountyMatch "1" -- "1" BountyProgram
+BountyMatch "1" -- "1" MatchingCriteria
+
+@enduml

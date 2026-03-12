@@ -1,0 +1,327 @@
+@startuml Researcher_Matching_Design
+
+' ============================================
+' DESIGN CLASS MODEL: Researcher Matching (BountyMatch)
+' Bug Bounty and Its Simulation Platform
+' Coverage: FREQ-16, FREQ-32, FREQ-39
+' ============================================
+
+title BountyMatch - Researcher Matching System - Design Class Model
+
+' ============================================
+' ENUMS
+' ============================================
+
+enum MatchingStatus {
+  PENDING
+  MATCHING
+  COMPLETED
+  FAILED
+}
+
+enum InvitationStatus {
+  SENT
+  VIEWED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+' ============================================
+' DOMAIN CLASSES
+' ============================================
+
+class MatchingRequest {
+  + request_id: UUID <<PK>>
+  + engagement_id: UUID <<FK>> <<not null>>
+  + engagement_type: String{max=50} <<not null>>
+  + organization_id: UUID <<FK>> <<not null>>
+  + criteria: JSON <<not null>>
+  + required_skills: JSON <<not null>>
+  + min_reputation: Decimal(5,2)
+  + max_researchers: Integer <<default=10>>
+  + status: MatchingStatus <<default=PENDING>>
+  + created_at: DateTime <<default=NOW>>
+  + completed_at: DateTime
+  --
+  + execute(): List<MatchResult>
+  + getTopMatches(limit: Integer): List<MatchResult>
+}
+
+
+class MatchResult {
+  + result_id: UUID <<PK>>
+  + request_id: UUID <<FK>> <<not null>>
+  + researcher_id: UUID <<FK>> <<not null>>
+  + match_score: Decimal(5,2) <<not null>>
+  + skill_score: Decimal(5,2) <<not null>>
+  + reputation_score: Decimal(5,2) <<not null>>
+  + availability_score: Decimal(5,2) <<not null>>
+  + performance_score: Decimal(5,2) <<not null>>
+  + rank: Integer <<not null>>
+  + explanation: JSON
+  + created_at: DateTime <<default=NOW>>
+  --
+  + calculateScore(): Decimal
+  + getScoreBreakdown(): Dict
+}
+
+class ResearcherProfile {
+  + profile_id: UUID <<PK>>
+  + researcher_id: UUID <<FK>> <<not null>> <<unique>>
+  + skills: JSON <<not null>>
+  + specializations: JSON
+  + experience_years: Integer
+  + certifications: JSON
+  + languages: JSON
+  + timezone: String{max=50}
+  + availability_hours: Integer <<default=40>>
+  + current_workload: Integer <<default=0>>
+  + max_concurrent_engagements: Integer <<default=3>>
+  + preferred_engagement_types: JSON
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + isAvailable(): Boolean
+  + getAvailabilityScore(): Decimal
+  + updateWorkload(): void
+  + matchesSkills(required: List): Boolean
+}
+
+class SkillTag {
+  + tag_id: UUID <<PK>>
+  + name: String{max=100} <<not null>> <<unique>>
+  + category: String{max=50} <<not null>>
+  + description: Text
+  + parent_tag_id: UUID <<FK>>
+  + is_active: Boolean <<default=true>>
+  + created_at: DateTime <<default=NOW>>
+  --
+  + getRelatedTags(): List<SkillTag>
+  + getHierarchy(): List<SkillTag>
+}
+
+class ResearcherSkill {
+  + skill_id: UUID <<PK>>
+  + researcher_id: UUID <<FK>> <<not null>>
+  + tag_id: UUID <<FK>> <<not null>>
+  + level: SkillLevel <<not null>>
+  + years_experience: Integer
+  + verified: Boolean <<default=false>>
+  + verified_by: UUID <<FK>>
+  + verified_at: DateTime
+  + created_at: DateTime <<default=NOW>>
+  --
+  + verify(admin_id: UUID): void
+  + getLevelScore(): Decimal
+}
+
+class MatchingInvitation {
+  + invitation_id: UUID <<PK>>
+  + request_id: UUID <<FK>> <<not null>>
+  + researcher_id: UUID <<FK>> <<not null>>
+  + engagement_id: UUID <<FK>> <<not null>>
+  + match_score: Decimal(5,2) <<not null>>
+  + status: InvitationStatus <<default=SENT>>
+  + message: Text
+  + expires_at: DateTime <<not null>>
+  + sent_at: DateTime <<default=NOW>>
+  + viewed_at: DateTime
+  + responded_at: DateTime
+  + response_note: Text
+  --
+  + accept(): void
+  + decline(reason: String): void
+  + isExpired(): Boolean
+  + remind(): void
+}
+
+class MatchingAlgorithm {
+  + algorithm_id: UUID <<PK>>
+  + version: String{max=20} <<not null>>
+  + weights: JSON <<not null>>
+  + parameters: JSON <<not null>>
+  + is_active: Boolean <<default=true>>
+  + created_at: DateTime <<default=NOW>>
+  --
+  + calculateMatch(researcher: Researcher, criteria: Dict): Decimal
+  + getWeights(): Dict
+}
+
+class MatchingFeedback {
+  + feedback_id: UUID <<PK>>
+  + request_id: UUID <<FK>> <<not null>>
+  + researcher_id: UUID <<FK>> <<not null>>
+  + organization_id: UUID <<FK>> <<not null>>
+  + rating: Integer <<min=1, max=5>>
+  + quality_score: Integer <<min=1, max=5>>
+  + communication_score: Integer <<min=1, max=5>>
+  + timeliness_score: Integer <<min=1, max=5>>
+  + would_work_again: Boolean
+  + comments: Text
+  + created_at: DateTime <<default=NOW>>
+  --
+  + updateResearcherScore(): void
+  + improveAlgorithm(): void
+}
+
+class MatchingMetrics {
+  + metrics_id: UUID <<PK>>
+  + request_id: UUID <<FK>> <<not null>> <<unique>>
+  + total_candidates: Integer <<not null>>
+  + invited_count: Integer <<not null>>
+  + accepted_count: Integer <<not null>>
+  + declined_count: Integer <<not null>>
+  + expired_count: Integer <<not null>>
+  + average_match_score: Decimal(5,2)
+  + average_response_time: Integer
+  + success_rate: Decimal(5,2)
+  + created_at: DateTime <<default=NOW>>
+  --
+  + calculate(): void
+  + getSuccessRate(): Decimal
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+MatchingRequest "1" --> "0..*" MatchResult : produces
+MatchingRequest "1" --> "1" Organization : requested_by
+MatchResult "0..*" --> "1" Researcher : matched_researcher
+ResearcherProfile "1" --> "1" Researcher : profile_of
+ResearcherSkill "0..*" --> "1" Researcher : skills_of
+ResearcherSkill "0..*" --> "1" SkillTag : tagged_with
+SkillTag "0..*" --> "0..1" SkillTag : parent
+MatchingInvitation "0..*" --> "1" MatchingRequest : from_request
+MatchingInvitation "0..*" --> "1" Researcher : invited_researcher
+MatchingFeedback "0..*" --> "1" MatchingRequest : feedback_for
+MatchingFeedback "0..*" --> "1" Researcher : about_researcher
+MatchingFeedback "0..*" --> "1" Organization : from_organization
+MatchingMetrics "1" --> "1" MatchingRequest : metrics_for
+
+' ============================================
+' NOTES
+' ============================================
+
+note right of MatchingRequest
+  Matching request lifecycle
+  - Criteria definition
+  - Algorithm execution
+  - Result ranking
+  
+  Engagement types:
+  - Bug bounty program
+  - PTaaS engagement
+  - Code review
+  - AI red teaming
+  - Live hacking event
+end note
+
+note right of MatchResult
+  Match scoring algorithm
+  
+  Score = Skills (40%) +
+          Reputation (30%) +
+          Availability (20%) +
+          Performance (10%)
+  
+  Skills: Tag matching + level
+  Reputation: Platform score
+  Availability: Workload + hours
+  Performance: Past success rate
+end note
+
+note right of ResearcherProfile
+  Researcher capabilities
+  - Skills and specializations
+  - Availability tracking
+  - Workload management
+  
+  Availability factors:
+  - Current engagements
+  - Hours per week
+  - Timezone compatibility
+  - Preferred types
+end note
+
+note right of SkillTag
+  Hierarchical skill taxonomy
+  
+  Categories:
+  - Programming languages
+  - Security domains
+  - Tools & frameworks
+  - Methodologies
+  - Certifications
+  
+  Example hierarchy:
+  Web Security → XSS → Stored XSS
+end note
+
+note right of ResearcherSkill
+  Skill proficiency tracking
+  - Self-reported initially
+  - Admin verification optional
+  - Level-based scoring
+  
+  Levels:
+  - Beginner (1.0)
+  - Intermediate (2.0)
+  - Advanced (3.0)
+  - Expert (4.0)
+end note
+
+note right of MatchingInvitation
+  Invitation management
+  - Expiry: 7 days default
+  - Reminder after 3 days
+  - Auto-decline on expiry
+  
+  Status flow:
+  Sent → Viewed → Accepted/Declined
+  Sent → Expired (no response)
+end note
+
+note right of MatchingAlgorithm
+  Algorithm versioning
+  - A/B testing support
+  - Weight tuning
+  - Performance tracking
+  
+  Default weights:
+  - skills: 0.40
+  - reputation: 0.30
+  - availability: 0.20
+  - performance: 0.10
+end note
+
+note right of MatchingFeedback
+  Learning system
+  - Post-engagement feedback
+  - Algorithm improvement
+  - Researcher scoring
+  
+  Updates:
+  - Researcher reputation
+  - Algorithm weights
+  - Matching accuracy
+end note
+
+note right of MatchingMetrics
+  Matching effectiveness
+  - Acceptance rate
+  - Response time
+  - Success rate
+  
+  Success rate =
+  (accepted / invited) * 100
+end note
+
+@enduml

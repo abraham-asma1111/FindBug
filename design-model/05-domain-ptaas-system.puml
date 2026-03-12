@@ -1,0 +1,135 @@
+@startuml Design_Domain_PTaaS_System
+
+' ============================================
+' Design Class Model - Domain Layer
+' Module 5: PTaaS (Penetration Testing as a Service)
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class PTaaSEngagement {
+    - engagementId: UUID {PK, unique, not null}
+    - organizationId: UUID {FK->Organization.organizationId, not null}
+    - name: String {max=255, not null}
+    - scope: Text {max=5000, not null}
+    - methodology: MethodologyType {enum, not null}
+    - duration: Integer {days, min=1, max=90}
+    - startDate: DateTime {not null}
+    - endDate: DateTime {not null}
+    - status: EngagementStatus {enum, default=SCHEDULED}
+    - pricingModel: PricingModel {enum, not null}
+    - fixedPrice: Decimal(15,2) {min=0, nullable}
+    - platformCommission: Decimal(15,2) {min=0, default=0}
+    - totalCost: Decimal(15,2) {min=0, not null}
+    - assignedResearchers: JSON {array of UUIDs}
+    - findingsCount: Integer {default=0}
+    - createdAt: DateTime {default=now()}
+    
+    + create(data: PTaaSDTO): PTaaSEngagement throws ValidationException
+    + assignResearchers(researcherIds: List<UUID>): void
+    + start(): void throws InvalidStateException
+    + complete(): void
+    + generateReport(): PTaaSReportDTO
+    + trackProgress(): ProgressDTO
+}
+
+enum MethodologyType {
+    OWASP_TOP_10
+    PTES
+    OSSTMM
+    NIST
+    CUSTOM
+}
+
+enum EngagementStatus {
+    SCHEDULED
+    IN_PROGRESS
+    PAUSED
+    COMPLETED
+    CANCELLED
+}
+
+enum PricingModel {
+    FIXED
+    SUBSCRIPTION
+    PER_FINDING
+}
+
+class TestingMethodology {
+    - methodologyId: UUID {PK, unique, not null}
+    - engagementId: UUID {FK->PTaaSEngagement.engagementId, not null}
+    - name: String {max=100, not null}
+    - version: String {max=20, nullable}
+    - checklist: JSON {array of objects, not null}
+    - completedItems: JSON {array of strings, default=[]}
+    - progress: Decimal(5,2) {min=0, max=100, default=0}
+    - notes: Text {max=5000, nullable}
+    
+    + apply(): void
+    + markItemComplete(itemId: String): void
+    + calculateProgress(): Decimal
+    + generateChecklistReport(): ChecklistDTO
+}
+
+class RetestRequest {
+    - retestId: UUID {PK, unique, not null}
+    - engagementId: UUID {FK->PTaaSEngagement.engagementId, not null}
+    - originalFindingId: UUID {FK->VulnerabilityReport.reportId, not null}
+    - requestedBy: UUID {FK->Organization.organizationId, not null}
+    - requestDate: DateTime {default=now()}
+    - scheduledDate: DateTime {nullable}
+    - completedDate: DateTime {nullable}
+    - status: RetestStatus {enum, default=PENDING}
+    - assignedResearcherId: UUID {FK->Researcher.researcherId, nullable}
+    - result: RetestResult {enum, nullable}
+    - notes: Text {max=2000, nullable}
+    - isFree: Boolean {default=true}
+    
+    + create(findingId: UUID): RetestRequest throws ValidationException
+    + approve(): void
+    + assign(researcherId: UUID): void
+    + complete(result: RetestResult, notes: String): void
+    + validateEligibility(): Boolean
+}
+
+enum RetestStatus {
+    PENDING
+    APPROVED
+    SCHEDULED
+    IN_PROGRESS
+    COMPLETED
+    REJECTED
+}
+
+enum RetestResult {
+    FIXED
+    PARTIALLY_FIXED
+    NOT_FIXED
+    CANNOT_REPRODUCE
+}
+
+class PTaaSProgress {
+    - progressId: UUID {PK, unique, not null}
+    - engagementId: UUID {FK->PTaaSEngagement.engagementId, unique, not null}
+    - currentPhase: String {max=100, not null}
+    - overallProgress: Decimal(5,2) {min=0, max=100, default=0}
+    - methodologyProgress: Decimal(5,2) {min=0, max=100, default=0}
+    - findingsSubmitted: Integer {default=0}
+    - findingsValidated: Integer {default=0}
+    - hoursSpent: Decimal(10,2) {min=0, default=0}
+    - lastUpdated: DateTime {default=now()}
+    
+    + updateProgress(): void
+    + calculateOverallProgress(): Decimal
+    + getDashboardData(): PTaaSDashboardDTO
+}
+
+' Relationships
+Organization "1" -- "0..*" PTaaSEngagement : requests
+PTaaSEngagement "1" -- "1" TestingMethodology : follows
+PTaaSEngagement "1" -- "0..*" Researcher : assigns
+PTaaSEngagement "1" -- "0..*" VulnerabilityReport : produces
+PTaaSEngagement "1" -- "0..*" RetestRequest : allows
+PTaaSEngagement "1" -- "1" PTaaSProgress : tracks
+
+@enduml

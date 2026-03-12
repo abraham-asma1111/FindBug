@@ -1,0 +1,62 @@
+@startuml PTaaS_System
+
+' ============================================
+' Module 7: Penetration Testing as a Service
+' FREQ-29 to FREQ-40
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class Organization {
+    - organizationId: String
+}
+
+class Researcher {
+    - researcherId: String
+}
+
+class BountyMatch {
+    - matchId: String
+    - matchScore: Decimal
+    + matchResearcher()
+}
+
+class PTaaSEngagement {
+    - engagementId: String
+    - scope: String
+    - methodology: String
+    - duration: Integer
+    - status: Enum {Scheduled, InProgress, Completed}
+    - pricingModel: Enum {Fixed, Subscription}
+    + create()
+    + assignResearchers()
+}
+
+class TestingMethodology {
+    - methodologyId: String
+    - name: String {OWASP, PTES}
+    - checklist: List<String>
+    + apply()
+}
+
+class RetestRequest {
+    - retestId: String
+    - originalFindingId: String
+    - requestDate: DateTime
+    - status: Enum {Pending, Approved, Completed}
+    + create()
+}
+
+class VulnerabilityReport {
+    - reportId: String
+    - title: String
+}
+
+Organization "1" -- "0..*" PTaaSEngagement : requests
+PTaaSEngagement "1" -- "1" TestingMethodology : follows
+PTaaSEngagement "1" -- "0..*" Researcher : assigns
+PTaaSEngagement "1" -- "0..*" VulnerabilityReport : produces
+PTaaSEngagement "1" -- "0..*" RetestRequest : allows
+BountyMatch "1" -- "0..*" PTaaSEngagement : matches
+
+@enduml

@@ -1,0 +1,101 @@
+@startuml Design_Domain_Live_Events
+
+' ============================================
+' Design Class Model - Domain Layer
+' Module 9: Live Hacking Events
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class LiveHackingEvent {
+    - eventId: UUID {PK, unique, not null}
+    - organizationId: UUID {FK->Organization.organizationId, not null}
+    - name: String {max=255, not null}
+    - description: Text {max=2000, not null}
+    - startTime: DateTime {not null}
+    - endTime: DateTime {not null}
+    - scope: Text {max=5000, not null}
+    - status: EventStatus {enum, default=SCHEDULED}
+    - maxParticipants: Integer {min=1, nullable}
+    - currentParticipants: Integer {default=0}
+    - inviteOnly: Boolean {default=false}
+    - bonusMultiplier: Decimal(3,2) {min=1.0, max=5.0, default=1.5}
+    - totalSubmissions: Integer {default=0}
+    - validSubmissions: Integer {default=0}
+    - createdAt: DateTime {default=now()}
+    
+    + schedule(data: EventDTO): LiveHackingEvent throws ValidationException
+    + invite(researcherIds: List<UUID>): void
+    + start(): void throws InvalidStateException
+    + close(): void
+    + extendDuration(minutes: Integer): void
+    + generateMetrics(): EventMetricsDTO
+}
+
+enum EventStatus {
+    SCHEDULED
+    ACTIVE
+    PAUSED
+    COMPLETED
+    CANCELLED
+}
+
+class EventParticipation {
+    - participationId: UUID {PK, unique, not null}
+    - eventId: UUID {FK->LiveHackingEvent.eventId, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - joinedAt: DateTime {default=now()}
+    - leftAt: DateTime {nullable}
+    - submissionCount: Integer {default=0}
+    - validSubmissionCount: Integer {default=0}
+    - totalEarnings: Decimal(15,2) {default=0.0}
+    - rank: Integer {nullable}
+    - isActive: Boolean {default=true}
+    
+    + join(eventId: UUID, researcherId: UUID): EventParticipation throws EventFullException
+    + submit(reportId: UUID): void
+    + leave(): void
+    + calculateRank(): Integer
+}
+
+class EventMetrics {
+    - metricsId: UUID {PK, unique, not null}
+    - eventId: UUID {FK->LiveHackingEvent.eventId, unique, not null}
+    - totalBugsFound: Integer {default=0}
+    - criticalBugs: Integer {default=0}
+    - highBugs: Integer {default=0}
+    - mediumBugs: Integer {default=0}
+    - lowBugs: Integer {default=0}
+    - participationRate: Decimal(5,2) {min=0, max=100}
+    - totalRewards: Decimal(15,2) {default=0.0}
+    - averageResponseTime: Integer {minutes, default=0}
+    - topResearchers: JSON {array of objects, nullable}
+    - calculatedAt: DateTime {default=now()}
+    
+    + calculate(): void
+    + report(): EventReportDTO
+    + getLeaderboard(): List<LeaderboardEntry>
+}
+
+class EventInvitation {
+    - invitationId: UUID {PK, unique, not null}
+    - eventId: UUID {FK->LiveHackingEvent.eventId, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - invitedAt: DateTime {default=now()}
+    - status: InvitationStatus {enum, default=PENDING}
+    - respondedAt: DateTime {nullable}
+    
+    + send(): void
+    + accept(): void
+    + decline(): void
+}
+
+' Relationships
+Organization "1" -- "0..*" LiveHackingEvent : hosts
+Researcher "1" -- "0..*" EventParticipation : participates
+LiveHackingEvent "1" -- "0..*" EventParticipation : has
+LiveHackingEvent "1" -- "0..*" VulnerabilityReport : receives
+LiveHackingEvent "1" -- "1" EventMetrics : tracks
+LiveHackingEvent "1" -- "0..*" EventInvitation : sends
+
+@enduml

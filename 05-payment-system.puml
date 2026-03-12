@@ -1,0 +1,61 @@
+@startuml Payment_System
+
+' ============================================
+' Module 5: Payment & Reward System
+' FREQ-10, FREQ-11, FREQ-20, UC-05
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class VulnerabilityReport {
+    - reportId: String
+    - title: String
+}
+
+class FinancialOfficer {
+    - officerId: String
+}
+
+class Researcher {
+    - researcherId: String
+}
+
+class BountyPayment {
+    - paymentId: String
+    - amount: Decimal
+    - platformCommission: Decimal
+    - status: Enum {Pending, Approved, Processed}
+    - approvedDate: DateTime
+    + approve()
+    + process()
+}
+
+class PayoutRequest {
+    - requestId: String
+    - requestedAmount: Decimal
+    - requestDate: DateTime
+    - status: Enum {Pending, Processing, Completed}
+    + create()
+}
+
+class Transaction {
+    - transactionId: String
+    - amount: Decimal
+    - transactionDate: DateTime
+    - paymentMethod: String
+    + record()
+}
+
+class PaymentGateway {
+    - gatewayId: String
+    - gatewayName: String
+    + processPayment()
+}
+
+VulnerabilityReport "1" -- "0..1" BountyPayment : rewards
+FinancialOfficer "1" -- "0..*" BountyPayment : approves
+Researcher "1" -- "0..*" PayoutRequest : requests
+BountyPayment "1" -- "0..1" Transaction : generates
+PaymentGateway "1" -- "0..*" Transaction : processes
+
+@enduml

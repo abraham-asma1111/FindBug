@@ -1,0 +1,303 @@
+@startuml Analytics_Dashboard_Design
+
+' ============================================
+' DESIGN CLASS MODEL: Analytics & Dashboard
+' Bug Bounty and Its Simulation Platform
+' Coverage: FREQ-13, FREQ-15, UC-06
+' ============================================
+
+title Analytics & Dashboard System - Design Class Model
+
+' ============================================
+' ENUMS
+' ============================================
+
+enum DashboardType {
+  RESEARCHER
+  ORGANIZATION
+  ADMIN
+  TRIAGE_SPECIALIST
+  FINANCE_OFFICER
+}
+
+enum MetricType {
+  REPORTS_SUBMITTED
+  REPORTS_VALIDATED
+  REPORTS_REJECTED
+  TOTAL_EARNINGS
+  AVERAGE_SEVERITY
+  RESPONSE_TIME
+  VALIDATION_TIME
+  PAYMENT_VOLUME
+  ACTIVE_PROGRAMS
+  ACTIVE_RESEARCHERS
+  PLATFORM_REVENUE
+  USER_GROWTH
+}
+
+enum ChartType {
+  LINE
+  BAR
+  PIE
+  AREA
+  HEATMAP
+  CANDLESTICK
+  DONUT
+  SCATTER
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+  JSON
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ON_DEMAND
+}
+
+' ============================================
+' DOMAIN CLASSES
+' ============================================
+
+class Dashboard {
+  + dashboard_id: UUID <<PK>>
+  + user_id: UUID <<FK>> <<not null>>
+  + type: DashboardType <<not null>>
+  + layout: JSON <<not null>>
+  + widgets: JSON <<not null>>
+  + is_default: Boolean <<default=false>>
+  + created_at: DateTime <<default=NOW>>
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + addWidget(widget: Dict): void
+  + removeWidget(widget_id: UUID): void
+  + updateLayout(layout: JSON): void
+  + getMetrics(): List<Metric>
+}
+
+
+class Metric {
+  + metric_id: UUID <<PK>>
+  + name: String{max=100} <<not null>>
+  + type: MetricType <<not null>>
+  + value: Decimal(15,2) <<not null>>
+  + previous_value: Decimal(15,2)
+  + change_percentage: Decimal(5,2)
+  + period_start: DateTime <<not null>>
+  + period_end: DateTime <<not null>>
+  + filters: JSON
+  + created_at: DateTime <<default=NOW>>
+  --
+  + calculate(): Decimal
+  + compare(previous: Metric): Decimal
+  + getTrend(): String
+}
+
+class ResearcherMetrics {
+  + metrics_id: UUID <<PK>>
+  + researcher_id: UUID <<FK>> <<not null>> <<unique>>
+  + total_reports: Integer <<default=0>>
+  + validated_reports: Integer <<default=0>>
+  + rejected_reports: Integer <<default=0>>
+  + duplicate_reports: Integer <<default=0>>
+  + total_earnings: Decimal(15,2) <<default=0>>
+  + pending_earnings: Decimal(15,2) <<default=0>>
+  + average_severity: Decimal(3,2)
+  + success_rate: Decimal(5,2)
+  + reputation_score: Decimal(5,2)
+  + rank: Integer
+  + last_report_date: DateTime
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + updateMetrics(): void
+  + calculateSuccessRate(): Decimal
+  + calculateRank(): Integer
+}
+
+class OrganizationMetrics {
+  + metrics_id: UUID <<PK>>
+  + organization_id: UUID <<FK>> <<not null>> <<unique>>
+  + active_programs: Integer <<default=0>>
+  + total_reports_received: Integer <<default=0>>
+  + validated_reports: Integer <<default=0>>
+  + total_paid: Decimal(15,2) <<default=0>>
+  + average_response_time: Integer
+  + average_validation_time: Integer
+  + mttr: Integer
+  + roi: Decimal(10,2)
+  + vulnerability_trend: JSON
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + updateMetrics(): void
+  + calculateMTTR(): Integer
+  + calculateROI(): Decimal
+}
+
+class PlatformMetrics {
+  + metrics_id: UUID <<PK>>
+  + date: Date <<not null>> <<unique>>
+  + total_users: Integer <<default=0>>
+  + active_researchers: Integer <<default=0>>
+  + active_organizations: Integer <<default=0>>
+  + total_reports: Integer <<default=0>>
+  + total_payments: Decimal(15,2) <<default=0>>
+  + platform_revenue: Decimal(15,2) <<default=0>>
+  + new_users: Integer <<default=0>>
+  + user_growth_rate: Decimal(5,2)
+  + system_health: JSON
+  + created_at: DateTime <<default=NOW>>
+  --
+  + calculateDailyMetrics(): void
+  + getGrowthRate(): Decimal
+}
+
+class AnalyticsReport {
+  + report_id: UUID <<PK>>
+  + user_id: UUID <<FK>> <<not null>>
+  + title: String{max=200} <<not null>>
+  + type: DashboardType <<not null>>
+  + format: ReportFormat <<not null>>
+  + frequency: ReportFrequency <<default=ON_DEMAND>>
+  + filters: JSON
+  + data: JSON
+  + file_path: String{max=500}
+  + generated_at: DateTime
+  + next_generation: DateTime
+  + is_scheduled: Boolean <<default=false>>
+  + created_at: DateTime <<default=NOW>>
+  --
+  + generate(): void
+  + schedule(frequency: ReportFrequency): void
+  + export(format: ReportFormat): String
+  + sendEmail(): void
+}
+
+class ChartData {
+  + chart_id: UUID <<PK>>
+  + dashboard_id: UUID <<FK>> <<not null>>
+  + title: String{max=200} <<not null>>
+  + chart_type: ChartType <<not null>>
+  + metric_type: MetricType <<not null>>
+  + data: JSON <<not null>>
+  + config: JSON
+  + period_start: DateTime <<not null>>
+  + period_end: DateTime <<not null>>
+  + created_at: DateTime <<default=NOW>>
+  --
+  + refresh(): void
+  + export(): JSON
+}
+
+class TriageMetrics {
+  + metrics_id: UUID <<PK>>
+  + triage_specialist_id: UUID <<FK>> <<not null>> <<unique>>
+  + total_triaged: Integer <<default=0>>
+  + average_triage_time: Integer
+  + accuracy_rate: Decimal(5,2)
+  + reports_in_queue: Integer <<default=0>>
+  + disputed_reports: Integer <<default=0>>
+  + dispute_win_rate: Decimal(5,2)
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + updateMetrics(): void
+  + calculateAccuracy(): Decimal
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+Dashboard "0..*" --> "1" User : owned_by
+ChartData "0..*" --> "1" Dashboard : contains
+AnalyticsReport "0..*" --> "1" User : created_by
+ResearcherMetrics "1" --> "1" Researcher : metrics_for
+OrganizationMetrics "1" --> "1" Organization : metrics_for
+TriageMetrics "1" --> "1" TriageSpecialist : metrics_for
+
+' ============================================
+' NOTES
+' ============================================
+
+note right of Dashboard
+  Role-based dashboards
+  - Customizable layouts
+  - Widget system
+  - Real-time updates
+  
+  Default dashboards created
+  on user registration
+end note
+
+note right of ResearcherMetrics
+  Researcher performance tracking
+  - Success rate calculation
+  - Reputation scoring
+  - Leaderboard ranking
+  
+  Updated on report status change
+  
+  Indexes:
+  - reputation_score DESC
+  - rank ASC
+end note
+
+note right of OrganizationMetrics
+  Organization analytics
+  - MTTR: Mean Time To Resolve
+  - ROI: Return on Investment
+  - Vulnerability trends
+  
+  MTTR = avg(resolved_at - submitted_at)
+  ROI = (prevented_cost / total_paid) * 100
+end note
+
+note right of PlatformMetrics
+  Platform-wide statistics
+  - Daily aggregation
+  - Growth tracking
+  - System health monitoring
+  
+  Generated by Celery Beat
+  daily at midnight
+end note
+
+note right of AnalyticsReport
+  Custom report generation
+  - Scheduled reports
+  - Multiple formats
+  - Email delivery
+  
+  Large reports processed
+  by Celery workers
+end note
+
+note right of ChartData
+  Visualization data
+  - Multiple chart types
+  - Time-series support
+  - Crypto-style candlestick
+  
+  Chart types:
+  - Line, Bar, Pie, Area
+  - Heatmap, Candlestick
+  - Donut, Scatter
+end note
+
+note right of TriageMetrics
+  Triage specialist performance
+  - Triage speed
+  - Accuracy tracking
+  - Dispute resolution rate
+  
+  Accuracy = (correct_assessments /
+  total_triaged) * 100
+end note
+
+@enduml

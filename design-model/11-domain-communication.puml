@@ -1,0 +1,256 @@
+@startuml Communication_System_Design
+
+' ============================================
+' DESIGN CLASS MODEL: Communication System
+' Bug Bounty and Its Simulation Platform
+' Coverage: FREQ-09, FREQ-12
+' ============================================
+
+title Communication System - Design Class Model
+
+' ============================================
+' ENUMS
+' ============================================
+
+enum NotificationType {
+  REPORT_SUBMITTED
+  REPORT_TRIAGED
+  REPORT_VALIDATED
+  REPORT_REJECTED
+  REPORT_DUPLICATE
+  PAYMENT_APPROVED
+  PAYMENT_COMPLETED
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_COMPLETED
+  COMMENT_ADDED
+  PROGRAM_INVITATION
+  ENGAGEMENT_INVITATION
+  KYC_APPROVED
+  KYC_REJECTED
+  DISPUTE_CREATED
+  DISPUTE_RESOLVED
+  EVENT_STARTING
+  SIMULATION_COMPLETED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WEBHOOK
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessageType {
+  DIRECT
+  SYSTEM
+  ANNOUNCEMENT
+}
+
+' ============================================
+' DOMAIN CLASSES
+' ============================================
+
+class Notification {
+  + notification_id: UUID <<PK>>
+  + user_id: UUID <<FK>> <<not null>>
+  + type: NotificationType <<not null>>
+  + channel: NotificationChannel <<not null>>
+  + title: String{max=200} <<not null>>
+  + message: Text <<not null>>
+  + data: JSON
+  + status: NotificationStatus <<default=PENDING>>
+  + read_at: DateTime
+  + sent_at: DateTime
+  + delivered_at: DateTime
+  + failed_reason: String{max=500}
+  + retry_count: Integer <<default=0>>
+  + created_at: DateTime <<default=NOW>>
+  --
+  + markAsRead(): void
+  + markAsSent(): void
+  + markAsDelivered(): void
+  + markAsFailed(reason: String): void
+  + shouldRetry(): Boolean
+}
+
+
+class NotificationPreference {
+  + preference_id: UUID <<PK>>
+  + user_id: UUID <<FK>> <<not null>> <<unique>>
+  + email_enabled: Boolean <<default=true>>
+  + sms_enabled: Boolean <<default=false>>
+  + in_app_enabled: Boolean <<default=true>>
+  + report_updates: Boolean <<default=true>>
+  + payment_updates: Boolean <<default=true>>
+  + program_invitations: Boolean <<default=true>>
+  + marketing: Boolean <<default=false>>
+  + created_at: DateTime <<default=NOW>>
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + updatePreferences(data: Dict): void
+  + isChannelEnabled(channel: NotificationChannel): Boolean
+  + isTypeEnabled(type: NotificationType): Boolean
+}
+
+class Message {
+  + message_id: UUID <<PK>>
+  + sender_id: UUID <<FK>> <<not null>>
+  + recipient_id: UUID <<FK>> <<not null>>
+  + type: MessageType <<default=DIRECT>>
+  + subject: String{max=200}
+  + body: Text <<not null>>
+  + parent_message_id: UUID <<FK>>
+  + report_id: UUID <<FK>>
+  + is_read: Boolean <<default=false>>
+  + read_at: DateTime
+  + created_at: DateTime <<default=NOW>>
+  --
+  + markAsRead(): void
+  + reply(body: Text): Message
+  + isThreaded(): Boolean
+}
+
+class Comment {
+  + comment_id: UUID <<PK>>
+  + report_id: UUID <<FK>> <<not null>>
+  + user_id: UUID <<FK>> <<not null>>
+  + content: Text <<not null>>
+  + parent_comment_id: UUID <<FK>>
+  + is_internal: Boolean <<default=false>>
+  + is_edited: Boolean <<default=false>>
+  + edited_at: DateTime
+  + created_at: DateTime <<default=NOW>>
+  --
+  + edit(content: Text): void
+  + delete(): void
+  + reply(content: Text): Comment
+  + getThread(): List<Comment>
+}
+
+class EmailTemplate {
+  + template_id: UUID <<PK>>
+  + name: String{max=100} <<not null>> <<unique>>
+  + subject: String{max=200} <<not null>>
+  + body_html: Text <<not null>>
+  + body_text: Text <<not null>>
+  + variables: JSON
+  + is_active: Boolean <<default=true>>
+  + created_at: DateTime <<default=NOW>>
+  + updated_at: DateTime <<default=NOW>>
+  --
+  + render(data: Dict): String
+  + validate(): Boolean
+}
+
+class WebhookEndpoint {
+  + endpoint_id: UUID <<PK>>
+  + organization_id: UUID <<FK>> <<not null>>
+  + url: String{max=500} <<not null>>
+  + secret: String{max=100} <<encrypted>>
+  + events: JSON <<not null>>
+  + is_active: Boolean <<default=true>>
+  + last_triggered_at: DateTime
+  + created_at: DateTime <<default=NOW>>
+  --
+  + trigger(event: String, data: Dict): void
+  + verify(signature: String, payload: String): Boolean
+  + disable(): void
+}
+
+class WebhookLog {
+  + log_id: UUID <<PK>>
+  + endpoint_id: UUID <<FK>> <<not null>>
+  + event: String{max=100} <<not null>>
+  + payload: JSON <<not null>>
+  + response_status: Integer
+  + response_body: Text
+  + error_message: String{max=500}
+  + retry_count: Integer <<default=0>>
+  + created_at: DateTime <<default=NOW>>
+  --
+  + isSuccess(): Boolean
+  + shouldRetry(): Boolean
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+Notification "0..*" --> "1" User : recipient
+NotificationPreference "1" --> "1" User : preferences
+Message "0..*" --> "1" User : sender
+Message "0..*" --> "1" User : recipient
+Message "0..*" --> "0..1" Message : parent
+Message "0..*" --> "0..1" VulnerabilityReport : related_to
+Comment "0..*" --> "1" VulnerabilityReport : on_report
+Comment "0..*" --> "1" User : author
+Comment "0..*" --> "0..1" Comment : parent
+WebhookEndpoint "0..*" --> "1" Organization : owned_by
+WebhookLog "0..*" --> "1" WebhookEndpoint : logs
+
+' ============================================
+' NOTES
+' ============================================
+
+note right of Notification
+  Handles all platform notifications
+  - Multi-channel delivery
+  - Retry mechanism (max 3 attempts)
+  - Read receipts
+  - Delivery tracking
+  
+  Indexes:
+  - user_id, status
+  - created_at
+  - type, status
+end note
+
+note right of NotificationPreference
+  User notification settings
+  - Per-channel control
+  - Per-type control
+  - Marketing opt-in/out
+  
+  Default: Email + In-App enabled
+end note
+
+note right of Message
+  Direct messaging between users
+  - Thread support
+  - Read receipts
+  - Context linking (reports)
+  
+  Indexes:
+  - sender_id, recipient_id
+  - report_id
+end note
+
+note right of Comment
+  Report discussion threads
+  - Nested comments
+  - Internal vs public
+  - Edit tracking
+  
+  is_internal: Only visible to
+  org + triage team
+end note
+
+note right of WebhookEndpoint
+  Organization webhook integration
+  - Event subscriptions
+  - HMAC signature verification
+  - Automatic retry on failure
+  
+  Events: report.*, payment.*,
+  program.*, engagement.*
+end note
+
+@enduml

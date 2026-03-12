@@ -1,0 +1,35 @@
+@startuml Simulation_Environment
+
+' ============================================
+' Module 6: Bug Bounty Simulation
+' FREQ-23 to FREQ-28, UC-07
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class Researcher {
+    - researcherId: String
+}
+
+class SimulatedEnvironment {
+    - simulationId: String
+    - difficultyLevel: Enum {Beginner, Intermediate, Advanced}
+    - targetName: String
+    - vulnerabilityType: String
+    + launch()
+    + submitReport()
+    + provideFeedback()
+}
+
+class SimulationReport {
+    - reportId: String
+    - findings: String
+    - score: Integer
+    - feedback: String
+    + submit()
+}
+
+Researcher "1" -- "0..*" SimulatedEnvironment : practices
+SimulatedEnvironment "1" -- "0..*" SimulationReport : generates
+
+@enduml

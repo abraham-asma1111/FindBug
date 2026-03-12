@@ -1,0 +1,160 @@
+@startuml Researcher_Matching
+
+' ============================================
+' ACTIVITY DIAGRAM: BountyMatch - Researcher Matching
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title BountyMatch - Intelligent Researcher Matching - Activity Diagram
+
+|Organization|
+start
+:Create Engagement\n(Program/PTaaS/AI Red Team);
+:Define Requirements;
+
+note right
+  Requirements:
+  - Skills needed
+  - Experience level
+  - Availability
+  - Budget
+  - Timeline
+end note
+
+:Submit Engagement;
+
+|System|
+:Receive Engagement Request;
+:Extract Matching Criteria;
+
+partition "Matching Algorithm" {
+  :Query Researcher Database;
+
+fork
+  :Filter by Skills;
+  note right
+    - Programming languages
+    - Security domains
+    - Tools expertise
+  end note
+fork again
+  :Filter by Reputation;
+  note right
+    - Success rate
+    - Report quality
+    - Past ratings
+  end note
+fork again
+  :Filter by Availability;
+  note right
+    - Current workload
+    - Timezone
+    - Response time
+  end note
+fork again
+  :Filter by Performance;
+  note right
+    - Severity of findings
+    - Time to report
+    - Collaboration score
+  end note
+end fork
+
+:Combine Filter Results;
+:Calculate Match Scores;
+
+note right
+  Score = 
+  Skills (40%) +
+  Reputation (30%) +
+  Availability (20%) +
+  Performance (10%)
+end note
+
+:Rank Researchers;
+:Select Top Matches;
+}
+
+if (Matches Found?) then (yes)
+  :Send Invitations;
+  
+  |Researcher|
+  :Receive Invitation;
+  :Review Engagement Details;
+  :Check Requirements;
+  
+  if (Interested?) then (yes)
+    :Accept Invitation;
+    
+    |System|
+    :Record Acceptance;
+    :Update Engagement Status;
+    
+    if (Enough Researchers?) then (yes)
+      :Close Invitations;
+      :Start Engagement;
+      
+      |Organization|
+      :Receive Confirmation;
+      :Engagement Active;
+      stop
+      
+    else (no)
+      :Continue Inviting;
+      |Researcher|
+    endif
+    
+  else (no)
+    :Decline Invitation;
+    
+    |System|
+    :Record Decline;
+    :Update Match Score;
+    
+    if (More Candidates?) then (yes)
+      :Invite Next Researcher;
+      |Researcher|
+    else (no)
+      :Expand Search Criteria;
+      :Find More Matches;
+      stop
+    endif
+  endif
+  
+else (no)
+  :Notify Organization;
+  
+  |Organization|
+  :Adjust Requirements;
+  
+  if (Retry Matching?) then (yes)
+    :Update Criteria;
+    |System|
+    :Re-run Matching;
+  else (no)
+    :Cancel Engagement;
+    stop
+  endif
+endif
+
+partition "Learning & Optimization" {
+  |System|
+  :Monitor Engagement Outcomes;
+
+fork
+  :Track Researcher Performance;
+fork again
+  :Collect Feedback;
+fork again
+  :Update Match Scores;
+fork again
+  :Improve Algorithm;
+end fork
+
+:Store Learning Data;
+:Optimize Future Matches;
+}
+
+stop
+
+@enduml

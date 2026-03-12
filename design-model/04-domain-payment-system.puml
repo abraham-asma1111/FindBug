@@ -1,0 +1,179 @@
+@startuml Design_Domain_Payment_System
+
+' ============================================
+' Design Class Model - Domain Layer
+' Module 4: Payment & Reward System
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class BountyPayment {
+    - paymentId: UUID {PK, unique, not null}
+    - reportId: UUID {FK->VulnerabilityReport.reportId, unique, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - organizationId: UUID {FK->Organization.organizationId, not null}
+    - amount: Decimal(15,2) {min=0, not null}
+    - platformCommission: Decimal(15,2) {min=0, default=0}
+    - commissionRate: Decimal(5,2) {min=0, max=100, default=30.0}
+    - netAmount: Decimal(15,2) {min=0, not null}
+    - currency: String {max=3, default='USD'}
+    - status: PaymentStatus {enum, default=PENDING}
+    - approvedDate: DateTime {nullable}
+    - approvedBy: UUID {FK->FinancialOfficer.officerId, nullable}
+    - processedDate: DateTime {nullable}
+    - createdAt: DateTime {default=now()}
+    - notes: Text {max=1000, nullable}
+    
+    + approve(officerId: UUID, amount: Decimal): void throws ApprovalException
+    + process(): void throws PaymentProcessingException
+    + reject(reason: String): void
+    + calculateCommission(): Decimal
+    + generateInvoice(): InvoiceDTO
+}
+
+enum PaymentStatus {
+    PENDING
+    APPROVED
+    PROCESSING
+    PROCESSED
+    FAILED
+    REJECTED
+    REFUNDED
+}
+
+class PayoutRequest {
+    - requestId: UUID {PK, unique, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - requestedAmount: Decimal(15,2) {min=0, not null}
+    - availableBalance: Decimal(15,2) {min=0, not null}
+    - requestDate: DateTime {default=now()}
+    - status: PayoutStatus {enum, default=PENDING}
+    - processedDate: DateTime {nullable}
+    - paymentMethod: PaymentMethod {enum, not null}
+    - paymentDetails: JSON {encrypted, not null}
+    - transactionId: String {max=255, nullable}
+    - failureReason: Text {max=500, nullable}
+    - retryCount: Integer {default=0, max=3}
+    
+    + create(amount: Decimal, method: PaymentMethod): PayoutRequest throws InsufficientBalanceException
+    + process(): void throws PaymentProcessingException
+    + retry(): void throws MaxRetryExceededException
+    + cancel(reason: String): void
+    + validateKYC(): Boolean
+}
+
+enum PayoutStatus {
+    PENDING
+    PROCESSING
+    COMPLETED
+    FAILED
+    REJECTED
+    CANCELLED
+}
+
+enum PaymentMethod {
+    BANK_TRANSFER
+    TELEBIRR
+    CBE_BIRR
+    PAYPAL
+    CRYPTOCURRENCY
+}
+
+class Transaction {
+    - transactionId: UUID {PK, unique, not null}
+    - paymentId: UUID {FK->BountyPayment.paymentId, nullable}
+    - payoutRequestId: UUID {FK->PayoutRequest.requestId, nullable}
+    - amount: Decimal(15,2) {not null}
+    - transactionType: TransactionType {enum, not null}
+    - transactionDate: DateTime {default=now()}
+    - paymentMethod: PaymentMethod {enum, not null}
+    - status: TransactionStatus {enum, default=PENDING}
+    - externalTransactionId: String {max=255, nullable}
+    - gatewayResponse: JSON {nullable}
+    - failureReason: Text {max=500, nullable}
+    - metadata: JSON {nullable}
+    
+    + record(data: TransactionDTO): Transaction
+    + updateStatus(status: TransactionStatus): void
+    + refund(): Transaction throws RefundException
+    + verify(): Boolean
+}
+
+enum TransactionType {
+    BOUNTY_PAYMENT
+    PAYOUT
+    REFUND
+    COMMISSION
+    SUBSCRIPTION_FEE
+}
+
+enum TransactionStatus {
+    PENDING
+    PROCESSING
+    COMPLETED
+    FAILED
+    REFUNDED
+    CANCELLED
+}
+
+class PaymentGateway {
+    - gatewayId: UUID {PK, unique, not null}
+    - gatewayName: String {max=100, not null}
+    - gatewayType: PaymentMethod {enum, not null}
+    - apiKey: String {max=500, encrypted, not null}
+    - apiSecret: String {max=500, encrypted, not null}
+    - webhookUrl: String {max=500, nullable}
+    - isActive: Boolean {default=true}
+    - supportedCurrencies: JSON {array of strings}
+    - transactionFee: Decimal(5,2) {min=0, default=0}
+    - minAmount: Decimal(15,2) {min=0, default=0}
+    - maxAmount: Decimal(15,2) {min=0, nullable}
+    - configuredAt: DateTime {default=now()}
+    
+    + processPayment(transaction: Transaction): TransactionResult throws PaymentException
+    + verifyTransaction(transactionId: String): Boolean
+    + refundTransaction(transactionId: String): Boolean throws RefundException
+    + handleWebhook(payload: JSON): void
+    + testConnection(): Boolean
+}
+
+class ResearcherBalance {
+    - balanceId: UUID {PK, unique, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, unique, not null}
+    - availableBalance: Decimal(15,2) {min=0, default=0}
+    - pendingBalance: Decimal(15,2) {min=0, default=0}
+    - totalEarned: Decimal(15,2) {min=0, default=0}
+    - totalWithdrawn: Decimal(15,2) {min=0, default=0}
+    - currency: String {max=3, default='USD'}
+    - lastUpdated: DateTime {default=now()}
+    
+    + addEarnings(amount: Decimal): void
+    + deductPayout(amount: Decimal): void throws InsufficientBalanceException
+    + movePendingToAvailable(amount: Decimal): void
+    + calculateBalance(): Decimal
+}
+
+class PaymentHistory {
+    - historyId: UUID {PK, unique, not null}
+    - userId: UUID {FK->User.userId, not null}
+    - transactionId: UUID {FK->Transaction.transactionId, not null}
+    - amount: Decimal(15,2) {not null}
+    - type: String {max=50, not null}
+    - description: String {max=500, nullable}
+    - timestamp: DateTime {default=now()}
+    
+    + record(transaction: Transaction): void
+    + getHistory(userId: UUID, startDate: Date, endDate: Date): List<PaymentHistory>
+}
+
+' Relationships
+VulnerabilityReport "1" -- "0..1" BountyPayment : rewards
+FinancialOfficer "1" -- "0..*" BountyPayment : approves
+Researcher "1" -- "0..*" PayoutRequest : requests
+Researcher "1" -- "1" ResearcherBalance : has
+BountyPayment "1" -- "0..1" Transaction : generates
+PayoutRequest "1" -- "0..1" Transaction : generates
+PaymentGateway "1" -- "0..*" Transaction : processes
+Transaction "1" -- "1" PaymentHistory : records
+
+@enduml

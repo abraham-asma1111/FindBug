@@ -1,0 +1,54 @@
+@startuml Triage_Validation
+
+' ============================================
+' Module 4: Triage & Validation
+' FREQ-07, FREQ-08, UC-03
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class TriageSpecialist {
+    - specialistId: String
+    - validationCount: Integer
+    + validateReport()
+    + assignSeverity()
+}
+
+class VulnerabilityReport {
+    - reportId: String
+    - title: String
+    - status: Enum {New, Triaged, Valid, Invalid, Duplicate, Resolved}
+}
+
+class TriageQueue {
+    - queueId: String
+    - pendingCount: Integer
+    + addReport()
+    + assignToSpecialist()
+}
+
+class ValidationResult {
+    - validationId: String
+    - isValid: Boolean
+    - isDuplicate: Boolean
+    - comments: String
+    - validatedDate: DateTime
+    + validate()
+}
+
+class SeverityRating {
+    - ratingId: String
+    - severity: Enum {Critical, High, Medium, Low, Info}
+    - vrtCategory: String
+    - justification: String
+    + assignSeverity()
+}
+
+' Relationships
+TriageSpecialist "1" -- "0..*" TriageQueue : manages
+TriageQueue "1" -- "0..*" VulnerabilityReport : contains
+TriageSpecialist "1" -- "0..*" ValidationResult : creates
+VulnerabilityReport "1" -- "0..1" ValidationResult : has
+VulnerabilityReport "1" -- "0..1" SeverityRating : assigned
+
+@enduml
