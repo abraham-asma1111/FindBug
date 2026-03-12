@@ -1,0 +1,78 @@
+@startuml AI_Red_Teaming_States
+
+' ============================================
+' STATE DIAGRAM: AI Red Teaming Engagement Lifecycle
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title AI Red Teaming Engagement State Transitions
+
+[*] --> Draft : Organization creates AI testing request
+
+Draft --> Published : Publish engagement
+Draft --> [*] : Cancel draft
+
+Published --> Inviting : Send expert invitations
+Inviting --> Assigned : AI security expert accepted
+Inviting --> Cancelled : No responses (timeout 7 days)
+
+Assigned --> In_Progress : Expert starts testing
+In_Progress --> Testing : Active attack execution
+Testing --> Vulnerability_Found : AI vulnerability discovered
+Testing --> No_Issues : Testing complete, no issues
+
+Vulnerability_Found --> Documenting : Document findings
+Documenting --> Report_Draft : Compile vulnerability report
+Report_Draft --> Report_Submitted : Submit findings
+
+Report_Submitted --> Under_Review : Org reviews findings
+Under_Review --> Clarification_Needed : Org requests details
+Under_Review --> Validated : Org confirms vulnerability
+
+Clarification_Needed --> Report_Submitted : Expert provides clarification
+
+Validated --> Fixing : Org applies fixes
+Fixing --> Retest_Requested : Request retest
+Retest_Requested --> Retesting : Expert retests fixes
+
+Retesting --> Retest_Passed : Vulnerability fixed
+Retesting --> Retest_Failed : Still vulnerable
+
+Retest_Failed --> Fixing : Continue fixing
+Retest_Passed --> Approved : Approve engagement completion
+
+No_Issues --> Report_Submitted : Submit clean report
+Approved --> Payment_Pending : Approve payment
+Payment_Pending --> Paid : Payment processed
+Paid --> Closed : Archive engagement
+
+Cancelled --> [*]
+Closed --> [*]
+
+note right of Testing
+  Attack types:
+  - Prompt injection
+  - Jailbreaking
+  - Data poisoning
+  - Model inversion
+  - Adversarial examples
+  - Bias exploitation
+end note
+
+note right of Vulnerability_Found
+  AI vulnerability categories:
+  - Unauthorized access
+  - Data leakage
+  - Model manipulation
+  - Bias exploitation
+  - Safety bypass
+end note
+
+note right of Retesting
+  Retest cycle:
+  - Max 3 retest rounds
+  - Each round: 5-10 days
+  - Payment adjusted if multiple rounds
+end note
+
+@enduml

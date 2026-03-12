@@ -1,0 +1,77 @@
+@startuml Bug_Bounty_Core
+
+' ============================================
+' Module 3: Bug Bounty Core (Programs & Reports)
+' FREQ-03, FREQ-04, FREQ-05, FREQ-06, UC-02, UC-04
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class Organization {
+    - organizationId: String
+    - companyName: String
+}
+
+class Researcher {
+    - researcherId: String
+    - reputationScore: Decimal
+}
+
+class BountyProgram {
+    - programId: String
+    - name: String
+    - description: String
+    - type: Enum {Public, Private, VDP}
+    - status: Enum {Draft, Active, Paused, Closed}
+    - createdDate: DateTime
+    + create()
+    + publish()
+    + pause()
+}
+
+class ProgramScope {
+    - scopeId: String
+    - inScopeAssets: List<String>
+    - outOfScopeAssets: List<String>
+    - rules: String
+    + defineScope()
+}
+
+class RewardTier {
+    - tierId: String
+    - severity: Enum {Critical, High, Medium, Low}
+    - minAmount: Decimal
+    - maxAmount: Decimal
+    + setReward()
+}
+
+class VulnerabilityReport {
+    - reportId: String
+    - title: String
+    - description: String
+    - stepsToReproduce: String
+    - impact: String
+    - suggestedSeverity: Enum
+    - status: Enum {New, Triaged, Valid, Invalid, Duplicate, Resolved}
+    - submittedDate: DateTime
+    + submit()
+    + update()
+}
+
+class Attachment {
+    - attachmentId: String
+    - fileName: String
+    - fileType: String
+    - fileUrl: String
+    + upload()
+}
+
+' Relationships
+Organization "1" -- "0..*" BountyProgram : creates
+BountyProgram "1" -- "1" ProgramScope : has
+BountyProgram "1" -- "1..*" RewardTier : defines
+BountyProgram "1" -- "0..*" VulnerabilityReport : receives
+Researcher "1" -- "0..*" VulnerabilityReport : submits
+VulnerabilityReport "1" -- "0..*" Attachment : contains
+
+@enduml

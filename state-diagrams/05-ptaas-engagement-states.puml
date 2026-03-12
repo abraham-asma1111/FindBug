@@ -1,0 +1,63 @@
+@startuml PTaaS_Engagement_States
+
+' ============================================
+' STATE DIAGRAM: PTaaS Engagement Lifecycle
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title PTaaS Engagement State Transitions
+
+[*] --> Draft : Organization creates engagement
+
+Draft --> Published : Publish engagement
+Draft --> [*] : Cancel draft
+
+Published --> Inviting : Send researcher invitations
+Inviting --> Assigned : Researcher(s) accepted
+Inviting --> Cancelled : No responses (timeout)
+
+Assigned --> In_Progress : Engagement started
+In_Progress --> Testing : Active testing phase
+Testing --> Reporting : Testing complete
+Reporting --> Review : Report submitted
+
+Review --> Retest_Required : Fixes needed
+Review --> Completed : Report approved
+
+Retest_Required --> Testing : Retest scheduled
+Completed --> Payment_Pending : Approve payment
+Payment_Pending --> Paid : Payment processed
+Paid --> Closed : Engagement archived
+
+Cancelled --> [*]
+Closed --> [*]
+
+note right of Published
+  Engagement details:
+  - Scope & timeline
+  - Budget
+  - Required skills
+end note
+
+note right of Testing
+  Active phase:
+  - Researcher testing
+  - Finding submission
+  - Real-time updates
+end note
+
+note right of Retest_Required
+  Verification needed:
+  - Fixes implemented
+  - Retest scheduled
+  - Same researcher
+end note
+
+note right of Completed
+  Deliverables:
+  - Final report
+  - Executive summary
+  - Recommendations
+end note
+
+@enduml

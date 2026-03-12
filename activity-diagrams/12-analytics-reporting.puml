@@ -1,0 +1,217 @@
+@startuml Analytics_Reporting
+
+' ============================================
+' ACTIVITY DIAGRAM: Analytics and Reporting
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Analytics Dashboard and Reporting - Activity Diagram
+
+|User|
+start
+:Login to Platform;
+
+if (User Role?) then (Researcher)
+  :Navigate to Researcher Dashboard;
+  
+  |System|
+  :Query Researcher Data;
+  
+  fork
+    :Get Report Statistics;
+  fork again
+    :Get Earnings Data;
+  fork again
+    :Get Reputation Score;
+  fork again
+    :Get Skill Metrics;
+  end fork
+  
+  :Calculate KPIs;
+  :Generate Charts;
+  
+  |User|
+  :View Dashboard;
+  
+  note right
+    Metrics:
+    - Total reports
+    - Success rate
+    - Earnings trend
+    - Reputation rank
+    - Skills breakdown
+  end note
+  
+else (Organization)
+  :Navigate to Organization Dashboard;
+  
+  |System|
+  :Query Organization Data;
+  
+  fork
+    :Get Program Statistics;
+  fork again
+    :Get Vulnerability Trends;
+  fork again
+    :Get Payment Analytics;
+  fork again
+    :Get Researcher Performance;
+  end fork
+  
+  :Calculate ROI;
+  :Generate Insights;
+  
+  |User|
+  :View Dashboard;
+  
+  note right
+    Metrics:
+    - Active programs
+    - Reports received
+    - Vulnerabilities fixed
+    - Cost per finding
+    - MTTR (Mean Time to Resolve)
+  end note
+  
+else (Admin)
+  :Navigate to Admin Dashboard;
+  
+  |System|
+  :Query Platform Data;
+  
+  fork
+    :Get Platform Statistics;
+  fork again
+    :Get User Growth;
+  fork again
+    :Get Revenue Metrics;
+  fork again
+    :Get System Health;
+  end fork
+  
+  :Generate Platform Insights;
+  
+  |User|
+  :View Dashboard;
+  
+  note right
+    Metrics:
+    - Total users
+    - Active programs
+    - Platform revenue
+    - System performance
+    - User engagement
+  end note
+endif
+
+== Custom Reports ==
+
+|User|
+:Click "Generate Report";
+:Select Report Type;
+
+if (Report Type?) then (Standard)
+  :Select Predefined Template;
+  :Set Date Range;
+  
+else (Custom)
+  :Select Metrics;
+  :Configure Filters;
+  :Choose Visualization;
+  :Set Date Range;
+endif
+
+:Click "Generate";
+
+|System|
+:Validate Parameters;
+:Query Database;
+:Aggregate Data;
+:Apply Filters;
+:Calculate Metrics;
+
+if (Large Dataset?) then (yes)
+  :Queue Background Job;
+  
+  |Celery Worker|
+  :Process Report Generation;
+  :Generate Charts;
+  :Create PDF;
+  :Upload to MinIO;
+  
+  |System|
+  :Send Completion Email;
+  
+  |User|
+  :Receive Email;
+  :Download Report;
+  
+else (no)
+  :Generate Report Instantly;
+  :Render Visualizations;
+  
+  |User|
+  :View Report;
+endif
+
+== Export Options ==
+
+|User|
+:Select Export Format;
+
+if (Format?) then (PDF)
+  |System|
+  :Generate PDF;
+  :Download File;
+  
+else (Excel)
+  |System|
+  :Generate Excel;
+  :Download File;
+  
+else (CSV)
+  |System|
+  :Generate CSV;
+  :Download File;
+  
+else (API)
+  |System|
+  :Return JSON Data;
+endif
+
+|User|
+:Save/Share Report;
+
+== Scheduled Reports ==
+
+|User|
+:Configure Scheduled Report;
+:Set Frequency\n(Daily, Weekly, Monthly);
+:Select Recipients;
+:Save Schedule;
+
+|System|
+:Create Schedule Record;
+
+|Celery Beat|
+:Monitor Schedule;
+
+repeat
+  :Wait for Trigger Time;
+  
+  if (Time to Generate?) then (yes)
+    :Queue Report Job;
+    
+    |Celery Worker|
+    :Generate Report;
+    :Send Email with Attachment;
+    
+    |User|
+    :Receive Scheduled Report;
+  endif
+  
+repeat while (Schedule Active?) is (yes)
+
+stop
+
+@enduml

@@ -1,0 +1,33 @@
+@startuml Live_Event_States
+
+' ============================================
+' STATE DIAGRAM: Live Hacking Event Lifecycle
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Live Hacking Event State Transitions
+
+[*] --> Draft : Organization creates event
+
+Draft --> Published : Publish event
+Draft --> [*] : Cancel draft
+
+Published --> Registration_Open : Open for registration
+Registration_Open --> Registration_Closed : Registration deadline
+Registration_Closed --> Active : Event starts
+
+Active --> In_Progress : Hacking begins
+In_Progress --> Ending_Soon : 1 hour remaining
+Ending_Soon --> Ended : Time expired
+
+Ended --> Under_Review : Triage findings
+Under_Review --> Results_Published : Winners announced
+Results_Published --> Payment_Processing : Process rewards
+Payment_Processing --> Completed : All payments done
+
+Completed --> Archived : Archive after 30 days
+Archived --> [*]
+
+note right of Registration_Open
+  Registration:
+  - E

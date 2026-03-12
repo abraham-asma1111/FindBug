@@ -1,0 +1,125 @@
+@startuml Simulation_Learning
+
+' ============================================
+' ACTIVITY DIAGRAM: Simulation Learning Path
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Simulation Practice and Learning - Activity Diagram
+
+|Researcher|
+start
+:Login to Platform;
+:Navigate to Practice Mode;
+:View Challenge Categories;
+
+:Select Category\n(XSS, SQLi, CSRF, etc.);
+:View Available Challenges;
+
+if (Beginner Level?) then (yes)
+  :Start with Basic Challenges;
+else (no)
+  if (Unlocked Advanced?) then (yes)
+    :Access Advanced Challenges;
+  else (no)
+    :Complete Prerequisites First;
+    stop
+  endif
+endif
+
+:Select Challenge;
+:Read Challenge Description;
+:Start Challenge Session;
+
+|System|
+:Deploy Vulnerable Instance\n(OWASP Juice Shop);
+:Initialize Challenge State;
+:Start Timer;
+:Provide Challenge URL;
+
+|Researcher|
+:Access Vulnerable App;
+:Explore Application;
+:Test for Vulnerabilities;
+
+repeat
+  :Try Exploit Technique;
+  
+  if (Need Help?) then (yes)
+    :Request Hint;
+    |System|
+    :Check Hint Limit;
+    if (Hints Available?) then (yes)
+      :Provide Hint;
+      :Deduct Hint Count;
+      note right: Max 3 hints per challenge
+    else (no)
+      :Show "No Hints Left";
+    endif
+    |Researcher|
+  endif
+  
+  :Test Exploit;
+  
+repeat while (Vulnerability Found?) is (no)
+->yes;
+
+:Document Finding;
+:Prepare Exploit PoC;
+:Write Description;
+:Submit Solution;
+
+|System|
+:Validate Submission;
+:Check Exploit Correctness;
+:Evaluate Description Quality;
+:Calculate Score;
+
+if (Score >= 70?) then (yes)
+  :Mark Challenge Complete;
+  :Award Points;
+  :Update Progress;
+  :Terminate Instance;
+  
+  |Researcher|
+  :View Score & Feedback;
+  :Read Solution Explanation;
+  :Update Skills;
+  
+  if (More Challenges?) then (yes)
+    :Select Next Challenge;
+    |System|
+  else (no)
+    :View Progress Dashboard;
+    :Check Leaderboard Rank;
+    
+    if (Unlock Criteria Met?) then (yes)
+      |System|
+      :Unlock Next Level;
+      :Send Achievement Email;
+      |Researcher|
+      :Receive Unlock Notification;
+    endif
+    
+    stop
+  endif
+  
+else (no - Score < 70)
+  :Show Feedback;
+  :Provide Improvement Tips;
+  
+  |Researcher|
+  :Review Feedback;
+  
+  if (Retry Challenge?) then (yes)
+    :Reset Challenge;
+    |System|
+    :Deploy New Instance;
+    |Researcher|
+  else (no)
+    :Try Different Challenge;
+    stop
+  endif
+endif
+
+@enduml

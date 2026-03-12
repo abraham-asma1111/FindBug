@@ -1,0 +1,77 @@
+@startuml KYC_Verification_States
+
+' ============================================
+' STATE DIAGRAM: KYC Verification Lifecycle
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title KYC Verification State Transitions
+
+[*] --> Not_Started : User registers
+
+Not_Started --> Documents_Pending : User initiates KYC
+Documents_Pending --> Documents_Submitted : Upload ID documents
+Documents_Submitted --> Under_Review : Submit for review
+
+Under_Review --> Additional_Info_Required : Documents unclear/incomplete
+Under_Review --> Approved : Documents valid
+Under_Review --> Rejected : Documents invalid/fraudulent
+
+Additional_Info_Required --> Documents_Submitted : Resubmit documents
+Additional_Info_Required --> Expired : No response (14 days)
+
+Approved --> Active : KYC verified
+Rejected --> Documents_Pending : User can retry (max 3 attempts)
+Rejected --> Permanently_Rejected : Max attempts exceeded
+
+Active --> Expired : KYC expires (365 days)
+Active --> Under_Reverification : Suspicious activity detected
+
+Under_Reverification --> Active : Reverification passed
+Under_Reverification --> Suspended : Reverification failed
+
+Expired --> Documents_Pending : Renewal required
+Suspended --> [*]
+Permanently_Rejected --> [*]
+
+note right of Documents_Submitted
+  Required documents:
+  - Government-issued ID
+  - Proof of address
+  - Selfie with ID
+  - Tax identification (optional)
+end note
+
+note right of Under_Review
+  Review process:
+  - Manual verification by admin
+  - Document authenticity check
+  - Face matching
+  - Address verification
+  - Typical time: 24-48 hours
+end note
+
+note right of Approved
+  Benefits:
+  - Full platform access
+  - Withdrawal enabled
+  - Higher withdrawal limits
+  - Participate in private programs
+end note
+
+note right of Active
+  KYC validity:
+  - Valid for 365 days
+  - Renewal notification at 30 days
+  - Auto-expire if not renewed
+end note
+
+note right of Under_Reverification
+  Triggers:
+  - Suspicious withdrawal patterns
+  - Multiple failed withdrawals
+  - Account sharing detected
+  - Policy violation reports
+end note
+
+@enduml

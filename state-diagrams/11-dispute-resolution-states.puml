@@ -1,0 +1,69 @@
+@startuml Dispute_Resolution_States
+
+' ============================================
+' STATE DIAGRAM: Dispute Resolution Lifecycle
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Dispute Resolution State Transitions
+
+[*] --> Initiated : Organization disputes report
+
+Initiated --> Evidence_Collection : Dispute created
+Evidence_Collection --> Researcher_Response : Researcher submits response
+Researcher_Response --> Organization_Counter : Org provides counter-arguments
+Organization_Counter --> Under_Mediation : All evidence collected
+
+Under_Mediation --> Triage_Review : Triage analyst reviews
+Triage_Review --> Decision_Made : Clear resolution found
+Triage_Review --> Escalated : Complex case, escalate to admin
+
+Decision_Made --> Resolved_Favor_Researcher : Decision: Favor researcher
+Decision_Made --> Resolved_Favor_Organization : Decision: Favor organization
+
+Resolved_Favor_Researcher --> Closed : Restore original assessment
+Resolved_Favor_Organization --> Researcher_Appeal : Researcher can appeal
+Resolved_Favor_Organization --> Closed : Researcher accepts
+
+Researcher_Appeal --> Escalated : Appeal to admin
+
+Escalated --> Admin_Review : Admin investigates
+Admin_Review --> Expert_Consultation : Need external opinion
+Expert_Consultation --> Admin_Review : Expert provides input
+Admin_Review --> Final_Decision : Admin makes final decision
+
+Final_Decision --> Closed : Dispute resolved
+
+Closed --> [*]
+
+note right of Evidence_Collection
+  Evidence phase:
+  - Researcher response (3 days)
+  - Organization counter (3 days)
+  - Additional clarifications
+end note
+
+note right of Triage_Review
+  Triage analyst:
+  - Re-evaluates vulnerability
+  - Tests reproduction steps
+  - Reviews both arguments
+  - Makes recommendation
+end note
+
+note right of Escalated
+  Escalation criteria:
+  - High-value disputes (>$5000)
+  - Complex technical issues
+  - Conflicting evidence
+  - Policy interpretation needed
+end note
+
+note right of Final_Decision
+  Admin decision is final
+  - No further appeals
+  - Binding on both parties
+  - Logged for transparency
+end note
+
+@enduml

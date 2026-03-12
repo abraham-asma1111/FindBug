@@ -1,0 +1,144 @@
+@startuml Live_Hacking_Event
+
+' ============================================
+' ACTIVITY DIAGRAM: Live Hacking Event
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Live Hacking Event Participation - Activity Diagram
+
+|Organization|
+start
+:Login to Platform;
+:Navigate to Events;
+:Click "Create Live Event";
+:Fill Event Details\n(Name, Date, Duration, Scope);
+:Set Reward Pool;
+:Define Rules & Targets;
+:Publish Event;
+
+|System|
+:Create Event Record;
+:Open Registration;
+:Send Event Announcements;
+
+|Researcher|
+:Receive Event Notification;
+:View Event Details;
+:Check Eligibility;
+
+if (Eligible?) then (yes)
+  :Register for Event;
+  :Accept Terms & Conditions;
+else (no)
+  :View as Observer;
+  stop
+endif
+
+|System|
+:Confirm Registration;
+:Add to Participant List;
+:Send Confirmation Email;
+
+|Researcher|
+:Wait for Event Start;
+
+note right
+  Event preparation period
+  Researchers can review scope
+end note
+
+|System|
+:Monitor Event Start Time;
+
+if (Event Started?) then (yes)
+  :Activate Event;
+  :Enable Target Access;
+  :Start Countdown Timer;
+  :Open Live Leaderboard;
+else (no)
+  :Wait for Start Time;
+endif
+
+|Researcher|
+:Access Event Dashboard;
+:View Live Targets;
+:Start Hunting;
+
+repeat
+  :Test Target Application;
+  :Find Vulnerability;
+  :Prepare Evidence;
+  :Submit Finding;
+  
+  |System|
+  :Receive Submission;
+  :Check Duplicate;
+  
+  if (Duplicate?) then (yes)
+    :Mark as Duplicate;
+    :Notify Researcher;
+    note right: First submission wins
+  else (no)
+    :Accept Submission;
+    :Quick Triage;
+    :Assign Preliminary Score;
+    :Update Leaderboard;
+  endif
+  
+  |Researcher|
+  :Check Leaderboard Position;
+  :View Remaining Time;
+  
+repeat while (Event Active?) is (yes)
+->no;
+
+|System|
+:End Event;
+:Freeze Submissions;
+:Lock Leaderboard;
+:Start Final Review;
+
+|Triage Team|
+:Review All Submissions;
+
+fork
+  :Validate Findings;
+fork again
+  :Calculate Final Scores;
+fork again
+  :Identify Winners;
+end fork
+
+:Finalize Results;
+
+|System|
+:Publish Final Leaderboard;
+:Calculate Reward Distribution;
+:Send Results Notification;
+
+|Organization|
+:Review Event Results;
+:Approve Rewards;
+
+|System|
+:Process Payments;
+:Credit Winner Wallets;
+
+|Researcher|
+:Receive Results Email;
+:Check Final Ranking;
+
+if (Won Prize?) then (yes)
+  :Receive Reward;
+  :Get Achievement Badge;
+  :Share Success;
+  stop
+else (no)
+  :Review Performance;
+  :Learn from Winners;
+  :Prepare for Next Event;
+  stop
+endif
+
+@enduml

@@ -1,0 +1,260 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Production System)
+  postgres-production:
+    image: postgres:15-alpine
+    container_name: bugbounty-postgres-prod
+    environment:
+      POSTGRES_DB: bug_bounty_production
+      POSTGRES_USER: bugbounty_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - production-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bugbounty_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database (Simulation System - ISOLATED)
+  postgres-simulation:
+    image: postgres:15-alpine
+    container_name: bugbounty-postgres-sim
+    environment:
+      POSTGRES_DB: bug_bounty_simulation
+      POSTGRES_USER: simulation_user
+      POSTGRES_PASSWORD: ${SIMULATION_PASSWORD:-simulation123}
+    volumes:
+      - postgres_sim_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - simulation-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U simulation_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (Cache + Session + Message Broker)
+  redis:
+    image: redis:7-alpine
+    container_name: bugbounty-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - production-network
+      - simulation-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO (S3-compatible File Storage)
+  minio:
+    image: minio/minio:latest
+    container_name: bugbounty-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    networks:
+      - production-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Backend API (FastAPI - Production)
+  backend-production:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bugbounty-backend-prod
+    environment:
+      - MODE=PRODUCTION
+      - DATABASE_URL=postgresql://bugbounty_user:${POSTGRES_PASSWORD:-changeme123}@postgres-production:5432/bug_bounty_production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - JWT_SECRET_KEY=${JWT_SECRET:-your-secret-key-change-in-production}
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/2
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres-production
+      - redis
+      - minio
+    networks:
+      - production-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Backend API (FastAPI - Simulation - ISOLATED)
+  backend-simulation:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bugbounty-backend-sim
+    environment:
+      - MODE=SIMULATION
+      - DATABASE_URL=postgresql://simulation_user:${SIMULATION_PASSWORD:-simulation123}@postgres-simulation:5432/bug_bounty_simulation
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/3
+      - JWT_SECRET_KEY=${JWT_SECRET:-your-secret-key-change-in-production}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8001:8000"
+    depends_on:
+      - postgres-simulation
+      - redis
+    networks:
+      - simulation-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker (Async Tasks)
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bugbounty-celery-worker
+    environment:
+      - MODE=PRODUCTION
+      - DATABASE_URL=postgresql://bugbounty_user:${POSTGRES_PASSWORD:-changeme123}@postgres-production:5432/bug_bounty_production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/2
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres-production
+      - redis
+      - backend-production
+    networks:
+      - production-network
+    command: celery -A app.celery_app worker --loglevel=info
+
+  # Celery Beat (Scheduled Tasks)
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bugbounty-celery-beat
+    environment:
+      - MODE=PRODUCTION
+      - DATABASE_URL=postgresql://bugbounty_user:${POSTGRES_PASSWORD:-changeme123}@postgres-production:5432/bug_bounty_production
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/2
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres-production
+      - redis
+      - celery-worker
+    networks:
+      - production-network
+    command: celery -A app.celery_app beat --loglevel=info
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bugbounty-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost/api
+      - NEXT_PUBLIC_SIMULATION_API_URL=http://localhost/simulation-api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    networks:
+      - production-network
+    command: npm run dev
+
+  # Nginx (Reverse Proxy + Load Balancer)
+  nginx:
+    image: nginx:alpine
+    container_name: bugbounty-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend-production
+      - backend-simulation
+      - frontend
+      - varnish
+    networks:
+      - production-network
+      - simulation-network
+
+  # Varnish Cache (HTTP Caching)
+  varnish:
+    image: varnish:7.3-alpine
+    container_name: bugbounty-varnish
+    volumes:
+      - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend-production
+    networks:
+      - production-network
+    command: varnishd -F -f /etc/varnish/default.vcl -s malloc,256M
+
+  # Vulnerable Web App 1 (OWASP Juice Shop - Simulation)
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: bugbounty-juice-shop
+    ports:
+      - "3001:3000"
+    networks:
+      - simulation-network
+
+  # Vulnerable Web App 2 (DVWA - Simulation)
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    container_name: bugbounty-dvwa
+    ports:
+      - "3002:80"
+    networks:
+      - simulation-network
+
+networks:
+  production-network:
+    driver: bridge
+  simulation-network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+  postgres_sim_data:
+  redis_data:
+  minio_data:

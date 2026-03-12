@@ -1,0 +1,57 @@
+@startuml AI_Red_Teaming
+
+' ============================================
+' Module 11: AI Red Teaming
+' FREQ-45 to FREQ-48, UC-11
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class Organization {
+    - organizationId: String
+}
+
+class Researcher {
+    - researcherId: String
+}
+
+class BountyMatch {
+    - matchId: String
+}
+
+class AIRedTeamingEngagement {
+    - engagementId: String
+    - targetAISystem: String
+    - testingEnvironment: String
+    - ethicalGuidelines: String
+    - status: Enum {Pending, Active, Completed}
+    + create()
+    + assignExperts()
+}
+
+class AIVulnerabilityReport {
+    - reportId: String
+    - inputPrompt: String
+    - modelResponse: String
+    - attackType: Enum {PromptInjection, Jailbreak, DataLeakage}
+    - classification: Enum {Security, Safety, Trust}
+    - impact: String
+    + submit()
+}
+
+class AITestingEnvironment {
+    - environmentId: String
+    - modelType: String
+    - sandboxUrl: String
+    - accessControls: String
+    + setup()
+    + isolate()
+}
+
+Organization "1" -- "0..*" AIRedTeamingEngagement : creates
+AIRedTeamingEngagement "1" -- "1" AITestingEnvironment : uses
+AIRedTeamingEngagement "1" -- "0..*" Researcher : assigns
+AIRedTeamingEngagement "1" -- "0..*" AIVulnerabilityReport : produces
+BountyMatch "1" -- "0..*" AIRedTeamingEngagement : matches
+
+@enduml

@@ -1,0 +1,51 @@
+@startuml Communication_System
+
+' ============================================
+' Module 12: Communication & Notifications
+' FREQ-09, FREQ-12
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class User {
+    - userId: String
+    - email: String
+}
+
+class VulnerabilityReport {
+    - reportId: String
+}
+
+class Notification {
+    - notificationId: String
+    - type: Enum {Email, InPlatform}
+    - message: String
+    - sentDate: DateTime
+    - isRead: Boolean
+    + send()
+    + markAsRead()
+}
+
+class Message {
+    - messageId: String
+    - subject: String
+    - body: String
+    - sentDate: DateTime
+    + send()
+    + reply()
+}
+
+class Comment {
+    - commentId: String
+    - content: String
+    - createdDate: DateTime
+    + add()
+    + edit()
+}
+
+User "1" -- "0..*" Notification : receives
+User "1" -- "0..*" Message : sends
+VulnerabilityReport "1" -- "0..*" Comment : has
+User "1" -- "0..*" Comment : writes
+
+@enduml

@@ -1,0 +1,39 @@
+@startuml Audit_Logging
+
+' ============================================
+' Module 14: Audit & Activity Logging
+' FREQ-17, BR-19
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class User {
+    - userId: String
+}
+
+class Administrator {
+    - adminId: String
+}
+
+class AuditLog {
+    - logId: String
+    - action: String
+    - performedBy: String
+    - timestamp: DateTime
+    - details: String
+    + record()
+    + query()
+}
+
+class ActivityLog {
+    - activityId: String
+    - activityType: String
+    - userId: String
+    - timestamp: DateTime
+    + log()
+}
+
+Administrator "1" -- "0..*" AuditLog : views
+User "1" -- "0..*" ActivityLog : generates
+
+@enduml

@@ -1,0 +1,66 @@
+@startuml User_Account_States
+
+' ============================================
+' STATE DIAGRAM: User Account Lifecycle
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title User Account State Transitions
+
+[*] --> Unverified : Registration
+
+Unverified --> Email_Verified : Email confirmed
+Unverified --> [*] : Expired (7 days)
+
+Email_Verified --> Pending_KYC : Submit KYC documents
+Email_Verified --> Limited_Access : Skip KYC (limited features)
+
+Pending_KYC --> KYC_Review : Documents submitted
+KYC_Review --> Active : KYC approved
+KYC_Review --> KYC_Rejected : Documents invalid
+KYC_Review --> Pending_KYC : Resubmit required
+
+KYC_Rejected --> Pending_KYC : Resubmit documents
+KYC_Rejected --> Limited_Access : Continue without KYC
+
+Limited_Access --> Pending_KYC : Submit KYC later
+Limited_Access --> Suspended : Policy violation
+
+Active --> Suspended : Policy violation
+Active --> Locked : Security issue
+Active --> Inactive : No activity (180 days)
+
+Suspended --> Active : Appeal approved
+Suspended --> Banned : Appeal rejected
+
+Locked --> Active : Security resolved
+Locked --> Banned : Fraud confirmed
+
+Inactive --> Active : User returns
+Inactive --> Archived : Inactive (365 days)
+
+Banned --> [*]
+Archived --> [*]
+
+note right of Limited_Access
+  Restrictions:
+  - Cannot withdraw funds
+  - Limited program access
+  - Lower trust score
+end note
+
+note right of Active
+  Full access:
+  - All features enabled
+  - Can submit reports
+  - Can withdraw funds
+end note
+
+note right of Suspended
+  Temporary ban:
+  - Cannot submit reports
+  - Cannot access programs
+  - Can appeal decision
+end note
+
+@enduml

@@ -1,0 +1,124 @@
+@startuml Design_Domain_AI_Red_Teaming
+
+' ============================================
+' Design Class Model - Domain Layer
+' Module 10: AI Red Teaming
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class AIRedTeamingEngagement {
+    - engagementId: UUID {PK, unique, not null}
+    - organizationId: UUID {FK->Organization.organizationId, not null}
+    - name: String {max=255, not null}
+    - targetAISystem: String {max=255, not null}
+    - modelType: AIModelType {enum, not null}
+    - testingEnvironment: String {max=500, not null}
+    - ethicalGuidelines: Text {max=5000, not null}
+    - status: EngagementStatus {enum, default=PENDING}
+    - startDate: DateTime {nullable}
+    - endDate: DateTime {nullable}
+    - assignedExperts: JSON {array of UUIDs}
+    - totalFindings: Integer {default=0}
+    - criticalFindings: Integer {default=0}
+    - createdAt: DateTime {default=now()}
+    
+    + create(data: AIEngagementDTO): AIRedTeamingEngagement throws ValidationException
+    + assignExperts(researcherIds: List<UUID>): void
+    + start(): void
+    + complete(): void
+    + generateReport(): AISecurityReportDTO
+}
+
+enum AIModelType {
+    LLM
+    ML_MODEL
+    AI_AGENT
+    CHATBOT
+    RECOMMENDATION_SYSTEM
+    COMPUTER_VISION
+}
+
+class AIVulnerabilityReport {
+    - reportId: UUID {PK, unique, not null}
+    - engagementId: UUID {FK->AIRedTeamingEngagement.engagementId, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - title: String {max=255, not null}
+    - inputPrompt: Text {max=5000, not null}
+    - modelResponse: Text {max=10000, not null}
+    - attackType: AIAttackType {enum, not null}
+    - classification: AIClassification {enum, not null}
+    - severity: SeverityLevel {enum, not null}
+    - impact: Text {max=5000, not null}
+    - reproduction: Text {max=5000, not null}
+    - mitigation: Text {max=5000, nullable}
+    - status: ReportStatus {enum, default=NEW}
+    - submittedAt: DateTime {default=now()}
+    - validatedAt: DateTime {nullable}
+    
+    + submit(data: AIReportDTO): AIVulnerabilityReport throws ValidationException
+    + validate(): void
+    + classify(): AIClassification
+}
+
+enum AIAttackType {
+    PROMPT_INJECTION
+    JAILBREAK
+    DATA_LEAKAGE
+    MODEL_EXTRACTION
+    ADVERSARIAL_INPUT
+    BIAS_EXPLOITATION
+    HALLUCINATION_TRIGGER
+    CONTEXT_MANIPULATION
+}
+
+enum AIClassification {
+    SECURITY
+    SAFETY
+    TRUST
+    PRIVACY
+    FAIRNESS
+}
+
+class AITestingEnvironment {
+    - environmentId: UUID {PK, unique, not null}
+    - engagementId: UUID {FK->AIRedTeamingEngagement.engagementId, unique, not null}
+    - modelType: String {max=100, not null}
+    - sandboxUrl: String {max=500, not null}
+    - apiEndpoint: String {max=500, not null}
+    - accessToken: String {max=500, encrypted, not null}
+    - accessControls: JSON {not null}
+    - rateLimits: JSON {nullable}
+    - isIsolated: Boolean {default=true}
+    - createdAt: DateTime {default=now()}
+    
+    + setup(config: EnvironmentConfig): void throws SetupException
+    + isolate(): void
+    + grantAccess(researcherId: UUID): AccessToken
+    + revokeAccess(researcherId: UUID): void
+    + monitor(): MonitoringData
+}
+
+class AIFindingClassification {
+    - classificationId: UUID {PK, unique, not null}
+    - reportId: UUID {FK->AIVulnerabilityReport.reportId, unique, not null}
+    - primaryCategory: AIClassification {enum, not null}
+    - secondaryCategories: JSON {array of enums, nullable}
+    - riskScore: Decimal(5,2) {min=0, max=100}
+    - confidenceLevel: Decimal(5,2) {min=0, max=100}
+    - classifiedBy: UUID {FK->TriageSpecialist.specialistId, not null}
+    - classifiedAt: DateTime {default=now()}
+    - justification: Text {max=2000, not null}
+    
+    + classify(category: AIClassification, justification: String): void
+    + calculateRiskScore(): Decimal
+}
+
+' Relationships
+Organization "1" -- "0..*" AIRedTeamingEngagement : creates
+AIRedTeamingEngagement "1" -- "1" AITestingEnvironment : uses
+AIRedTeamingEngagement "1" -- "0..*" Researcher : assigns
+AIRedTeamingEngagement "1" -- "0..*" AIVulnerabilityReport : produces
+AIVulnerabilityReport "1" -- "1" AIFindingClassification : has
+
+@enduml

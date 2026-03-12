@@ -1,0 +1,44 @@
+@startuml Analytics_Dashboard
+
+' ============================================
+' Module 13: Analytics & Dashboard
+' FREQ-13, FREQ-15, UC-06
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class User {
+    - userId: String
+    - email: String
+}
+
+class Dashboard {
+    - dashboardId: String
+    - userRole: String
+    - widgets: List<String>
+    + display()
+    + customize()
+}
+
+class AnalyticsReport {
+    - reportId: String
+    - reportType: String
+    - generatedDate: DateTime
+    - data: JSON
+    + generate()
+    + export()
+}
+
+class Metrics {
+    - metricId: String
+    - metricName: String
+    - value: Decimal
+    - calculatedDate: DateTime
+    + calculate()
+}
+
+User "1" -- "1" Dashboard : views
+Dashboard "1" -- "0..*" AnalyticsReport : displays
+AnalyticsReport "1" -- "0..*" Metrics : contains
+
+@enduml

@@ -1,0 +1,358 @@
+@startuml Service_Layer_Design
+
+' ============================================
+' DESIGN CLASS MODEL: Service Layer Architecture
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Service Layer - Controllers, Services, Repositories - Design Class Model
+
+' ============================================
+' CONTROLLER LAYER (API Endpoints)
+' ============================================
+
+package "Controllers (FastAPI)" {
+  
+  class AuthController {
+    + router: APIRouter
+    --
+    + POST /auth/register(data: UserRegisterDTO): UserResponse
+    + POST /auth/login(credentials: LoginDTO): TokenResponse
+    + POST /auth/logout(token: str): MessageResponse
+    + POST /auth/refresh(refresh_token: str): TokenResponse
+    + POST /auth/verify-email(token: str): MessageResponse
+    + POST /auth/forgot-password(email: str): MessageResponse
+    + POST /auth/reset-password(data: ResetPasswordDTO): MessageResponse
+  }
+  
+  class UserController {
+    + router: APIRouter
+    --
+    + GET /users/me(): UserResponse
+    + PUT /users/me(data: UpdateUserDTO): UserResponse
+    + GET /users/{user_id}(): UserResponse
+    + POST /users/kyc(data: KYCSubmitDTO): KYCResponse
+    + GET /users/kyc/status(): KYCStatusResponse
+  }
+  
+  class ReportController {
+    + router: APIRouter
+    --
+    + POST /reports(data: CreateReportDTO): ReportResponse
+    + GET /reports(): List<ReportResponse>
+    + GET /reports/{report_id}(): ReportResponse
+    + PUT /reports/{report_id}(data: UpdateReportDTO): ReportResponse
+    + POST /reports/{report_id}/comments(data: CommentDTO): CommentResponse
+    + POST /reports/{report_id}/attachments(file: UploadFile): AttachmentResponse
+  }
+  
+  class ProgramController {
+    + router: APIRouter
+    --
+    + POST /programs(data: CreateProgramDTO): ProgramResponse
+    + GET /programs(): List<ProgramResponse>
+    + GET /programs/{program_id}(): ProgramResponse
+    + PUT /programs/{program_id}(data: UpdateProgramDTO): ProgramResponse
+    + POST /programs/{program_id}/publish(): MessageResponse
+  }
+  
+  class PaymentController {
+    + router: APIRouter
+    --
+    + POST /payments/approve(data: ApprovePaymentDTO): PaymentResponse
+    + GET /payments(): List<PaymentResponse>
+    + POST /withdrawals(data: WithdrawalRequestDTO): WithdrawalResponse
+    + GET /withdrawals(): List<WithdrawalResponse>
+    + GET /balance(): BalanceResponse
+  }
+
+}
+
+
+' ============================================
+' SERVICE LAYER (Business Logic)
+' ============================================
+
+package "Services (Business Logic)" {
+  
+  class AuthService {
+    - user_repository: UserRepository
+    - token_service: TokenService
+    - email_service: EmailService
+    --
+    + register(data: UserRegisterDTO): User
+    + login(email: str, password: str): TokenPair
+    + verifyEmail(token: str): Boolean
+    + resetPassword(token: str, new_password: str): Boolean
+    + refreshToken(refresh_token: str): TokenPair
+  }
+  
+  class ReportService {
+    - report_repository: ReportRepository
+    - program_repository: ProgramRepository
+    - notification_service: NotificationService
+    - duplicate_detection_service: DuplicateDetectionService
+    --
+    + createReport(data: CreateReportDTO, researcher_id: UUID): VulnerabilityReport
+    + getReport(report_id: UUID, user_id: UUID): VulnerabilityReport
+    + updateReport(report_id: UUID, data: UpdateReportDTO): VulnerabilityReport
+    + submitReport(report_id: UUID): VulnerabilityReport
+    + addComment(report_id: UUID, content: str, user_id: UUID): Comment
+    + checkDuplicate(report: VulnerabilityReport): Boolean
+  }
+  
+  class TriageService {
+    - triage_repository: TriageRepository
+    - report_repository: ReportRepository
+    - notification_service: NotificationService
+    --
+    + assignToQueue(report_id: UUID): TriageQueue
+    + assignToAnalyst(report_id: UUID, analyst_id: UUID): TriageAssignment
+    + triageReport(report_id: UUID, data: TriageDTO): ValidationResult
+    + validateReport(report_id: UUID, data: ValidationDTO): VulnerabilityReport
+    + detectDuplicates(report_id: UUID): List<VulnerabilityReport>
+  }
+  
+  class PaymentService {
+    - payment_repository: PaymentRepository
+    - balance_repository: BalanceRepository
+    - gateway_service: PaymentGatewayService
+    - notification_service: NotificationService
+    --
+    + approvePayment(report_id: UUID, amount: Decimal): BountyPayment
+    + processPayment(payment_id: UUID): Transaction
+    + requestWithdrawal(researcher_id: UUID, amount: Decimal): PayoutRequest
+    + processWithdrawal(payout_id: UUID): Transaction
+    + getBalance(researcher_id: UUID): ResearcherBalance
+  }
+  
+  class MatchingService {
+    - matching_repository: MatchingRepository
+    - researcher_repository: ResearcherRepository
+    - algorithm_service: MatchingAlgorithmService
+    --
+    + createMatchingRequest(engagement_id: UUID, criteria: Dict): MatchingRequest
+    + executeMatching(request_id: UUID): List<MatchResult>
+    + sendInvitations(request_id: UUID, researcher_ids: List<UUID>): List<MatchingInvitation>
+    + acceptInvitation(invitation_id: UUID): void
+    + recordFeedback(data: FeedbackDTO): MatchingFeedback
+  }
+  
+  class NotificationService {
+    - notification_repository: NotificationRepository
+    - email_service: EmailService
+    - sms_service: SMSService
+    - webhook_service: WebhookService
+    --
+    + send(user_id: UUID, type: NotificationType, data: Dict): Notification
+    + sendEmail(user_id: UUID, template: str, data: Dict): void
+    + sendSMS(user_id: UUID, message: str): void
+    + triggerWebhook(org_id: UUID, event: str, data: Dict): void
+    + markAsRead(notification_id: UUID): void
+  }
+  
+  class AnalyticsService {
+    - metrics_repository: MetricsRepository
+    - report_repository: ReportRepository
+    --
+    + getResearcherMetrics(researcher_id: UUID): ResearcherMetrics
+    + getOrganizationMetrics(org_id: UUID): OrganizationMetrics
+    + getPlatformMetrics(date_range: DateRange): PlatformMetrics
+    + generateReport(user_id: UUID, filters: Dict): AnalyticsReport
+    + calculateMTTR(org_id: UUID): Integer
+    + calculateROI(org_id: UUID): Decimal
+  }
+
+}
+
+' ============================================
+' REPOSITORY LAYER (Data Access)
+' ============================================
+
+package "Repositories (Data Access)" {
+  
+  class UserRepository {
+    - db: AsyncSession
+    --
+    + create(user: User): User
+    + findById(user_id: UUID): Optional<User>
+    + findByEmail(email: str): Optional<User>
+    + update(user_id: UUID, data: Dict): User
+    + delete(user_id: UUID): Boolean
+    + list(filters: Dict, pagination: Pagination): List<User>
+  }
+  
+  class ReportRepository {
+    - db: AsyncSession
+    --
+    + create(report: VulnerabilityReport): VulnerabilityReport
+    + findById(report_id: UUID): Optional<VulnerabilityReport>
+    + update(report_id: UUID, data: Dict): VulnerabilityReport
+    + list(filters: Dict, pagination: Pagination): List<VulnerabilityReport>
+    + findByProgram(program_id: UUID): List<VulnerabilityReport>
+    + findDuplicates(report: VulnerabilityReport): List<VulnerabilityReport>
+  }
+  
+  class ProgramRepository {
+    - db: AsyncSession
+    --
+    + create(program: BountyProgram): BountyProgram
+    + findById(program_id: UUID): Optional<BountyProgram>
+    + update(program_id: UUID, data: Dict): BountyProgram
+    + list(filters: Dict, pagination: Pagination): List<BountyProgram>
+    + findActive(): List<BountyProgram>
+  }
+  
+  class PaymentRepository {
+    - db: AsyncSession
+    --
+    + create(payment: BountyPayment): BountyPayment
+    + findById(payment_id: UUID): Optional<BountyPayment>
+    + update(payment_id: UUID, data: Dict): BountyPayment
+    + list(filters: Dict, pagination: Pagination): List<BountyPayment>
+    + findPending(): List<BountyPayment>
+  }
+
+}
+
+' ============================================
+' DTO LAYER (Data Transfer Objects)
+' ============================================
+
+package "DTOs (Request/Response)" {
+  
+  class UserRegisterDTO {
+    + email: EmailStr
+    + password: str <<min=8, max=100>>
+    + full_name: str <<max=100>>
+    + role: str
+  }
+  
+  class LoginDTO {
+    + email: EmailStr
+    + password: str
+  }
+  
+  class CreateReportDTO {
+    + program_id: UUID
+    + title: str <<max=200>>
+    + description: str
+    + severity: str
+    + vulnerability_type: str
+    + steps_to_reproduce: str
+    + impact: str
+    + proof_of_concept: str
+  }
+  
+  class UserResponse {
+    + user_id: UUID
+    + email: str
+    + full_name: str
+    + role: str
+    + status: str
+    + created_at: datetime
+  }
+  
+  class ReportResponse {
+    + report_id: UUID
+    + program_id: UUID
+    + title: str
+    + severity: str
+    + status: str
+    + reward_amount: Decimal
+    + created_at: datetime
+  }
+  
+  class TokenResponse {
+    + access_token: str
+    + refresh_token: str
+    + token_type: str
+    + expires_in: int
+  }
+
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+AuthController --> AuthService
+UserController --> AuthService
+ReportController --> ReportService
+ProgramController --> ReportService
+PaymentController --> PaymentService
+
+AuthService --> UserRepository
+ReportService --> ReportRepository
+ReportService --> ProgramRepository
+TriageService --> ReportRepository
+PaymentService --> PaymentRepository
+MatchingService --> MatchingRepository
+AnalyticsService --> MetricsRepository
+
+' ============================================
+' NOTES
+' ============================================
+
+note right of AuthController
+  FastAPI router
+  - JWT authentication
+  - Rate limiting
+  - Input validation
+  
+  Endpoints:
+  - /auth/register
+  - /auth/login
+  - /auth/logout
+  - /auth/refresh
+end note
+
+note right of AuthService
+  Authentication business logic
+  - Password hashing (bcrypt)
+  - Token generation (JWT)
+  - Email verification
+  - Password reset
+  
+  Dependencies:
+  - UserRepository
+  - TokenService
+  - EmailService
+end note
+
+note right of UserRepository
+  Database operations
+  - Async SQLAlchemy
+  - PostgreSQL
+  - Transaction management
+  
+  Methods:
+  - CRUD operations
+  - Query builders
+  - Pagination support
+end note
+
+note right of UserRegisterDTO
+  Pydantic models
+  - Request validation
+  - Type checking
+  - Serialization
+  
+  Validation:
+  - Email format
+  - Password strength
+  - Required fields
+end note
+
+note as N1
+  Architecture Pattern:
+  Controller → Service → Repository
+  
+  Benefits:
+  - Separation of concerns
+  - Testability
+  - Maintainability
+  - Reusability
+end note
+
+@enduml

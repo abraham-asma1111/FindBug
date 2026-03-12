@@ -1,0 +1,87 @@
+@startuml Core_User_Management
+
+' ============================================
+' Module 1: Core User Management
+' FREQ-01, FREQ-02, UC-01
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class User {
+    - userId: String
+    - email: String
+    - password: String
+    - fullName: String
+    - status: Enum {Pending, Active, Suspended}
+    + login()
+    + logout()
+    + updateProfile()
+    + resetPassword()
+}
+
+class Researcher {
+    - researcherId: String
+    - reputationScore: Decimal
+    - skills: List<String>
+    - rank: Integer
+    + submitReport()
+    + joinProgram()
+    + viewDashboard()
+}
+
+class Organization {
+    - organizationId: String
+    - companyName: String
+    - subscriptionType: String
+    + createProgram()
+    + manageProgram()
+    + approveReward()
+}
+
+class TriageSpecialist {
+    - specialistId: String
+    - validationCount: Integer
+    + validateReport()
+    + assignSeverity()
+}
+
+class FinancialOfficer {
+    - officerId: String
+    + approveReward()
+    + processPayment()
+}
+
+class Administrator {
+    - adminId: String
+    - accessLevel: String
+    + manageUsers()
+    + configureSystem()
+}
+
+class KYCVerification {
+    - kycId: String
+    - status: Enum {Pending, Verified, Rejected}
+    - verifiedDate: DateTime
+    + submit()
+    + verify()
+}
+
+class IdentityDocument {
+    - documentId: String
+    - documentType: Enum {NationalID, Passport}
+    - documentNumber: String
+    - expiryDate: Date
+    + upload()
+}
+
+' Relationships
+User <|-- Researcher
+User <|-- Organization
+User <|-- TriageSpecialist
+User <|-- FinancialOfficer
+User <|-- Administrator
+
+Researcher "1" -- "0..1" KYCVerification : completes
+KYCVerification "1" -- "1..*" IdentityDocument : requires
+
+@enduml

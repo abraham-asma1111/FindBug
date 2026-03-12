@@ -1,0 +1,117 @@
+@startuml Triage_Validation
+
+' ============================================
+' SEQUENCE DIAGRAM: Triage and Validation
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Triage and Validation Process - Sequence Diagram
+
+actor "Triage Analyst" as Analyst
+participant "Admin Portal\n(Next.js)" as UI
+participant "Bug Bounty Engine\n(FastAPI)" as BugBounty
+participant "Severity Engine" as Severity
+participant "PostgreSQL DB" as DB
+participant "Notification Service" as Notification
+participant "Researcher" as Researcher
+participant "Organization" as Org
+
+== View Pending Reports ==
+Analyst -> UI: Login & access triage dashboard
+UI -> BugBounty: GET /reports?status=pending
+BugBounty -> DB: Query pending reports
+DB --> BugBounty: Report list
+BugBounty --> UI: Pending reports
+UI --> Analyst: Display reports queue
+
+== Review Report ==
+Analyst -> UI: Select report #12345
+UI -> BugBounty: GET /reports/12345/details
+BugBounty -> DB: Query report with evidence
+DB --> BugBounty: Full report data
+BugBounty --> UI: Report details
+UI --> Analyst: Display report & evidence
+
+== Validate Report ==
+Analyst -> UI: Review evidence & description
+Analyst -> UI: Verify vulnerability
+
+alt Report is Invalid/Duplicate
+    Analyst -> UI: Mark as "Invalid" or "Duplicate"
+    UI -> BugBounty: PUT /reports/12345/status\n{status: "rejected", reason: "..."}
+    
+    BugBounty -> DB: BEGIN TRANSACTION
+    BugBounty -> DB: UPDATE report status
+    BugBounty -> DB: INSERT INTO audit_log
+    BugBounty -> DB: COMMIT TRANSACTION
+    
+    BugBounty -> Notification: Send rejection notification
+    Notification -> Researcher: Email: Report rejected
+    
+    BugBounty --> UI: Success
+    UI --> Analyst: "Report rejected"
+
+else Report is Valid
+    Analyst -> UI: Mark as "Triaged"
+    Analyst -> UI: Assign severity score
+    
+    UI -> Severity: POST /severity/calculate\n{cvss_vector, vrt_category}
+    Severity -> Severity: Calculate CVSS score
+    Severity -> Severity: Apply VRT classification
+    Severity --> UI: Severity: Critical (9.2)
+    
+    UI -> BugBounty: PUT /reports/12345/triage\n{status: "triaged", severity: "critical"}
+    
+    BugBounty -> DB: BEGIN TRANSACTION
+    BugBounty -> DB: UPDATE report status
+    BugBounty -> DB: UPDATE severity & score
+    BugBounty -> DB: INSERT INTO triage_history
+    BugBounty -> DB: COMMIT TRANSACTION
+    
+    BugBounty -> Notification: Send triage notification
+    Notification -> Org: Email: Report triaged (Critical)
+    Notification -> Researcher: Email: Report accepted
+    
+    BugBounty --> UI: Success
+    UI --> Analyst: "Report triaged successfully"
+end
+
+== Organization Validation ==
+Org -> UI: Login to organization portal
+UI -> BugBounty: GET /reports?status=triaged&program_id=123
+BugBounty -> DB: Query triaged reports
+DB --> BugBounty: Report list
+BugBounty --> UI: Triaged reports
+UI --> Org: Display reports
+
+Org -> UI: Review report #12345
+Org -> UI: Validate vulnerability
+
+alt Organization Accepts
+    Org -> UI: Accept & set reward amount
+    UI -> BugBounty: PUT /reports/12345/validate\n{status: "validated", reward: 5000}
+    
+    BugBounty -> DB: BEGIN TRANSACTION
+    BugBounty -> DB: UPDATE report status
+    BugBounty -> DB: SET reward amount
+    BugBounty -> DB: UPDATE program stats
+    BugBounty -> DB: COMMIT TRANSACTION
+    
+    BugBounty -> Notification: Send validation notification
+    Notification -> Researcher: Email: Report validated ($5000)
+    
+    BugBounty --> UI: Success
+    UI --> Org: "Report validated"
+
+else Organization Disputes
+    Org -> UI: Dispute with reason
+    UI -> BugBounty: PUT /reports/12345/dispute\n{reason: "..."}
+    
+    BugBounty -> DB: UPDATE report status = "disputed"
+    BugBounty -> Notification: Notify analyst & researcher
+    
+    BugBounty --> UI: Success
+    UI --> Org: "Dispute submitted"
+end
+
+@enduml

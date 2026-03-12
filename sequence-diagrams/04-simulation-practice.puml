@@ -1,0 +1,107 @@
+@startuml Simulation_Practice
+
+' ============================================
+' SEQUENCE DIAGRAM: Simulation Practice Mode
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title Simulation Practice Mode - Sequence Diagram
+
+actor "Researcher\n(Learner)" as Researcher
+participant "Simulation Interface\n(Next.js)" as UI
+participant "Simulation Engine\n(FastAPI)" as SimEngine
+participant "Vulnerable App\n(OWASP Juice Shop)" as VulnApp
+participant "Feedback Engine" as Feedback
+participant "Simulation DB\n(Isolated)" as SimDB
+participant "Notification Service" as Notification
+
+== Access Simulation Environment ==
+Researcher -> UI: Navigate to practice mode
+UI -> SimEngine: GET /simulation/challenges
+SimEngine -> SimDB: Query available challenges
+SimDB --> SimEngine: Challenge list
+SimEngine --> UI: Challenges (XSS, SQLi, CSRF, etc.)
+UI --> Researcher: Display challenge categories
+
+== Start Challenge ==
+Researcher -> UI: Select "SQL Injection - Level 1"
+UI -> SimEngine: POST /simulation/start\n{challenge_id: "sqli-001"}
+
+SimEngine -> SimDB: BEGIN TRANSACTION
+SimEngine -> SimDB: Create practice session
+SimEngine -> SimDB: Initialize challenge state
+SimDB --> SimEngine: Session ID: SIM-12345
+
+SimEngine -> VulnApp: Deploy vulnerable instance
+VulnApp --> SimEngine: Instance URL: http://sim-12345.local
+
+SimEngine -> SimDB: COMMIT TRANSACTION
+SimEngine --> UI: Session started\n{session_id, url, hints}
+UI --> Researcher: "Challenge started!\nFind the SQL injection vulnerability"
+
+== Practice & Exploration ==
+Researcher -> VulnApp: Access vulnerable application
+VulnApp --> Researcher: Login page displayed
+
+Researcher -> VulnApp: Test input: ' OR '1'='1
+VulnApp --> Researcher: SQL error message
+
+Researcher -> UI: Request hint
+UI -> SimEngine: GET /simulation/hint/SIM-12345
+SimEngine -> SimDB: Check hint usage count
+SimDB --> SimEngine: Hints used: 0/3
+SimEngine --> UI: Hint: "Try manipulating the WHERE clause"
+UI --> Researcher: Display hint
+
+== Submit Vulnerability ==
+Researcher -> VulnApp: Exploit: admin' --
+VulnApp --> Researcher: Logged in as admin!
+
+Researcher -> UI: Submit finding
+UI -> SimEngine: POST /simulation/submit\n{session_id, exploit, description}
+
+SimEngine -> Feedback: Validate submission
+Feedback -> Feedback: Check exploit correctness
+Feedback -> Feedback: Evaluate description quality
+Feedback --> SimEngine: Score: 85/100\n{correctness: 90, description: 80}
+
+SimEngine -> SimDB: BEGIN TRANSACTION
+SimEngine -> SimDB: UPDATE session status = "completed"
+SimEngine -> SimDB: INSERT score & feedback
+SimEngine -> SimDB: UPDATE researcher progress
+SimDB --> SimEngine: Progress: 15/50 challenges
+
+SimEngine -> VulnApp: Terminate instance
+VulnApp --> SimEngine: Instance stopped
+
+SimEngine -> SimDB: COMMIT TRANSACTION
+
+SimEngine --> UI: Challenge completed!\n{score: 85, feedback, next_challenge}
+UI --> Researcher: "Great job! Score: 85/100\nFeedback: Good exploit, improve description"
+
+== View Progress & Leaderboard ==
+Researcher -> UI: View my progress
+UI -> SimEngine: GET /simulation/progress
+SimEngine -> SimDB: Query researcher stats
+SimDB --> SimEngine: Stats: 15 completed, 850 points
+SimEngine --> UI: Progress data
+UI --> Researcher: Display progress dashboard
+
+Researcher -> UI: View leaderboard
+UI -> SimEngine: GET /simulation/leaderboard
+SimEngine -> SimDB: Query top researchers
+SimDB --> SimEngine: Top 10 list
+SimEngine --> UI: Leaderboard
+UI --> Researcher: Display rankings
+
+== Unlock Advanced Challenges ==
+alt Progress >= 20 challenges
+    SimEngine -> SimDB: Check unlock criteria
+    SimDB --> SimEngine: Criteria met
+    SimEngine -> Notification: Send unlock notification
+    Notification -> Researcher: Email: "Advanced challenges unlocked!"
+    SimEngine --> UI: New challenges available
+    UI --> Researcher: "You've unlocked Advanced level!"
+end
+
+@enduml

@@ -1,0 +1,41 @@
+@startuml Researcher_Matching
+
+' ============================================
+' Module 15: BountyMatch (Researcher Matching)
+' FREQ-16, FREQ-32, FREQ-33, FREQ-39, FREQ-40
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class Researcher {
+    - researcherId: String
+    - reputationScore: Decimal
+    - skills: List<String>
+}
+
+class BountyProgram {
+    - programId: String
+    - name: String
+}
+
+class BountyMatch {
+    - matchId: String
+    - matchScore: Decimal
+    - matchDate: DateTime
+    + matchResearcher()
+    + recommendProgram()
+}
+
+class MatchingCriteria {
+    - criteriaId: String
+    - requiredSkills: List<String>
+    - minReputation: Integer
+    - availability: Boolean
+    + evaluate()
+}
+
+BountyMatch "1" -- "1" Researcher : matches
+BountyMatch "1" -- "1" BountyProgram : to
+BountyMatch "1" -- "1" MatchingCriteria : uses
+
+@enduml
