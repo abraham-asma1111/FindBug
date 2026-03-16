@@ -1,0 +1,175 @@
+@startuml Staff_Use_Cases
+
+title Platform Staff Use Cases
+
+' Actors
+actor "Administrator" as Admin
+actor "Triage Specialist" as Triage
+actor "Financial Officer" as Finance
+actor "Support Staff" as Support
+
+rectangle "Bug Bounty Platform - Staff Portal" {
+    
+    ' Admin Use Cases
+    package "Administrator" {
+        usecase "Provision Staff Accounts" as UC1
+        usecase "Manage User Accounts" as UC2
+        usecase "Suspend/Ban Users" as UC3
+        usecase "Moderate Programs" as UC4
+        usecase "Configure System Settings" as UC5
+        usecase "Manage Permissions" as UC6
+        usecase "View Audit Logs" as UC7
+        usecase "Resolve Disputes" as UC8
+        usecase "Generate System Reports" as UC9
+        usecase "Manage Platform Content" as UC10
+    }
+    
+    ' Triage Use Cases
+    package "Triage Specialist" {
+        usecase "View Pending Reports" as UC11
+        usecase "Validate Vulnerability" as UC12
+        usecase "Assign Severity Level" as UC13
+        usecase "Detect Duplicate Reports" as UC14
+        usecase "Request Additional Info" as UC15
+        usecase "Escalate to Organization" as UC16
+        usecase "Add Triage Comments" as UC17
+        usecase "Mark as Invalid" as UC18
+        usecase "View Triage Queue" as UC19
+    }
+    
+    ' Finance Use Cases
+    package "Financial Officer" {
+        usecase "Review Payment Requests" as UC20
+        usecase "Approve Payments" as UC21
+        usecase "Reject Payments" as UC22
+        usecase "Process Payouts" as UC23
+        usecase "Verify KYC Documents" as UC24
+        usecase "Generate Financial Reports" as UC25
+        usecase "Manage Payment Methods" as UC26
+        usecase "Handle Payment Disputes" as UC27
+        usecase "View Budget Overview" as UC28
+    }
+    
+    ' Support Use Cases
+    package "Support Staff" {
+        usecase "View Support Tickets" as UC29
+        usecase "Respond to Inquiries" as UC30
+        usecase "Assist with Onboarding" as UC31
+        usecase "Troubleshoot Issues" as UC32
+        usecase "Update Documentation" as UC33
+        usecase "Escalate Complex Issues" as UC34
+        usecase "Send Announcements" as UC35
+    }
+    
+    ' Shared Staff Use Cases
+    package "Common Staff Features" {
+        usecase "Login with Staff Credentials" as UC36
+        usecase "Enable MFA" as UC37
+        usecase "View Staff Dashboard" as UC38
+        usecase "Access Audit Trail" as UC39
+        usecase "Send Internal Messages" as UC40
+    }
+}
+
+' Administrator Relationships
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+Admin --> UC36
+Admin --> UC37
+Admin --> UC38
+Admin --> UC39
+Admin --> UC40
+
+' Triage Specialist Relationships
+Triage --> UC11
+Triage --> UC12
+Triage --> UC13
+Triage --> UC14
+Triage --> UC15
+Triage --> UC16
+Triage --> UC17
+Triage --> UC18
+Triage --> UC19
+Triage --> UC36
+Triage --> UC37
+Triage --> UC38
+Triage --> UC39
+Triage --> UC40
+
+' Financial Officer Relationships
+Finance --> UC20
+Finance --> UC21
+Finance --> UC22
+Finance --> UC23
+Finance --> UC24
+Finance --> UC25
+Finance --> UC26
+Finance --> UC27
+Finance --> UC28
+Finance --> UC36
+Finance --> UC37
+Finance --> UC38
+Finance --> UC39
+Finance --> UC40
+
+' Support Staff Relationships
+Support --> UC29
+Support --> UC30
+Support --> UC31
+Support --> UC32
+Support --> UC33
+Support --> UC34
+Support --> UC35
+Support --> UC36
+Support --> UC37
+Support --> UC38
+Support --> UC40
+
+' Include relationships
+UC1 ..> UC2 : <<include>>
+UC12 ..> UC13 : <<include>>
+UC21 ..> UC20 : <<include>>
+UC23 ..> UC21 : <<include>>
+UC30 ..> UC29 : <<include>>
+
+' Extend relationships
+UC3 ..> UC2 : <<extend>>
+UC6 ..> UC2 : <<extend>>
+UC14 ..> UC12 : <<extend>>
+UC18 ..> UC12 : <<extend>>
+UC22 ..> UC20 : <<extend>>
+UC27 ..> UC20 : <<extend>>
+UC34 ..> UC30 : <<extend>>
+
+note right of Admin
+  Super Admin can perform
+  all administrative tasks
+  including staff provisioning
+end note
+
+note right of Triage
+  Validates and triages
+  vulnerability reports
+  before org review
+end note
+
+note right of Finance
+  Manages all financial
+  operations and KYC
+  verification
+end note
+
+note right of Support
+  Provides user support
+  and platform assistance
+end note
+
+@enduml

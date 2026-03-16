@@ -1,0 +1,126 @@
+@startuml Organization_Use_Cases
+
+title Organization Use Cases - Bug Bounty Platform
+
+actor "Organization" as Org
+actor "Payment Gateway" as PaymentGW
+
+rectangle "Bug Bounty Platform" {
+    
+    ' Authentication & Setup
+    usecase "Register Organization" as UC1
+    usecase "Login" as UC2
+    usecase "Complete Company Profile" as UC3
+    usecase "Subscribe to Plan" as UC4
+    
+    ' Program Management
+    usecase "Create Bounty Program" as UC5
+    usecase "Configure Program Scope" as UC6
+    usecase "Set Reward Ranges" as UC7
+    usecase "Define Severity Levels" as UC8
+    usecase "Publish Program" as UC9
+    usecase "Pause/Resume Program" as UC10
+    usecase "Close Program" as UC11
+    
+    ' Report Management
+    usecase "View Submitted Reports" as UC12
+    usecase "Review Report Details" as UC13
+    usecase "Accept Report" as UC14
+    usecase "Reject Report" as UC15
+    usecase "Request More Info" as UC16
+    usecase "Approve Reward Amount" as UC17
+    usecase "Mark as Resolved" as UC18
+    
+    ' Team Management
+    usecase "Invite Team Members" as UC19
+    usecase "Assign Roles" as UC20
+    usecase "Remove Team Members" as UC21
+    usecase "Manage Permissions" as UC22
+    
+    ' Advanced Services
+    usecase "Request PTaaS" as UC23
+    usecase "Request Code Review" as UC24
+    usecase "Request AI Red Teaming" as UC25
+    usecase "Host Live Hacking Event" as UC26
+    usecase "Integrate SSDLC Tools" as UC27
+    
+    ' Analytics & Reporting
+    usecase "View Program Analytics" as UC28
+    usecase "Generate Reports" as UC29
+    usecase "View Vulnerability Trends" as UC30
+    usecase "Export Data" as UC31
+    
+    ' Financial
+    usecase "Add Funds to Program" as UC32
+    usecase "View Budget Status" as UC33
+    usecase "View Payment History" as UC34
+    
+    ' Communication
+    usecase "Message Researchers" as UC35
+    usecase "Post Announcements" as UC36
+    usecase "Receive Notifications" as UC37
+}
+
+' Relationships
+Org --> UC1
+Org --> UC2
+Org --> UC3
+Org --> UC4
+Org --> UC5
+Org --> UC6
+Org --> UC7
+Org --> UC8
+Org --> UC9
+Org --> UC10
+Org --> UC11
+Org --> UC12
+Org --> UC13
+Org --> UC14
+Org --> UC15
+Org --> UC16
+Org --> UC17
+Org --> UC18
+Org --> UC19
+Org --> UC20
+Org --> UC21
+Org --> UC22
+Org --> UC23
+Org --> UC24
+Org --> UC25
+Org --> UC26
+Org --> UC27
+Org --> UC28
+Org --> UC29
+Org --> UC30
+Org --> UC31
+Org --> UC32
+Org --> UC33
+Org --> UC34
+Org --> UC35
+Org --> UC36
+Org --> UC37
+
+' Include relationships
+UC5 ..> UC6 : <<include>>
+UC5 ..> UC7 : <<include>>
+UC5 ..> UC8 : <<include>>
+UC9 ..> UC5 : <<include>>
+UC17 ..> UC14 : <<include>>
+UC19 ..> UC20 : <<include>>
+
+' Extend relationships
+UC3 ..> UC1 : <<extend>>
+UC4 ..> UC1 : <<extend>>
+UC10 ..> UC9 : <<extend>>
+UC11 ..> UC9 : <<extend>>
+UC16 ..> UC13 : <<extend>>
+UC23 ..> UC5 : <<extend>>
+UC24 ..> UC5 : <<extend>>
+UC25 ..> UC5 : <<extend>>
+UC26 ..> UC5 : <<extend>>
+
+' External systems
+UC32 --> PaymentGW : add funds
+UC17 --> PaymentGW : process payment
+
+@enduml

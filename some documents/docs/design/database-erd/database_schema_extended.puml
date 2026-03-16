@@ -1,0 +1,879 @@
+@startuml Database_Schema_ERD_Extended
+
+' ============================================
+' DATABASE SCHEMA - Extended Tables
+' Bug Bounty and Its Simulation Platform
+' PostgreSQL Database Design
+' ============================================
+
+!define PK <color:gold><&key></color>
+!define FK <color:silver><&link-intact></color>
+!define UK <color:blue><&star></color>
+
+skinparam linetype ortho
+
+title Bug Bounty Platform - Extended Database Schema
+
+' ============================================
+' PTAAS SYSTEM
+' ============================================
+
+entity "ptaas_engagements" as ptaas {
+  PK engagement_id : UUID
+  FK organization_id : UUID
+  FK researcher_id : UUID
+  title : VARCHAR(200)
+  description : TEXT
+  methodology : VARCHAR(50)
+  scope : JSON
+  status : VARCHAR(20)
+  pricing_model : VARCHAR(20)
+  budget : DECIMAL(15,2)
+  start_date : TIMESTAMP
+  end_date : TIMESTAMP
+  report_submitted_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "retest_requests" as retests {
+  PK retest_id : UUID
+  FK engagement_id : UUID
+  FK original_finding_id : UUID
+  status : VARCHAR(20)
+  result : VARCHAR(20)
+  notes : TEXT
+  requested_at : TIMESTAMP
+  completed_at : TIMESTAMP
+}
+
+' ============================================
+' SIMULATION ENVIRONMENT
+' ============================================
+
+entity "simulated_environments" as sim_envs {
+  PK environment_id : UUID
+  name : VARCHAR(200)
+  description : TEXT
+  difficulty : VARCHAR(20)
+  vulnerability_types : JSON
+  docker_image : VARCHAR(500)
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "simulation_sessions" as sim_sessions {
+  PK session_id : UUID
+  FK researcher_id : UUID
+  FK environment_id : UUID
+  status : VARCHAR(20)
+  score : INTEGER
+  hints_used : INTEGER
+  time_spent : INTEGER
+  completed_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' CODE REVIEW
+' ============================================
+
+entity "code_review_engagements" as code_reviews {
+  PK engagement_id : UUID
+  FK organization_id : UUID
+  FK reviewer_id : UUID
+  title : VARCHAR(200)
+  repository_url : VARCHAR(500)
+  review_type : VARCHAR(50)
+  status : VARCHAR(20)
+  findings_count : INTEGER
+  report_submitted_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "code_review_findings" as cr_findings {
+  PK finding_id : UUID
+  FK engagement_id : UUID
+  title : VARCHAR(200)
+  description : TEXT
+  severity : VARCHAR(20)
+  issue_type : VARCHAR(50)
+  file_path : VARCHAR(500)
+  line_number : INTEGER
+  status : VARCHAR(20)
+  created_at : TIMESTAMP
+}
+' ============================================
+' LIVE HACKING EVENTS
+' ============================================
+
+entity "live_hacking_events" as events {
+  PK event_id : UUID
+  FK organization_id : UUID
+  name : VARCHAR(200)
+  description : TEXT
+  status : VARCHAR(20)
+  start_time : TIMESTAMP
+  end_time : TIMESTAMP
+  max_participants : INTEGER
+  prize_pool : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "event_participations" as participations {
+  PK participation_id : UUID
+  FK event_id : UUID
+  FK researcher_id : UUID
+  status : VARCHAR(20)
+  score : INTEGER
+  rank : INTEGER
+  prize_amount : DECIMAL(15,2)
+  joined_at : TIMESTAMP
+}
+
+' ============================================
+' AI RED TEAMING
+' ============================================
+
+entity "ai_red_teaming_engagements" as ai_engagements {
+  PK engagement_id : UUID
+  FK organization_id : UUID
+  FK expert_id : UUID
+  title : VARCHAR(200)
+  ai_model_type : VARCHAR(50)
+  status : VARCHAR(20)
+  findings_count : INTEGER
+  created_at : TIMESTAMP
+}
+
+entity "ai_vulnerability_reports" as ai_reports {
+  PK report_id : UUID
+  FK engagement_id : UUID
+  title : VARCHAR(200)
+  attack_type : VARCHAR(50)
+  severity : VARCHAR(20)
+  description : TEXT
+  proof_of_concept : TEXT
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' COMMUNICATION SYSTEM
+' ============================================
+
+entity "notifications" as notifications {
+  PK notification_id : UUID
+  FK user_id : UUID
+  type : VARCHAR(50)
+  channel : VARCHAR(20)
+  title : VARCHAR(200)
+  message : TEXT
+  data : JSON
+  status : VARCHAR(20)
+  read_at : TIMESTAMP
+  sent_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "notification_preferences" as notif_prefs {
+  PK preference_id : UUID
+  FK user_id : UUID
+  email_enabled : BOOLEAN
+  sms_enabled : BOOLEAN
+  in_app_enabled : BOOLEAN
+  report_updates : BOOLEAN
+  payment_updates : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "messages" as messages {
+  PK message_id : UUID
+  FK sender_id : UUID
+  FK recipient_id : UUID
+  FK parent_message_id : UUID
+  subject : VARCHAR(200)
+  body : TEXT
+  is_read : BOOLEAN
+  read_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "webhook_endpoints" as webhooks {
+  PK endpoint_id : UUID
+  FK organization_id : UUID
+  url : VARCHAR(500)
+  secret : VARCHAR(100)
+  events : JSON
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' ANALYTICS & METRICS
+' ============================================
+
+entity "researcher_metrics" as r_metrics {
+  PK metrics_id : UUID
+  FK researcher_id : UUID
+  total_reports : INTEGER
+  validated_reports : INTEGER
+  total_earnings : DECIMAL(15,2)
+  success_rate : DECIMAL(5,2)
+  reputation_score : DECIMAL(5,2)
+  rank : INTEGER
+  updated_at : TIMESTAMP
+}
+
+entity "organization_metrics" as o_metrics {
+  PK metrics_id : UUID
+  FK organization_id : UUID
+  active_programs : INTEGER
+  total_reports_received : INTEGER
+  total_paid : DECIMAL(15,2)
+  average_response_time : INTEGER
+  mttr : INTEGER
+  roi : DECIMAL(10,2)
+  updated_at : TIMESTAMP
+}
+
+entity "platform_metrics" as p_metrics {
+  PK metrics_id : UUID
+  date : DATE
+  total_users : INTEGER
+  active_researchers : INTEGER
+  total_reports : INTEGER
+  total_payments : DECIMAL(15,2)
+  platform_revenue : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "analytics_reports" as a_reports {
+  PK report_id : UUID
+  FK user_id : UUID
+  title : VARCHAR(200)
+  type : VARCHAR(50)
+  format : VARCHAR(20)
+  frequency : VARCHAR(20)
+  file_path : VARCHAR(500)
+  generated_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' AUDIT & LOGGING
+' ============================================
+
+entity "audit_logs" as audit_logs {
+  PK audit_id : UUID
+  FK user_id : UUID
+  action : VARCHAR(50)
+  entity_type : VARCHAR(50)
+  entity_id : UUID
+  old_values : JSON
+  new_values : JSON
+  ip_address : VARCHAR(45)
+  user_agent : VARCHAR(500)
+  created_at : TIMESTAMP
+}
+
+entity "security_events" as security_events {
+  PK event_id : UUID
+  FK user_id : UUID
+  event_type : VARCHAR(100)
+  severity : VARCHAR(20)
+  description : TEXT
+  ip_address : VARCHAR(45)
+  is_blocked : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "login_history" as login_history {
+  PK login_id : UUID
+  FK user_id : UUID
+  ip_address : VARCHAR(45)
+  user_agent : VARCHAR(500)
+  is_successful : BOOLEAN
+  failure_reason : VARCHAR(200)
+  mfa_used : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' RESEARCHER MATCHING
+' ============================================
+
+entity "matching_requests" as matching_requests {
+  PK request_id : UUID
+  FK engagement_id : UUID
+  FK organization_id : UUID
+  engagement_type : VARCHAR(50)
+  criteria : JSON
+  required_skills : JSON
+  status : VARCHAR(20)
+  created_at : TIMESTAMP
+}
+
+entity "match_results" as match_results {
+  PK result_id : UUID
+  FK request_id : UUID
+  FK researcher_id : UUID
+  match_score : DECIMAL(5,2)
+  skill_score : DECIMAL(5,2)
+  reputation_score : DECIMAL(5,2)
+  rank : INTEGER
+  created_at : TIMESTAMP
+}
+
+entity "researcher_profiles" as r_profiles {
+  PK profile_id : UUID
+  FK researcher_id : UUID
+  skills : JSON
+  specializations : JSON
+  experience_years : INTEGER
+  timezone : VARCHAR(50)
+  availability_hours : INTEGER
+  current_workload : INTEGER
+  updated_at : TIMESTAMP
+}
+
+entity "skill_tags" as skill_tags {
+  PK tag_id : UUID
+  FK parent_tag_id : UUID
+  name : VARCHAR(100)
+  category : VARCHAR(50)
+  description : TEXT
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "researcher_skills" as r_skills {
+  PK skill_id : UUID
+  FK researcher_id : UUID
+  FK tag_id : UUID
+  level : VARCHAR(20)
+  years_experience : INTEGER
+  verified : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' SSDLC INTEGRATION
+' ============================================
+
+entity "external_integrations" as integrations {
+  PK integration_id : UUID
+  FK organization_id : UUID
+  type : VARCHAR(50)
+  config : JSON
+  status : VARCHAR(20)
+  last_sync_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "sync_logs" as sync_logs {
+  PK log_id : UUID
+  FK integration_id : UUID
+  FK report_id : UUID
+  action : VARCHAR(50)
+  status : VARCHAR(20)
+  error_message : TEXT
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+ptaas ||--o{ retests
+code_reviews ||--o{ cr_findings
+ai_engagements ||--o{ ai_reports
+events ||--o{ participations
+sim_envs ||--o{ sim_sessions
+
+@enduml
+
+' ============================================
+' USER MANAGEMENT (Missing Tables)
+' ============================================
+
+entity "users" as users {
+  PK user_id : UUID
+  email : VARCHAR(255)
+  password_hash : VARCHAR(60)
+  full_name : VARCHAR(100)
+  role : VARCHAR(20)
+  status : VARCHAR(20)
+  email_verified : BOOLEAN
+  phone : VARCHAR(20)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+  last_login_at : TIMESTAMP
+}
+
+entity "researchers" as researchers {
+  PK researcher_id : UUID
+  FK user_id : UUID
+  bio : TEXT
+  website : VARCHAR(500)
+  github : VARCHAR(255)
+  twitter : VARCHAR(255)
+  reputation_score : DECIMAL(5,2)
+  rank : INTEGER
+  total_earnings : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "organizations" as organizations {
+  PK organization_id : UUID
+  FK user_id : UUID
+  company_name : VARCHAR(200)
+  industry : VARCHAR(100)
+  website : VARCHAR(500)
+  subscription_type : VARCHAR(20)
+  subscription_expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "triage_specialists" as triage_specialists {
+  PK specialist_id : UUID
+  FK user_id : UUID
+  specialization : JSON
+  years_experience : INTEGER
+  accuracy_rate : DECIMAL(5,2)
+  created_at : TIMESTAMP
+}
+
+entity "administrators" as administrators {
+  PK admin_id : UUID
+  FK user_id : UUID
+  admin_level : VARCHAR(20)
+  permissions : JSON
+  created_at : TIMESTAMP
+}
+
+entity "financial_officers" as financial_officers {
+  PK officer_id : UUID
+  FK user_id : UUID
+  department : VARCHAR(100)
+  approval_limit : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "kyc_verifications" as kyc_verifications {
+  PK kyc_id : UUID
+  FK user_id : UUID
+  status : VARCHAR(20)
+  document_type : VARCHAR(50)
+  document_number : VARCHAR(100)
+  document_front : VARCHAR(500)
+  document_back : VARCHAR(500)
+  selfie_photo : VARCHAR(500)
+  verified_by : UUID
+  verified_at : TIMESTAMP
+  rejection_reason : TEXT
+  expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' BUG BOUNTY CORE (Missing Tables)
+' ============================================
+
+entity "bounty_programs" as programs {
+  PK program_id : UUID
+  FK organization_id : UUID
+  name : VARCHAR(200)
+  description : TEXT
+  type : VARCHAR(20)
+  status : VARCHAR(20)
+  start_date : TIMESTAMP
+  end_date : TIMESTAMP
+  budget : DECIMAL(15,2)
+  is_private : BOOLEAN
+  eligibility_criteria : JSON
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "program_scopes" as program_scopes {
+  PK scope_id : UUID
+  FK program_id : UUID
+  asset_type : VARCHAR(50)
+  asset_identifier : VARCHAR(500)
+  is_in_scope : BOOLEAN
+  description : TEXT
+  created_at : TIMESTAMP
+}
+
+entity "reward_tiers" as reward_tiers {
+  PK tier_id : UUID
+  FK program_id : UUID
+  severity : VARCHAR(20)
+  min_amount : DECIMAL(15,2)
+  max_amount : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "vulnerability_reports" as reports {
+  PK report_id : UUID
+  FK program_id : UUID
+  FK researcher_id : UUID
+  title : VARCHAR(200)
+  description : TEXT
+  severity : VARCHAR(20)
+  status : VARCHAR(20)
+  vulnerability_type : VARCHAR(100)
+  cvss_score : DECIMAL(3,1)
+  steps_to_reproduce : TEXT
+  impact : TEXT
+  proof_of_concept : TEXT
+  reward_amount : DECIMAL(15,2)
+  submitted_at : TIMESTAMP
+  triaged_at : TIMESTAMP
+  validated_at : TIMESTAMP
+  resolved_at : TIMESTAMP
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "attachments" as attachments {
+  PK attachment_id : UUID
+  FK report_id : UUID
+  file_name : VARCHAR(255)
+  file_path : VARCHAR(500)
+  file_size : BIGINT
+  mime_type : VARCHAR(100)
+  uploaded_at : TIMESTAMP
+}
+
+entity "comments" as comments {
+  PK comment_id : UUID
+  FK report_id : UUID
+  FK user_id : UUID
+  FK parent_comment_id : UUID
+  content : TEXT
+  is_internal : BOOLEAN
+  is_edited : BOOLEAN
+  edited_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "program_invitations" as program_invitations {
+  PK invitation_id : UUID
+  FK program_id : UUID
+  FK researcher_id : UUID
+  status : VARCHAR(20)
+  invited_at : TIMESTAMP
+  responded_at : TIMESTAMP
+  expires_at : TIMESTAMP
+}
+
+' ============================================
+' TRIAGE & VALIDATION
+' ============================================
+
+entity "triage_queue" as triage_queue {
+  PK queue_id : UUID
+  FK report_id : UUID
+  priority : INTEGER
+  assigned_to : UUID
+  status : VARCHAR(20)
+  created_at : TIMESTAMP
+  assigned_at : TIMESTAMP
+}
+
+entity "triage_assignments" as triage_assignments {
+  PK assignment_id : UUID
+  FK report_id : UUID
+  FK specialist_id : UUID
+  assigned_at : TIMESTAMP
+  completed_at : TIMESTAMP
+  status : VARCHAR(20)
+}
+
+entity "validation_results" as validation_results {
+  PK validation_id : UUID
+  FK report_id : UUID
+  FK validator_id : UUID
+  is_valid : BOOLEAN
+  severity_rating : VARCHAR(20)
+  cvss_score : DECIMAL(3,1)
+  recommended_reward : DECIMAL(15,2)
+  notes : TEXT
+  validated_at : TIMESTAMP
+}
+
+entity "duplicate_detections" as duplicate_detections {
+  PK detection_id : UUID
+  FK report_id : UUID
+  FK duplicate_of : UUID
+  similarity_score : DECIMAL(5,2)
+  detection_method : VARCHAR(50)
+  detected_at : TIMESTAMP
+}
+
+' ============================================
+' PAYMENT SYSTEM
+' ============================================
+
+entity "bounty_payments" as payments {
+  PK payment_id : UUID
+  FK report_id : UUID
+  FK researcher_id : UUID
+  amount : DECIMAL(15,2)
+  status : VARCHAR(20)
+  approved_by : UUID
+  approved_at : TIMESTAMP
+  processed_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "researcher_balances" as balances {
+  PK balance_id : UUID
+  FK researcher_id : UUID
+  available_balance : DECIMAL(15,2)
+  pending_balance : DECIMAL(15,2)
+  total_earned : DECIMAL(15,2)
+  total_withdrawn : DECIMAL(15,2)
+  updated_at : TIMESTAMP
+}
+
+entity "payout_requests" as payouts {
+  PK payout_id : UUID
+  FK researcher_id : UUID
+  amount : DECIMAL(15,2)
+  payment_method : VARCHAR(50)
+  payment_details : JSON
+  status : VARCHAR(20)
+  processed_by : UUID
+  processed_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "transactions" as transactions {
+  PK transaction_id : UUID
+  FK user_id : UUID
+  type : VARCHAR(50)
+  amount : DECIMAL(15,2)
+  status : VARCHAR(20)
+  reference_id : UUID
+  gateway_response : JSON
+  created_at : TIMESTAMP
+}
+
+entity "payment_gateways" as payment_gateways {
+  PK gateway_id : UUID
+  name : VARCHAR(100)
+  type : VARCHAR(50)
+  config : JSON
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "payment_history" as payment_history {
+  PK history_id : UUID
+  FK payment_id : UUID
+  previous_status : VARCHAR(20)
+  new_status : VARCHAR(20)
+  changed_by : UUID
+  notes : TEXT
+  changed_at : TIMESTAMP
+}
+
+' ============================================
+' ADDITIONAL MISSING TABLES
+' ============================================
+
+entity "email_templates" as email_templates {
+  PK template_id : UUID
+  name : VARCHAR(100)
+  subject : VARCHAR(200)
+  body_html : TEXT
+  body_text : TEXT
+  variables : JSON
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "webhook_logs" as webhook_logs {
+  PK log_id : UUID
+  FK endpoint_id : UUID
+  event : VARCHAR(100)
+  payload : JSON
+  response_status : INTEGER
+  response_body : TEXT
+  error_message : VARCHAR(500)
+  retry_count : INTEGER
+  created_at : TIMESTAMP
+}
+
+entity "api_request_logs" as api_logs {
+  PK request_id : UUID
+  FK user_id : UUID
+  method : VARCHAR(10)
+  endpoint : VARCHAR(500)
+  status_code : INTEGER
+  request_body : TEXT
+  response_body : TEXT
+  ip_address : VARCHAR(45)
+  user_agent : VARCHAR(500)
+  duration_ms : INTEGER
+  created_at : TIMESTAMP
+}
+
+entity "rate_limit_logs" as rate_limits {
+  PK log_id : UUID
+  FK user_id : UUID
+  ip_address : VARCHAR(45)
+  endpoint : VARCHAR(500)
+  request_count : INTEGER
+  limit : INTEGER
+  window_start : TIMESTAMP
+  window_end : TIMESTAMP
+  is_blocked : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "data_exports" as data_exports {
+  PK export_id : UUID
+  FK user_id : UUID
+  export_type : VARCHAR(50)
+  format : VARCHAR(20)
+  filters : JSON
+  file_path : VARCHAR(500)
+  file_size : BIGINT
+  status : VARCHAR(20)
+  expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+  completed_at : TIMESTAMP
+}
+
+entity "compliance_reports" as compliance_reports {
+  PK report_id : UUID
+  report_type : VARCHAR(100)
+  period_start : TIMESTAMP
+  period_end : TIMESTAMP
+  data : JSON
+  file_path : VARCHAR(500)
+  generated_by : UUID
+  generated_at : TIMESTAMP
+}
+
+entity "matching_invitations" as matching_invitations {
+  PK invitation_id : UUID
+  FK request_id : UUID
+  FK researcher_id : UUID
+  FK engagement_id : UUID
+  match_score : DECIMAL(5,2)
+  status : VARCHAR(20)
+  message : TEXT
+  expires_at : TIMESTAMP
+  sent_at : TIMESTAMP
+  viewed_at : TIMESTAMP
+  responded_at : TIMESTAMP
+  response_note : TEXT
+}
+
+entity "matching_algorithms" as matching_algorithms {
+  PK algorithm_id : UUID
+  version : VARCHAR(20)
+  weights : JSON
+  parameters : JSON
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
+entity "matching_feedback" as matching_feedback {
+  PK feedback_id : UUID
+  FK request_id : UUID
+  FK researcher_id : UUID
+  FK organization_id : UUID
+  rating : INTEGER
+  quality_score : INTEGER
+  communication_score : INTEGER
+  timeliness_score : INTEGER
+  would_work_again : BOOLEAN
+  comments : TEXT
+  created_at : TIMESTAMP
+}
+
+entity "matching_metrics" as matching_metrics {
+  PK metrics_id : UUID
+  FK request_id : UUID
+  total_candidates : INTEGER
+  invited_count : INTEGER
+  accepted_count : INTEGER
+  declined_count : INTEGER
+  expired_count : INTEGER
+  average_match_score : DECIMAL(5,2)
+  average_response_time : INTEGER
+  success_rate : DECIMAL(5,2)
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' MORE RELATIONSHIPS
+' ============================================
+
+users ||--o| researchers
+users ||--o| organizations
+users ||--o| triage_specialists
+users ||--o| administrators
+users ||--o| financial_officers
+users ||--o{ kyc_verifications
+
+organizations ||--o{ programs
+programs ||--o{ program_scopes
+programs ||--o{ reward_tiers
+programs ||--o{ reports
+programs ||--o{ program_invitations
+researchers ||--o{ reports
+researchers ||--o{ program_invitations
+
+reports ||--o{ attachments
+reports ||--o{ comments
+reports ||--o| triage_queue
+reports ||--o{ triage_assignments
+reports ||--o{ validation_results
+reports ||--o{ duplicate_detections
+reports ||--o| payments
+
+researchers ||--|| balances
+researchers ||--o{ payouts
+researchers ||--o{ payments
+users ||--o{ transactions
+
+organizations ||--o{ webhooks
+webhooks ||--o{ webhook_logs
+users ||--o{ notifications
+users ||--|| notif_prefs
+users ||--o{ messages
+users ||--o{ audit_logs
+users ||--o{ security_events
+users ||--o{ login_history
+
+researchers ||--|| r_metrics
+organizations ||--|| o_metrics
+researchers ||--|| r_profiles
+r_profiles ||--o{ r_skills
+skill_tags ||--o{ r_skills
+skill_tags ||--o{ skill_tags
+
+organizations ||--o{ matching_requests
+matching_requests ||--o{ match_results
+matching_requests ||--o{ matching_invitations
+matching_requests ||--|| matching_metrics
+researchers ||--o{ match_results
+researchers ||--o{ matching_invitations
+
+organizations ||--o{ integrations
+integrations ||--o{ sync_logs
+
+organizations ||--o{ ptaas
+researchers ||--o{ ptaas
+organizations ||--o{ code_reviews
+researchers ||--o{ code_reviews
+organizations ||--o{ ai_engagements
+researchers ||--o{ ai_engagements
+organizations ||--o{ events
+researchers ||--o{ participations
+researchers ||--o{ sim_sessions

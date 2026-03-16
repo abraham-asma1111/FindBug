@@ -1,0 +1,201 @@
+@startuml Staff_Provisioning_Flow
+
+title Internal Staff Provisioning & Authentication Flow
+
+actor "Super Admin" as SuperAdmin
+participant "Admin Panel UI" as AdminUI
+participant "Auth Service" as AuthService
+participant "User Service" as UserService
+participant "Email Service" as EmailService
+participant "Database" as DB
+participant "Identity Provider\n(Optional SSO)" as IDP
+actor "New Staff Member" as Staff
+
+== Staff Account Creation (Internal Provisioning) ==
+
+SuperAdmin -> AdminUI: Access Staff Management
+activate AdminUI
+
+AdminUI -> AuthService: Verify Super Admin Permissions
+activate AuthService
+AuthService -> DB: Check admin_level = SUPER_ADMIN
+AuthService --> AdminUI: Authorized
+deactivate AuthService
+
+SuperAdmin -> AdminUI: Create Staff Account\n(email, role, permissions)
+AdminUI -> UserService: createStaffAccount(staffDTO)
+activate UserService
+
+UserService -> UserService: Validate Staff Data
+UserService -> UserService: Generate Temporary Password
+UserService -> UserService: Set is_staff = true
+
+UserService -> DB: INSERT INTO users\n(email, role, is_staff, status=PENDING)
+activate DB
+DB --> UserService: Staff Account Created
+deactivate DB
+
+UserService -> DB: INSERT INTO staff_invitations\n(token, expires_at)
+DB --> UserService: Invitation Token
+
+UserService -> EmailService: sendStaffInvitation(email, token)
+activate EmailService
+EmailService -> Staff: Email: "Welcome to Platform Staff"
+note right
+  Email contains:
+  - Temporary credentials
+  - Invitation link
+  - Role assignment
+  - First login instructions
+end note
+deactivate EmailService
+
+UserService --> AdminUI: Staff Account Created
+deactivate UserService
+AdminUI --> SuperAdmin: Success: Staff Invited
+deactivate AdminUI
+
+== First Login & Password Setup ==
+
+Staff -> AuthService: Click Invitation Link
+activate AuthService
+
+AuthService -> DB: Verify invitation_token\nAND expires_at > NOW()
+activate DB
+DB --> AuthService: Token Valid
+deactivate DB
+
+AuthService --> Staff: Show Password Setup Page
+Staff -> AuthService: Set New Password\n(must meet policy)
+
+AuthService -> AuthService: Validate Password Strength
+AuthService -> AuthService: Hash Password (bcrypt)
+
+AuthService -> DB: UPDATE users\nSET password_hash, status=ACTIVE\nWHERE email = staff_email
+activate DB
+DB --> AuthService: Password Updated
+deactivate DB
+
+AuthService -> DB: DELETE FROM staff_invitations\nWHERE token = invitation_token
+DB --> AuthService: Invitation Consumed
+deactivate DB
+
+AuthService -> AuthService: Generate JWT Token\n(with staff role & permissions)
+
+AuthService --> Staff: Login Success\n+ JWT Token + Role
+deactivate AuthService
+
+== Staff Login (Standard) ==
+
+Staff -> AuthService: POST /auth/login\n(email, password)
+activate AuthService
+
+AuthService -> DB: SELECT * FROM users\nWHERE email = ? AND is_staff = true
+activate DB
+DB --> AuthService: User Record
+deactivate DB
+
+AuthService -> AuthService: Verify Password Hash
+AuthService -> AuthService: Check MFA if enabled
+
+alt MFA Enabled
+    AuthService --> Staff: Request MFA Code
+    Staff -> AuthService: Submit MFA Code
+    AuthService -> AuthService: Verify TOTP Code
+end
+
+AuthService -> AuthService: Generate JWT Token\n(claims: userId, role, permissions)
+
+AuthService -> DB: UPDATE users\nSET last_login_at = NOW()
+activate DB
+DB --> AuthService: Updated
+deactivate DB
+
+AuthService -> DB: INSERT INTO audit_logs\n(staff_login event)
+DB --> AuthService: Logged
+deactivate DB
+
+AuthService --> Staff: JWT Token + Refresh Token
+deactivate AuthService
+
+Staff -> AdminUI: Access Admin Dashboard\n(Authorization: Bearer <token>)
+activate AdminUI
+
+AdminUI -> AuthService: Validate JWT Token
+activate AuthService
+AuthService -> AuthService: Verify Signature\nCheck Expiration\nExtract Claims
+AuthService --> AdminUI: Token Valid + User Context
+deactivate AuthService
+
+AdminUI -> AdminUI: Route to Role-Specific Dashboard
+note right
+  Based on role:
+  - SUPER_ADMIN → Full Admin Panel
+  - ADMIN → Limited Admin Panel
+  - TRIAGE_SPECIALIST → Triage Dashboard
+  - FINANCIAL_OFFICER → Finance Dashboard
+  - SUPPORT_STAFF → Support Dashboard
+end note
+
+AdminUI --> Staff: Display Dashboard
+deactivate AdminUI
+
+== Optional: SSO Integration for Staff ==
+
+group SSO Login (Alternative Flow)
+    Staff -> AuthService: Login with SSO
+    activate AuthService
+    
+    AuthService -> IDP: Redirect to Identity Provider
+    activate IDP
+    
+    Staff -> IDP: Enter Corporate Credentials
+    IDP -> IDP: Authenticate User
+    
+    IDP --> AuthService: SAML Response\n(email, attributes)
+    deactivate IDP
+    
+    AuthService -> DB: SELECT * FROM users\nWHERE email = ? AND is_staff = true
+    activate DB
+    DB --> AuthService: Staff User Found
+    deactivate DB
+    
+    AuthService -> AuthService: Generate JWT Token
+    AuthService --> Staff: Login Success + Token
+    deactivate AuthService
+end
+
+== Staff Permission Check (Every Request) ==
+
+Staff -> AdminUI: Perform Admin Action
+activate AdminUI
+
+AdminUI -> AuthService: Verify Permission\n(action, resource)
+activate AuthService
+
+AuthService -> AuthService: Extract JWT Claims
+AuthService -> DB: SELECT permissions\nFROM users WHERE userId = ?
+activate DB
+DB --> AuthService: User Permissions
+deactivate DB
+
+AuthService -> AuthService: Check if action allowed\nfor user role & permissions
+
+alt Permission Granted
+    AuthService --> AdminUI: Authorized
+    AdminUI -> UserService: Execute Action
+    activate UserService
+    UserService -> DB: Perform Operation
+    UserService -> DB: Log to audit_logs
+    UserService --> AdminUI: Action Completed
+    deactivate UserService
+    AdminUI --> Staff: Success
+else Permission Denied
+    AuthService --> AdminUI: 403 Forbidden
+    AdminUI --> Staff: Access Denied
+end
+
+deactivate AuthService
+deactivate AdminUI
+
+@enduml

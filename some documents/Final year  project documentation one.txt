@@ -1,0 +1,2218 @@
+                                                 
+　　　　　　　　　　　　　　Bahir Dar University
+　　　　　　　Bahir Dar Institute  of  Technology Faculty of Computing
+　　　　　　　　　　Requirement Analysis Document (RAD)  
+　　　　　　　　　　　　　　　　　　　　for		
+　　　　Industrial project on Bug Bounty and Its Simulation Platform
+　　　　　　Submitted to the faculty of computing in partial fulfillment 
+　　　of the requirements for the degree of Bachelor of Science in Cyber Security
+　　
+　　　　　　　　　Group members Name                                                                IDNumber
+
+                                    1.  Niway  Tadesse                                                                  1507460
+                                    2.  Abraham Asimamaw                                                        1504838
+                                    3. Melkamu Tesfa                                                                   1507064
+　　　　　　　　　　Advisor : Yosef Worku
+
+
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　　　　　　　　　　2026
+　　　　　　　　　　　　Bahir Dar University, Bahir Dar Institute of Technology
+　　　　　　　　　　　　　　　
+　　　　　　　　　　　　　　　Declaration
+The Project is our own and has not been presented for a degree in any other university and all the sources of material used for the project have been duly acknowledged.
+                      Name                                                                             Signiture
+            
+　　　　　 1.Abraham  Asmamaw                                                               
+                 2.Niway  Tadesse                                                                                                
+                 3.Melkamu Tesfa                                                                         
+          
+　　　　Faculty:Computing
+　　　　Program:Cyber  Security
+　　　　Project Title:  Bug Bounty and Its Simulation  Platform
+This is to certify that I have read this project and that in my supervision and the students’ performance, it is fully adequate, in scope and quality, as a project for the degree of Bachelor of Science                                                                                  
+Advisor Name                                                            `         Signature 
+1.Yosef  Worku                                                                     
+
+
+Examining committee members	signature	Date
+1.  Examiner1			
+	
+2.  Examiner2			 		 	
+
+It is approved that this project has been written in compliance with the formatting rules laid down by the faculty.
+
+
+　　　　　　　　　
+　　　　　　　　　Roles and Responsibilities of the Group Members
+List Of Tasks1	Melkamu	Niway	Abraham
+Requirement Gathering & Analysis	✔	✔	✔
+System Design (UML Diagrams)	✔	✔	✔
+Implementation & Prototyping	✔	✔	✔
+Documentation & Final Report		✔	✔
+
+　　　　　　　　　　　　　　　Acknowledgment
+First and foremost, we give thanks to Almighty God for granting us the strength, wisdom, patience, and good health required to successfully complete this project. Without His guidance and blessings, the accomplishment of this work would not have been possible.
+We would like to express our heartfelt gratitude to our family members for their unconditional love, encouragement, moral support, and understanding throughout our academic journey. Their continuous motivation played a vital role in helping us overcome challenges during the development of this project.
+Our sincere appreciation goes to our project advisor, Mr. Yosef Worku, for his invaluable guidance, constructive feedback, and continuous supervision throughout the project period. His professional advice, technical insights, and commitment greatly contributed to improving the quality and success of this work.
+We would also like to extend our thanks to our friends and classmates for their cooperation, idea sharing, and encouragement. Their discussions and support were essential in refining our understanding and approach to the project.
+
+
+Finally, we acknowledge all individuals and participants who directly or indirectly contributed to the success of this project, including instructors, technical staff, and anyone who provided support, advice, or resources during the course of this work.
+　　　　　　　　　　　　　List of Acronyms
+Acronym	Full Form
+BR	Business Rule
+CRC	Class-Responsibility-Collaboration
+FREQ	Functional Requirement
+NFR	Non-Functional Requirement
+OWASP	Open Worldwide Application Security Project
+ 
+RAD  
+	Rquirement Analysis Document
+SSDLC	Secure Software Development Life Cycle
+ UC	Use case 
+UI 	User Interface
+VDP 	Vulnerablity Disclosure Program
+VRT	Vulnerablity Rating Taxonomy
+
+
+
+
+
+
+
+
+
+
+                                                     List Of Figures
+Image 1  Use case diagram	44
+Image 3  user Registration state chart	61
+Image 4  Vulnerablity Report Life cycle	61
+Image 5  Bug bounty program	62
+Image 6  Bounty Payment	62
+Image 7  Live Hacking Event 	62
+Image 8  Expert Code Review Statechart	63
+Image 9  SSDLC integration Statechart	63
+Image 10  Combined All Statechart Diagram	64
+Image 11 Vulnerablity report Submisson A.D	65
+Image 12  User Registration A.diagram                                 	65
+Image 13  Report Validation A.D	66
+Image 14  Create Bounty Program	67
+Image 15  Reward Approval	67
+Image 16 View Dashboard A.D 	68
+Image 17  Practice Vulnerablity In simulation A.D	68
+Image 18 Expert Code Review A.D	69
+Image 19  SSDLC integration A.D	69
+Image 20  Live Hacking Event A.D 	70
+Image 21  AI Red Teaming Engagement	70
+Image 22  Combined Sequence Diagram	71
+Image 23  Analysis Class Model	72
+Image 24  Class Diagram	88
+Image 25 . Home page prototype	91
+Image 26 .user registration prototype	91
+Image 27 .Researcher Dashbord	92
+Image 28 .less featured Analytics	93
+Image 29 . Report Submission prototype	93
+Image 30 .report submission 2	94
+Image 31 .  Bounty program Creation prototype	94
+Image 32 . Customer pentest Dashboard	95
+Image 33 . Customer Analytics Dashboard	95
+Image 34  Architectural Design	97
+Image 35  Component modeling	98
+Image 36  Deployment Model	99
+Image 37   Design Class Model	101
+Image 38 hacker registration	105
+Image 39  Org registration form	105
+Image 40  Researcher Dashboard	106
+Image 41  Organisation Dashboard	106
+Image 42  Triage Specialist portal	107
+Image 43  Admin portal1	107
+Image 44  Admin portal2	108
+Image 45  Admin portal3	108
+Image 46  Finance Officer portal1	109
+Image 47  Finance officer portal2	109
+
+                                                    List Of Tables
+Table 1 .   Functional Requirement	37
+Table 2  .Bussiness Rule Documentation	51
+Table 3 . Non Functional Requirement	79
+Table 4 .  Hardware Requirement	82
+Table 5 . Software Requirement	83
+Table 6  . CRC   Analysis	85
+Table 7 . Change Cases	87
+Table 8  Users Persistence model	99
+Table 9  Researcher p.model	99
+Table 10  Organization P.model	99
+Table 11 Bounty Program	100
+Table 12  Vulnerablity Reports	100
+Table 13 Bounty paymen	100
+Table 14  PTaas Engagement	100
+Table 15  Ai red teaming Engagement	100
+Table 16  Simulations	101
+Table 17  SSDL Integration	101
+Table 18  Unified Relationship	101
+
+　　　　　Table of Contents
+
+
+
+Bahir Dar University	1
+Bahir Dar Institute  of  Technology Faculty of Computing	1
+Declaration	2
+The Project is our own and has not been presented for a degree in any other university and all the sources of material used for the project have been duly acknowledged.	2
+Roles and Responsibilities of the Group Members	3
+Acknowledgment	3
+List of Acronyms	4
+Abstract	10
+Chapter One	11
+Introduction	11
+1.1 Background	11
+1.1.1 Overview  Of The Platform	11
+1.1.2 Background of the Organization	11
+1.1.3 Organizational Structure	12
+1.1.4 Mission, Vision, and Core Values	12
+1.1.5 Basic Information about the Business Process	13
+1.1.6 Bug Bounty Simulation Environment	13
+1.2  Statement of the problem	14
+1.3  Objectives	14
+1.3.1 General Objective	14
+1.4 Methodology	16
+1.4.1 Requirement Gathering Methods	16
+I. Interviews with Local Ethical Hackers	16
+II. Interviews with Organizations and Security Teams	17
+III. Interviews with Cybersecurity Experts	17
+IV. Questionnaires for Ethical Hackers	18
+V. Document Analysis of Online Sources	18
+VI. Literature Review	19
+After gathering requirements, they were structured and modeled using an Object-Oriented (OO) approach.	19
+1.4.2 Analysis and Design Methodology	19
+Analysis and Design Tools	20
+1.4.3 Implementation Methodology	21
+Frontend Development Tools	21
+ Framework: Next.js (React-based frontend framework)	21
+Backend Development Tools	21
+Deployment and Containerization Tools	22
+1.5 Feasibility	23
+1.5.3 Time Feasibility	24
+1.6 Beneficiaries or Significance of the Project	24
+1.6.1  Beneficiaries	24
+1. Public and Private Organizations	24
+ Key benefits include	24
+2. Ethical Hackers and Cybersecurity Professionals	25
+3. Platform Owners and Developers	25
+4. Government and Regulatory Bodies	25
+1.6.2 Significance of the Project	25
+1.6.3 Effects on Organizations and the Industry	26
+1.7 Limitations of the Project	26
+1.8 Scope of the Project	27
+1.9 Organization of the Project	30
+Chapter Two	32
+System Features	32
+2.1 The Existing System	32
+2.1.1 How the Existing System Functions	32
+2.2  Proposed System	33
+2.2.1 Bug Bounty Simulation (Learning Environment)	33
+Participation in the simulation is optional and does not affect researcher eligibility, reputation, or rewards in real crowdsourced bug bounty programs. Its primary goal is to improve user readiness, report quality, and overall platform effectiveness.	34
+2.2.2 Bug Bounty Simulation Module Architecture	34
+2.3 Requirement Analysis	36
+2.3.1 Functional requirement	36
+2.3.2 System Use case	42
+ UC-07→ Practice Vulnerability in Simulation	49
+2.3.3 Business Rule Documentation	51
+2.3.4  User Interface Prototype	58
+2.3.5 State chart diagram	60
+2.3.6 Activity Diagram	63
+2.3.7 Sequence Diagram	70
+2.3.8 Analysis Class Model	71
+2.3.9 Logic Model	72
+2.4 Non functional requirement	79
+2.5 System Requirement	82
+2.5.1 Hardware requirements	82
+2.5.2 Software requirements	83
+2.6 Key Abstraction with CRC Analysis	84
+2.6.1 Conceptual Modeling: Class Diagram	85
+2.6.2 Identifying change cases	87
+2.6.3 User Interface Prototyping	88
+Chapter Three	94
+System Design	94
+The platform is designed to facilitate secure collaboration between ethical hackers (researchers) and organizations that require vulnerability assessment of their applications, systems, and AI models.	94
+Purpose of the System Design	94
+3.1 Architectural Design	94
+3.1.1 Component modeling	96
+3.1.2 Deployment Modeling	97
+3.2 Detail Design	98
+3.2.2 Persistent model	99
+3.3 User Interface Design	101
+3.4 Access control and security	107
+References	113
+Appendeces	114
+Sample Questionnaire Used During Requirement Gathering	114
+Interview Questions Used During Requirement Gathering	114
+
+　　　　　　　　　　　　　　Abstract
+The increasing reliance on digital systems and online services has made cybersecurity a critical concern for organizations worldwide. Traditional security testing methods, such as periodic audits and penetration tests, are often insufficient to detect all vulnerabilities due to limited scope, time constraints, and cost. This project presents the design and development of Crowdsourced Cybersecurity Platform with Simulation, PTaaS, and Advanced Matching, a secure and structured environment that connects organizations with ethical hackers to identify and remediate software vulnerabilities efficiently.
+The platform allows organizations to define program scope, manage vulnerability submissions, and reward valid security findings. Ethical hackers can safely report vulnerabilities, receive recognition, and earn monetary rewards, all within a legally protected framework. By leveraging crowdsourced security expertise, the platform enhances the security posture of participating organizations while fostering a collaborative cybersecurity community.
+Key features of the platform include vulnerability reporting and tracking, triage and validation mechanisms, secure communication channels, reward management, reputation systems for researchers, expert code review, SSDLC integrations with tools like Jira and GitHub, and live hacking events. This project demonstrates how crowdsourced cybersecurity platforms  reduce the risk of cyberattacks, and promote ethical hacking practices.
+In addition to real-world crowdsourced vulnerability discovery, the platform integrates a Bug Bounty Simulation environment for learning purposes. The ssimulation mirrors real bug bounty workflows using simulated targets and data, allowing beginner, intermediate, and advanced users to practice vulnerability discovery and reporting. This environment operates independently from real programs and does not involve real organizations, production assets, or monetary rewards.
+
+
+
+
+
+
+
+
+
+　　　　　　　　　　Chapter One 
+　　　　　　　　　　Introduction
+1.1Background 
+　　　　　1.1.1 Overview  Of The Platform
+The platform is a crowdsourced cybersecurity system that enables organizations to identify and fix security vulnerabilities by engaging ethical hackers (security researchers). Organizations publish the scope of their digital assets, while researchers responsibly discover, report, and validate vulnerabilities in exchange for monetary rewards. This approach provides continuous security testing and improves overall cyber resilience.
+　　　　　　1.1.2 Background of the Organization
+The proposed organization is a commercial crowdsourced bug bounty platform planned to be established within the next 1–2 years. The platform will be headquartered in Ethiopia and will primarily serve Ethiopian organizations while expanding to the African market.
+Year of Establishment: Planned (2026–2027)
+Location: Ethiopia
+Number of Employees: It will have at least 10 employees
+Operational Area: Ethiopia and Africa
+
+
+　　　　　　　
+　　　　　　　　
+　　　　　　　　1.1.3 Organizational Structure
+The organization will adopt a structured management hierarchy to ensure efficiency and security:
+Chief Executive Officer (CEO): Founder of the company, responsible for overall strategic direction.
+Top Director / General Manager: Oversees daily operations and manages all departments.
+Platform Administrators: Control system configuration, user management, and access control.
+Security Specialists / Analysts: Validate and triage vulnerability reports submitted by hackers.
+Technical Staff: Maintain the platform infrastructure and security.
+Support Staff: Handle communication with clients and researchers.
+　　　　　　1.1.4 Mission, Vision, and Core Values
+　　　　　　　　　　　　　Mission
+To secure digital assets in Ethiopia and across Africa by providing a trusted, ethical, and efficient crowdsourced cybersecurity platform.
+　　　　　　　　　　　　　Vision
+To become a successful and outstanding crowdsourced bug bounty company in Ethiopia and Africa.
+　　　　　　　　　　Core Values
+Promoting ethical hacking and responsible disclosure.
+Strengthening cybersecurity awareness and skills.
+Creating a sustainable cybersecurity ecosystem.
+Trust, transparency, and fairness.
+Innovation and continuous improvement.
+
+    1.1.5 Basic Information about the Business Process 
+The platform automates the following business processes
+Organization onboarding and subscription management.
+Secure submission of asset scope by clients.
+Researcher registration and verification.
+Vulnerability discovery and report submission.
+Technical triage and validation of reports.
+Secure communication between stakeholders.
+Bounty approval, reward processing, and reporting.
+　　　　1.1.6 Bug Bounty Simulation Environment
+Bug bounty platforms require practical experience in identifying, reporting, and validating vulnerabilities. However, beginners often face barriers such as legal risks, lack of confidence, and insufficient exposure to real-world workflows.
+To address this challenge, the proposed system includes a Bug Bounty Simulation environment that replicates real bug bounty program features using simulated targets and controlled data. The simulation allows users to safely practice vulnerability discovery, structured reporting, severity classification, and communication workflows without impacting real organizations or systems.
+The simulation environment supports multiple difficulty levels beginner, intermediate, and advanced to progressively build user competence. This approach enhances report quality, prepares researchers for real bug bounty participation, and strengthens the overall effectiveness of the platform.
+
+
+　　　
+　　　　　1.2  Statement of the problem
+Many organizations, especially smaller ones, struggle with identifying security vulnerabilities due to limited resources for internal testing or expensive external audits.
+Existing vulnerability discovery approaches suffer from several limitations:
+High cost of traditional penetration testing.
+Limited security expertise availability.
+Lack of continuous security testing.
+Poor coordination between organizations and ethical hackers.
+Limited local platforms supporting regional cybersecurity communities.
+Lack of safe environments for beginners to practice ethical hacking.
+Poor report quality due to limited hands-on experience.
+Legal and ethical risks for inexperienced researchers.
+ Absence of structured learning paths linked to real bug bounty workflows.
+These challenges expose organizations to undetected vulnerabilities, data breaches, and financial loss.
+　　　　1.3  Objectives
+　　　　　　　　　1.3.1 General Objective
+To develop a secure, scalable, commercial crowdsourced bug bounty platform tailored for the Ethiopian context, facilitating responsible vulnerability discovery and disclosure to strengthen national and organizational cybersecurity.
+To facilitate responsible vulnerability discovery, disclosure, Penetration Testing as a Service (PTaaS), and intelligent researcher matching via BountyMatch to strengthen national and organizational cybersecurity.
+             
+
+　　　　       1.3.2  Specific Objective
+The specific objectives of this project are to:
+Enable Ethiopian organizations, both public and private, to launch, manage, and monitor customized bug bounty programs in an affordable and independent manner.
+Provide a trusted and centralized platform for local and regional ethical hackers to register, discover active bug bounty programs, submit vulnerability reports, and earn fair rewards.
+Implement an efficient and secure vulnerability reporting, triage, validation, and communication workflow that supports timely remediation of security issues.
+Integrate secure and reliable payout mechanisms that comply with Ethiopian financial systems and regulatory constraints.
+Build researcher reputation systems and leaderboards to recognize performance, encourage ethical behavior, and nurture Ethiopia’s cybersecurity talent.
+Promote awareness and adoption of responsible vulnerability disclosure practices, contributing to a safer and more resilient digital ecosystem in Ethiopia.
+To provide a bug bounty simulation environment that mirrors real bug bounty workflows using simulated systems to prepare users for participation in live crowdsourced bug bounty programs.
+Provide Penetration Testing as a Service (PTaaS) to enable organizations to request on-demand, crowdsourced penetration tests with automated reporting and remediation tracking.
+Implement BountyMatch, an intelligent matching system to connect ethical hackers with suitable bug bounty programs based on skills, expertise, and performance history.
+Integrate expert code review services to identify vulnerabilities, bugs, and inefficiencies in source code during development.
+Facilitate SSDLC integration with tools like Jira and GitHub for seamless vulnerability tracking in development workflows.
+Host Live Hacking Events for real-time, collaborative bug hunting with enhanced rewards and community building.
+Provide AI Red Teaming services to enable organizations to test AI systems (LLMs, ML models, AI-powered features) for security vulnerabilities, safety issues, and trust violations using specialized methodologies and expert researchers.
+　　　　　　　1.4 Methodology
+　　　　　　　　　1.4.1 Requirement Gathering Methods
+The requirement gathering process for the Crowdsourced Bug Bounty Platform was conducted using multiple complementary techniques to ensure accuracy, completeness, and relevance to the Ethiopian cybersecurity environment. Since Ethiopia has limited crowdsourced security platforms and few specialized security organizations, requirements were collected from local stakeholders, experts, and international references.
+I.Interviews with Local Ethical Hackers
+Description
+Semi-structured interviews were conducted with local Ethiopian ethical hackers and cybersecurity students.
+Purpose
+To understand challenges faced in accessing international bug bounty platforms
+To identify preferred vulnerability submission workflows
+To gather expectations on rewards, reputation systems, and legal protection
+Outcome
+The interviews helped define
+Hacker registration and verification requirements
+Bug submission formats and severity classification
+Reputation, ranking, and leaderboard features
+II.Interviews with Organizations and Security Teams
+Description
+Interviews were conducted with local public and private organizations, including developers and IT/security staff.
+Purpose
+To understand current security testing practices
+To identify gaps caused by lack of continuous security testing
+To gather requirements for organization dashboards and program control
+Outcome
+ This method contributed to
+Program creation and scope definition features
+Triage workflows and communication tools
+Access control and reporting requirements
+III.Interviews with Cybersecurity Experts
+Description
+Discussions were held with cybersecurity professionals and academic experts.
+Purpose
+To validate responsible disclosure practices
+To identify legal and ethical requirements
+To ensure alignment with global security standards
+Outcome
+Helped define
+Disclosure timelines
+Bug validation processes
+Non-functional security requirements
+IV.Questionnaires for Ethical Hackers
+Description
+Online questionnaires were distributed to ethical hackers to collect quantitative data.
+Purpose
+To reach a wider hacking community
+To understand skill levels and tool preferences
+To gather feedback on UI and usability expectations
+Outcome
+Supported design decisions for
+User interface simplicity
+Reward and motivation mechanisms
+Platform accessibility
+V.Document Analysis of Online Sources
+Description
+Extensive analysis was performed on international bug bounty platforms and online security programs, including Microsoft, Google, HackerOne, and Bugcrowd.
+Purpose
+To study real-world vulnerability disclosure workflows
+To understand industry best practices
+To identify features required for commercialization
+Outcome
+　　　Provided guidance on
+Program lifecycle management
+Bug triage and duplicate handling
+Severity-based reward models
+VI.Literature Review
+Description
+A literature review was conducted using academic journals, standards, and guidelines.
+Sources included
+OWASP Vulnerability Disclosure Guidelines
+ISO/IEC 29147
+Research papers on crowdsourced security
+Outcome
+Ensured the system follows:
+Ethical hacking principles
+Responsible disclosure standards
+Secure system design practice
+Requirement Modeling Approach
+After gathering requirements, they were structured and modeled using an Object-Oriented (OO) approach. 
+The Object-Oriented approach was selected over the structured approach because
+The system involves multiple interacting entities such as Hacker, Organization, Program, BugReport, and Reward
+OO modeling supports modularity, scalability, and maintainability
+It aligns with modern web application development and commercialization goals
+Structured modeling was considered less suitable due to the dynamic and evolving nature of crowdsourced security platforms.
+　　　1.4.2 Analysis and Design Methodology
+The project adopts an Object-Oriented Analysis and Design (OOAD) methodology rather than a structured analysis approach.
+The Object-Oriented methodology was selected because the Crowdsourced Bug Bounty Platform is composed of several interacting real-world entities such as Ethical Hacker, Organization and Staff. These entities possess attributes, behaviors, and relationships that are naturally and efficiently represented using object-oriented concepts.
+The OOAD approach provides the following advantages
+Modularity: The system is divided into well-defined classes, making it easier to manage and understand.
+Scalability: Supports future expansion such as mobile applications, automation, and regional commercialization.
+Maintainability: System changes can be implemented with minimal impact on existing components.
+Reusability: Common functionalities can be reused through inheritance and composition.
+Industry Relevance: OOAD aligns with modern web-based and enterprise security system development practices.
+The structured analysis approach was not selected because it focuses primarily on functional decomposition and process flows, which are less suitable for systems with complex interactions and evolving requirements such as crowdsourced security platforms.  
+　　　　　　　　Analysis and Design Tools
+The following tools were used during system analysis and design
+Lucidchart: Used to create UML diagrams such as Use Case, Class, Sequence, Activity, and State Chart diagrams.
+Draw.io: Used for quick modeling, requirement discussions, and diagram refinement.
+StarUML: Used for detailed object-oriented modeling and diagram consistency.
+These tools enabled clear visualization of system behavior, structure, and interactions among components.
+are selected to ensure responsive design, cross-browser compatibility, and accessibility in low-bandwidth environments.
+　　　　　1.4.3 Implementation Methodology
+The implementation methodology defines the software development tools, technologies, and platforms used to develop, test, deploy, and maintain the system.
+ Frontend Development Tools
+Framework: Next.js (React-based frontend framework)
+Programming Languages
+HTML5
+CSS3
+JavaScript 
+UI Styling Framework Tailwind CSS.
+Frontend Architecture Component-based architecture.
+Features Supported
+Responsive user interface
+Role-based dashboards (Researcher, Organization, Admin)
+Client-side routing and server-side rendering
+These technologies are used to design a modern, responsive, and user-friendly interface for the Platform.
+Backend Development Tools
+Programming Language Python
+Backend Framework FastAPI
+Architecture Style RESTful API-based microservices architecture
+Web Server Nginx
+Caching Mechanism: Varnish Cache
+Authentication & Security
+JWT-based authentication
+Role-Based Access Control (RBAC)
+HTTPS and secure headers
+API Communication 
+JSON-based request and response handling
+The backend architecture ensures secure authentication, efficient data processing, high performance, and seamless communication between frontend and backend services.
+Database and Persistence Layer
+Database Management System PostgreSQL
+Database Type  Relational Database
+PostgreSQL is selected for its strong consistency, relational integrity, and support for complex queries and transactions.
+Deployment and Containerization Tools
+Containerization Platform Docker
+Deployment Model Microservices-based deployment
+Container Orchestration (Optional/Future) Docker Compose / Kubernete
+Environment Support
+Development
+Testing
+Production
+Docker is used to ensure consistency across development, testing, and production environments.
+Development and Collaboration Tools
+Version Control System: Git
+Source Code Hosting: GitHub / GitLab
+Development Environment: Visual Studio Code
+API Testing Tool: Postman 
+These tools support collaborative development, version tracking, testing, and continuous improvement of the system.
+　　　　　　　1.5 Feasibility 
+The feasibility of the Crowdsourced Bug Bounty Platform is analyzed in terms of economic feasibility, technical feasibility, and time feasibility to ensure that the project is practical, achievable, and sustainable within the given constraints. 
+　　　　　
+　　　　　　　 1.5.1 Economic Feasibility
+The project is economically feasible due to its reliance on open-source technologies and a crowdsourced security model, which significantly reduces development and operational costs.The platform minimizes the need for expensive, periodic penetration testing by enabling continuous vulnerability discovery through ethical hackers.
+Organizations benefit from affordable security testing services, which is especially important in the Ethiopian context where many institutions operate with limited cybersecurity budgets.
+The system has strong commercialization potential through:
+Organization subscription fees
+Program listing fees
+Service commissions on rewards
+Therefore, the system offers both cost efficiency for users and a viable revenue model for future commercialization.
+                           1.5.2 Technical Feasibility
+The project is technically feasible based on the existing technical skills and academic background of the project team and the availability of appropriate development tools and resources.
+The development team consists of students with hands-on knowledge in web application development, database management, and basic cybersecurity principles, gained through university coursework, and self-learning. The team has practical experience on the mentioned technology stack,which are the core technologies required to implement the proposed system.
+　　　　　　　　　　1.5.3 Time Feasibility
+The project is time-feasible within the academic schedule of the university.The system will be developed based on the available time and divided into the SDLC phases such as requirement gathering, analysis,design, development,testing and deployment.
+Advanced commercial features can be implemented in later iterations after the completion of the academic project.The use of agile and incremental development allows progress to be monitored and adjusted according to available time.
+　　　　　1.6 Beneficiaries or Significance of the Project
+　　　　　　　　1.6.1  Beneficiaries
+The deployment of the Crowdsourced Bug Bounty Platform provides significant benefits to a wide range of users and stakeholders. The system contributes to improving cybersecurity practices, strengthening responsible disclosure culture, and supporting digital transformation, particularly in the Ethiopian context where local bug bounty platforms and specialized security organizations are limited.
+For organizations, PTaaS provides affordable, scalable pentesting, for researchers, BountyMatch increases participation opportunities and fair assignments.
+1.Public and Private Organizations
+Government institutions, financial organizations, telecom companies, startups, and private enterprises directly benefit from the system by gaining access to an affordable and continuous vulnerability discovery mechanism. Instead of relying solely on expensive penetration testing services, organizations can launch customized bug bounty programs to identify security weaknesses early.
+Key benefits include
+Improved protection of digital assets and sensitive data
+Reduced cybersecurity incidents and financial losses
+Faster vulnerability identification and remediation
+Increased trust from customers and users
+2.Ethical Hackers and Cybersecurity Professionals
+Ethical hackers, cybersecurity students, and independent security researchers benefit by having a legal and trusted platform to practice their skills and earn rewards.
+Benefits include
+Legitimate opportunities to report vulnerabilities
+Fair recognition through reputation and leaderboard systems
+Skill development and career growth
+Encouragement of responsible disclosure practices
+3.Platform Owners and Developers
+The organization managing the platform benefits from commercialization opportunities through subscriptions, service fees, and partnerships. The platform can grow into a sustainable cybersecurity service provider within Ethiopia and the region.
+4. Government and Regulatory Bodies
+Government agencies benefit indirectly through
+Improved national cybersecurity posture
+Support for digital government initiatives
+Promotion of ethical hacking and responsible disclosure
+　　　　　　1.6.2 Significance of the Project
+The significance of his project lies in addressing a critical gap in Ethiopia’s cybersecurity ecosystem.  
+This project
+Promotes a local and culturally relevant cybersecurity solution
+Reduces dependency on foreign security platforms
+Encourages ethical hacking and talent development
+Supports national digital transformation efforts
+　　1.6.3 Effects on Organizations and the Industry
+The platform positively impacts organizations by
+Lowering the cost of cybersecurity testing
+Improving compliance with security best practices
+Creating a collaborative security culture
+For the broader industry, it contributes to
+Strengthening the local cybersecurity market
+Creating employment and skill development opportunities
+Enhancing innovation in security services
+　　　　　　　　　1.7 Limitations of the Project
+The proposed Crowdsourced Bug Bounty Platform addresses key challenges in Ethiopia's cybersecurity landscape by providing a structured, localized mechanism for vulnerability discovery and responsible disclosure. However, due to time constraints, resource limitations, and the academic nature of the project, the system has certain boundaries and limitations.
+The following challenges and constraints have hindered the full achievement of the planned objectives
+Limited Development Time: As a final-year undergraduate project with a fixed academic timeline, only the core functionalities could be analyzed and modeled in detail. Full implementation, testing, and deployment of a production-grade system were may not possible.
+Full AI-driven BountyMatch not implemented due to time limits instead basic rule-based matching used.
+Resource Constraints: Lack of access to commercial-grade infrastructure (e.g., high-availability servers, advanced security auditing tools) and budget for third-party integrations e.g real payment gateways.
+Scope Prioritization: Focus was placed on requirement analysis and design (as required by the RAD), rather than  deployment and post-launch maintenance.
+Regulatory and Compliance Challenges: Detailed handling of Ethiopian financial regulations, tax reporting for bounty payouts, could not be fully incorporated due to  time limits.
+Activities left undone due to these constraints
+Full implementation and coding of the system.
+Integration with real payment gateways (e.g., Ethiopian banks, Telebirr, CBE Birr).
+Mobile application development (native iOS/Android apps).
+Advanced AI-based report triaging or researcher matching.
+ Complete legal compliance module .
+　　　　　　　　1.8 Scope of the Project
+The scope of the Crowdsourced Bug Bounty Platform is defined to closely align with system requirements and bussiness logic, focusing on managed bug bounty programs while incorporating elements of vulnerability disclosure and researcher engagement. 
+The system boundaries include the following business processes and subsystems.
+I.User and Role Management Subsystem
+Support for multiple roles: Organizations (customers), Ethical Hackers/Researchers (the Crowd), and Administrators/Platform Managers and staff.
+Registration, profile management, authentication, and researcher vetting/profile enrichment.
+II.Program Creation and Management Subsystem
+Organizations can launch and manage public, private (invite-only), or managed bug bounty programs.
+Define scope (in-scope/out-of-scope assets), rules, reward structures (tiered bounties based on severity), and program briefs.
+Support for Vulnerability Disclosure Programs (VDP) as non-rewarded intake channels.
+III.Researcher Engagement and BountyMatch Subsystem
+Researchers can browse, join, and participate in programs. 
+Advanced matching of researchers to programs and PTaaS requests using algorithms based on skills, vulnerability history, and performance metrics.
+IV.Vulnerability Submission and Reporting Subsystem
+Researchers submit detailed reports with evidence, reproduction steps, impact assessment, and attachments.
+Structured submission workflows compliant with Vulnerability Rating Taxonomy (VRT)-like severity scoring.
+V.Managed Triage and Validation Subsystem
+Platform-managed triage: Intake, validation, duplication checking, prioritization, and remediation advice.
+Status tracking (New → Triaged → To Review → Resolved) with notifications.
+VI.Collaboration and Communication Subsystem
+Secure in-platform messaging and comments between researchers, organizations, and platform triage team.
+Real-time updates and activity feeds.
+VII.Reward and Payout Management Subsystem
+Bounty awarding based on validity and severity.
+Payout tracking and researcher reputation/leaderboard system.
+VIII.Analytics, Reporting, and Dashboard Subsystem
+Role-based dashboards for organizations (program insights, KPIs, vulnerability trends) and researchers (submissions, earnings).
+Basic reporting and benchmarking.
+IX.Administration and Integration Subsystem
+Admin tools for program moderation, user management, and platform oversight.
+Conceptual support for API integrations and workflow connectors (e.g., to SDLC tools).
+X.Bug Bounty Simulation (Learning Environment) Subsystem
+Controlled learning environment using intentionally vulnerable applications.
+ Feature parity with real bug bounty workflows using simulated data.
+Beginner, intermediate, and advanced difficulty levels.
+ Fully isolated with no real-world impact.
+No real organizations or monetary rewards.
+XI.PTaaS Subsystem
+On-demand, time-bound penetration testing engagements leveraging the platform's ethical hacker community via BountyMatch for precise researcher assignment.
+Structured methodology-driven testing (e.g., OWASP, PTES) with defined scopes, timelines, and compliance-ready deliverables.
+Real-time dashboards providing visibility into testing progress, methodology checklists, and emerging findings.
+Integration with BountyMatch for intelligent matching of vetted researchers based on skills, reputation, and expertise.
+Structured vulnerability reporting with validation, prioritization, remediation guidance, and free retesting for confirmed fixes.
+Fixed or subscription-based pricing models with platform commission, separate from variable bug bounty rewards.
+Fully integrated yet isolated workflows from ongoing bug bounty programs to ensure controlled access and no overlap.
+XII.Live Hacking Events subsystem
+Time-bound collaborative events as a promotional feature, with real-time dashboards and integration to standard report flows.
+XIII.SSDLC Integration subsytem
+API-based connections to Jira and GitHub for  vulnerability tracking in development pipelines.
+Expert Code Review Crowdsourced code audits integrated with PTaaS, supporting static analysis and human review for source code security.
+XIV.AI Red Teaming Subsystem
+
+Organizations can create AI Red Teaming engagements targeting AI systems (LLMs, AI agents, ML models).
+Specialized vulnerability reporting for AI-specific attacks (prompt injection, jailbreak, data poisoning, model extraction).
+Integration with BountyMatch for matching researchers with AI/ML security expertise.
+Compliance-ready reporting with security/safety/trust taxonomy.
+Strict ethical guidelines and isolation from regular bug bounty programs.
+   Out of Scope (will be included in the future) 
+Attack Surface Management (automated asset discovery and risk ranking).
+Advanced AI features .
+Managed Vulnerability Disclosure at scale without bounties. 
+AI-assisted vulnerability hints and adaptive difficulty in the simulation environment.
+　　　　　　　1.9 Organization of the Project
+This Requirement Analysis Document (RAD) for the Crowdsourced Bug Bounty Platform is structured in accordance with the guidelines provided by the Faculty of Computing, Bahir Dar Institute of Technology. The document consists of preliminary sections, two main chapters, references, and appendices, presenting a thorough requirement analysis and design foundation for the proposed commercial platform.
+The preliminary sections comprise the title page, declaration (with signatures of group members, advisor, and examiners), roles and responsibilities of the group members (including the completed role assignment matrix), acknowledgment, list of acronyms, list of figures, list of tables, abstract, and table of contents. These sections provide formal documentation of authorship, individual contributions, originality, and structured navigation throughout the report.
+Chapter One → Introduction
+Establishes the context and rationale for the project. It includes the background (overview of bug bounty platforms, the proposed organization’s structure, mission, vision, core values, and business processes), statement of the problem (highlighting cybersecurity gaps in Ethiopia), objectives (general and specific), methodology (requirement gathering techniques such as interviews, questionnaires, document analysis). 
+Literature review, and justification of the Object-Oriented approach, feasibility analysis (economic, technical, and time), beneficiaries and significance of the project, limitations, scope (detailing subsystems and boundaries), and this organization summary.
+Chapter Two →System Features 
+Presents a detailed analysis and object-oriented modeling of the proposed system. It begins with a description of the existing informal and ad-hoc vulnerability disclosure practices in Ethiopia. The chapter then provides comprehensive requirement analysis, including functional and non-functional requirements, business rules, UML diagrams (use case, activity, sequence, state chart, and class diagrams), user interface prototypes, CRC card analysis, conceptual class models, and identification of potential change cases for future enhancements.
+The document ends with References, citing all sources used (including  OWASP guidelines, ISO/IEC 29147, academic papers, and local stakeholder inputs), and Appendices, containing supplementary materials such as sample interview/questionnaire forms, detailed wireframes, additional UML diagrams, and prototypes developed during the analysis phase.
+This RAD serves as a complete blueprint for the Crowdsourced Bug Bounty Platform, fulfilling the academic requirements while laying a solid foundation for future full-scale implementation, commercialization, and expansion across Ethiopia and Africa
+
+
+　　　　　　　　　　　  Chapter Two
+ System Features 
+　　　　　2.1 The Existing System 
+The Crowdsourced Bug Bounty Platform is a startup project currently in the planning and design phase, with no operational platform yet established. Therefore, there is no existing automated or semi-automated system within the startup organization itself. All activities related to vulnerability discovery and responsible disclosure that the future platform will manage are currently handled in a completely manual manner by ethical hackers and target organizations in Ethiopia.
+The existing system refers to the prevailing practices in the Ethiopian cybersecurity ecosystem, where ethical hackers and organizations interact directly without any intermediary platform. These interactions are fully manual, unstructured, and depend entirely on personal initiative and communication channels.
+　　　　2.1.1 How the Existing System Functions
+The current process is 100% in person process, relying on email, phone calls, social media, or personal networks. There is no centralized portal, standardized forms, tracking system, or reward mechanism in place locally. Ethical hackers must individually identify and contact organizations, while organizations handle incoming reports on an ad-hoc basis with limited resources.The existing system operates as follows:
+Organizations formally request security testing services from INSA or licensed private cybersecurity firms.
+Security assessments are conducted on-site or through controlled engagements, often requiring physical presence, official letters, and long approval processes.
+Testing is usually performed periodically, not continuously.
+Reports are delivered as static documents (PDF or printed reports).
+Vulnerability remediation is handled internally by the organization after receiving the report.
+There is limited or no structured follow-up, real-time communication, or verification of fixes.
+This approach is semi-automated and heavily dependent on institutional procedures.
+　　　　　　　　　2.2  Proposed System
+The proposed Crowdsourced Bug Bounty Platform is a secure, scalable, and fully automated web-based system designed as a commercial startup solution to directly address the problems identified in the existing manual vulnerability disclosure practices in Ethiopia. It serves as a trusted, localized intermediary that connects Ethiopian organizations with ethical hackers, streamlining the entire lifecycle of vulnerability discovery, reporting, validation, remediation, and rewarding.
+　　　　2.2.1 Bug Bounty Simulation (Learning Environment)
+While the core of the proposed system is a real crowdsourced bug bounty platform, an additional Bug Bounty Simulation environment is integrated to support learning and skill development.
+The Bug Bounty Simulation is a fully isolated, non-production environment that implements the functional features of learning-focused platforms. It mirrors real bug bounty workflows including simulated target listing, vulnerability discovery, structured vulnerability reporting, severity assessment, and feedback.
+All targets, vulnerabilities, reports, and outcomes within the simulation are intentionally simulated and have no real-world impact. No real organizations, domains, or monetary rewards are involved.
+The simulation environment is organized into three levels.
+Beginner Level: Guided challenges with hints and learning support.
+Intermediate Level: Realistic vulnerability scenarios with limited guidance.
+Advanced Level: Complex vulnerability chains with no hints, closely resembling real bug bounty difficulty.
+Participation in the simulation is optional and does not affect researcher eligibility, reputation, or rewards in real crowdsourced bug bounty programs. Its primary goal is to improve user readiness, report quality, and overall platform effectiveness.
+　　　　　　2.2.2 Bug Bounty Simulation Module Architecture
+The Bug Bounty Simulation module is designed as a fully isolated subsystem within the Crowdsourced Bug Bounty Platform. It shares the same user interface patterns, report workflows, and severity classification mechanisms as real bug bounty programs but operates exclusively on simulated assets and data.
+The simulation module consists of the following components
+Simulated Targets Repository – Contains intentionally vulnerable web applications and APIs. 
+Simulation Report Engine – Enables structured vulnerability report submission identical to real programs.
+ Feedback & Scoring Engine – Provides automated feedback and learning insights without affecting real reputation or rewards.
+ Isolation Layer – Ensures strict separation between simulation data and real bug bounty data.
+This architecture ensures feature parity while maintaining security, ethical boundaries, and academic integrity.
+
+
+
+
+　　　Key Features and Solutions to Existing Problems
+The proposed system eliminates the inefficiencies, risks, and barriers of the current manual approach by introducing the following automated and structured solutions.
+Centralized Platform Access 
+Replaces scattered email and social media contacts with a single, professional web portal where organizations and researchers can register, log in, and interact securely.
+Structured Program Management 
+Organizations can easily create and manage public, private (invite-only), or non-rewarded Vulnerability Disclosure Programs (VDPs). They define clear scope, rules, reward tiers, and severity guidelines solving the problem of unclear or non-existent disclosure policies.
+Standardized Report Submission
+Ethical hackers submit vulnerabilities using guided forms with required fields (title, description, steps to reproduce, impact, attachments). This replaces unstructured emails and ensures complete, high-quality reports.
+Automated and Managed Triage 
+Platform staff (or organization teams) use built-in tools to intake, deduplicate, validate, prioritize, and assign severity (using a VRT-like taxonomy). This eliminates manual forwarding, delays, and duplicate handling issues.
+Secure Collaboration and Communication 
+In-platform messaging, comments, and real-time notifications replace insecure email threads, ensuring confidential and timely exchanges between researchers, organizations, and triage teams.
+Fair Reward and Reputation System
+Valid reports trigger bounty awards, payout tracking, and automatic reputation updates with leaderboards—addressing the critical lack of incentives and recognition that currently discourages local researchers.
+Role-Based Dashboards and Analytics 
+Customized views for researchers (submissions, earnings, rankings), organizations (program performance, vulnerability trends), and administrators (platform oversight) .
+Secure and Compliant Operations
+Built-in security features (encryption, role-based access, audit logs) and integration points for local payment systems (e.g., Telebirr, CBE Birr, bank transfers) ensure safe transactions and regulatory alignment.
+　　　　　　Overall Benefits of the Proposed System
+By automating and standardizing the entire workflow, the platform directly resolves the core problems of the current manual system
+Slow response times → Fast, tracked processing.
+Risk of public disclosure → Safe, coordinated handling.
+Low participation → Attractive rewards and reputation building.
+Inefficiency and errors → Structured, auditable processes.
+Dependency on foreign platforms → Affordable, local alternative with data sovereignty.
+　　　　　　　2.3 Requirement Analysis 
+　　　　　　　　　　　2.3.1 Functional requirement
+The functional requirements define the core services and operations that the proposed crowdsourced bug bounty platform must provide. Each requirement is uniquely identified and prioritized based on its importance to system operation.
+
+                 
+
+Table 1.   Functional Requirement
+
+Requirement ID
+	
+　　　　　Functional Requirement	
+priority
+
+
+FREQ-01	The system shall allow users to register and log in with different roles: Researcher (Ethical Hacker), Organization (Program Owner), Platform Staff (Triage Specialist), Finance Officer, and Administrator.	
+
+High
+
+FREQ-02	The system shall support email verification, password recovery, and multi-factor authentication for all users.	
+High
+
+
+FREQ-03	Organizations shall be able to create, edit, publish, and archive bug bounty programs (public, private/invite-only, or Vulnerability Disclosure Programs - VDP).	
+
+High
+
+
+FREQ-04	Organizations shall define program details including scope (in-scope/out-of-scope assets), rules, reward tiers, severity guidelines, and disclosure policy.	
+
+High
+FREQ-05	Researchers shall be able to browse, search, and join eligible active programs.	High
+FREQ-06	Researchers shall submit vulnerability reports using a structured form with fields for title, description, steps to reproduce, impact assessment, severity suggestion, and file attachments (screenshots, PoC, videos).	High
+FREQ-07	The system shall allow platform staff/triage specialists to intake, review, deduplicate, validate, prioritize, and update report status (New, Triaged, Valid, Invalid, Duplicate, Resolved).	High
+FREQ-08	The system shall assign severity ratings to reports using a standardized taxonomy ( Vulnerability Rating Taxonomy - VRT).	High
+FREQ-09	The system shall provide secure in-platform messaging and comment threads for collaboration between researchers, organizations, and triage staff.	Medium
+FREQ-10	Organizations/Finance Officers shall approve bounties, set reward amounts, and mark reports for payout processing.	High
+FREQ-11	The system shall track and update researcher reputation scores, signal strength, and display public leaderboards/rankings.	High
+FREQ-12	The system shall send real-time notifications (email and in-platform) for key events such as new reports, status changes, messages, and bounty awards.	High
+FREQ-13	The system shall provide role-specific dashboards, Researcher (submissions, earnings, rankings), Organization (program performance, reports, trends), Staff (triage queue), and Admin (platform overview).	High
+FREQ-14	Administrators shall manage users, roles, programs, and perform platform audits and configurations.	High
+FREQ-15	The system shall view analytics reports  for vulnerability trends, program effectiveness, and researcher performance.	High
+FREQ-16	The system shall support basic researcher-to-program matching based on skills, past performance, and program requirements (conceptual foundation for future AI enhancement).	Medium
+FREQ-17	The system shall maintain an activity log and audit trail for all critical actions (report submission, status changes, bounty awards).	High
+FREQ-18	The system shall allow researchers to view and track the status of their submitted reports.	High
+FREQ-19	The system shall enable organizations to view and manage all reports submitted to their programs.	High
+FREQ-20	The system shall integrate payout tracking (pending, processed) with placeholders for future local payment gateway integration (e.g., Telebirr, bank APIs).	Medium
+
+FREQ-21	The system shall securely store vulnerability reports and related attachments.	
+High
+
+FREQ-22	The system shall implement the SSDLC based on OWASP top 10 vulnerablity.	
+High
+
+FREQ-23	The system shall provide a bug bounty simulation environment with simulated vulnerable applications.	
+High
+
+FREQ-24
+	The system shall mirror real bug bounty workflows within the simulation using simulated data.
+	
+Medium
+
+FREQ-25
+	The system shall support beginner, intermediate, and advanced simulation levels.
+	
+
+High
+
+FREQ-26
+	The system shall allow users to submit simulated vulnerability reports without affecting real programs.
+	
+
+High
+
+FREQ-27
+	The system shall isolate simulation data from real crowdsourced bug bounty data.
+	
+High
+FREQ-28  
+  
+ 	The system shall provide automated feedback and learning hints for simulation reports.  
+	
+High
+
+FREQ-29
+	system shall allow organizations to create and manage Penetration Testing as a Service (PTaaS) engagements separate from ongoing bug bounty programs	
+High
+
+FREQ-30 
+	Organizations shall define PTaaS engagement details including fixed scope, testing methodology (e.g., OWASP, PTES), duration, compliance requirements, and deliverables	
+High
+FREQ-31 
+	The system shall support fixed or subscription-based pricing models for PTaaS engagements, with automatic calculation of platform commission	
+High
+
+FREQ-32 
+	The system shall implement BountyMatch (advanced researcher matching) to automatically recommend and assign vetted researchers to PTaaS engagements and bug bounty programs based on skills, reputation, past performance, vulnerability expertise, and availability.	
+
+High
+FREQ-33 
+	BountyMatch shall allow administrators and organizations to configure matching criteria and approve/reject recommended researcher assignments for PTaaS engagements.	
+High
+
+FREQ-34 
+	The system shall provide real-time PTaaS progress dashboards showing testing phases, methodology checklists, emerging findings, and collaboration updates for organizations and assigned researchers	
+High
+　
+FREQ-35 
+	Researchers assigned to PTaaS engagements shall submit findings using structured templates with mandatory proof-of-exploit, impact analysis, and remediation recommendations	
+High
+
+FREQ-36 
+	The system shall enable platform triage specialists to validate PTaaS findings, prioritize them, and generate compliance-ready executive reports with risk ratings and evidence	
+High
+
+FREQ-37 
+	The system shall support free retesting of fixed vulnerabilities within a defined period (e.g., 12 months) for PTaaS engagements.Medium	
+Medium
+
+FREQ-38 
+	The system shall isolate PTaaS workflows, data, and findings from regular bug bounty programs to ensure controlled access and prevent overlap	
+High
+
+FREQ-39 
+	BountyMatch shall provide researchers with personalized recommendations of active bug bounty programs and PTaaS opportunities matching their profile and expertise.	
+High
+FREQ-40 .
+	The system shall track and display BountyMatch performance metrics (e.g., match success rate, researcher acceptance rate) in admin and organization dashboards	
+Medium
+
+
+FREQ-41	The system shall enable expert code reviews by automatically matching vetted researchers via BountyMatch, allowing scans for specific issues such as dead code, insecure dependencies, or logic flaws, with reports delivered within defined timelines.
+	
+
+
+High
+
+FREQ-42	The system shall integrate with Jira and GitHub for bi-directional synchronization of vulnerability reports, issues, and deployments, ensuring real-time updates and conflict resolution through API hooks.
+	
+
+High
+
+
+FREQ-43	The system shall support live hacking events by providing invite management for selected researchers, real-time dashboards for tracking submissions, and focused scopes for targeted assets, with event duration configurable from a specific days
+	
+
+
+High
+
+
+FREQ-44	The system shall track live hacking event metrics (e.g., bugs found, participation rates) and automatically integrate findings into standard workflows, including triage queues and analytics dashboards.
+	
+
+
+High
+
+FREQ-45	The system shall allow organizations to create and manage AI Red Teaming engagements targeting AI systems (LLMs, AI agents, ML models, AI-powered features).
+	
+
+High
+
+
+FREQ-46	
+The system shall enable organizations to define AI Red Teaming scope, including target AI systems, allowed testing environment (e.g., sandbox), and ethical testing guidelines.
+	
+
+
+High
+
+
+FREQ-47	The system shall allow researchers to submit AI-specific vulnerability reports with fields for input/prompt, model response, attack type (e.g., prompt injection, jailbreak, data leakage), and impact
+	
+
+High
+
+FREQ-48	The system shall provide a dedicated triage workflow for AI Red Teaming engagements, including validation of AI-specific vulnerabilities and generation of summary reports with security, safety, and trust findings.
+
+	
+High
+
+　　　　　　　　2.3.2 System Use case 
+　　　　　　　　　　　2.3.2.1 Use case Diagram 
+A use case diagram is a Unified Modeling Language (UML) diagram used to represent the functional behavior of a system and the way different actors interact with the system to achieve specific goals. It provides a high-level view of the system’s functionality from the user’s perspective.
+
+
+
+
+
+
+In this project, the use case diagram illustrates the main functionalities of the Crowdsourced Bug Bounty Platform, the external actors involved (such as Ethical Hackers, Organizations, Platform Staff, and Administrators), and the interactions between these actors and the system.The diagram also demonstrates use case reusability and relationships using
+<<include>> relationships to represent mandatory and reusable system behaviors,
+<<extend>> relationships to show optional or conditional functionalities, and
+<<inherit>> (generalization) relationships to model shared behaviors among different actors
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Image 1 Use case diagram
+
+
+　　　　　　　　　2.3.2.2 Use Case Documentation
+The following section documents the major use cases of the Crowdsourced Bug Bounty Platform. These use cases are derived from the functional requirements (FREQ-01 to FREQ-22) listed in Table 1 and the provided Use Case Diagram. Six primary use cases are detailed below to cover the core workflows of the system.
+UC-01→ Register User
+ Name : Register User
+Actor : Unauthenticated User (prospective Researcher, Organization, Platform Staff, Finance Officer, Administrator)
+Description : A new user creates an account on the platform by selecting a role and verifying their email.
+Pre-condition : User has access to the platform homepage and a valid email address.
+Post-condition : User account is created with the selected role, email is verified, and user is redirected to login or dashboard.
+Priority : High (FREQ-01, FREQ-02)
+Basic Course of Action
+I.User navigates to the homepage and clicks Register (UI, Registration button).
+II.System displays registration form . 
+III.System validates input and creates account.
+IV.System sends verification email (UI, Success message Verification email sent).
+V.User clicks verification link in email.
+VI.System verifies email and activates account (UI, Registration successful Login now.
+Alternate Course of Action
+I.A1. At step 3, Invalid input → System displays error messages.
+II.A2. At step 6, Verification link expired → User requests resend verification. 
+UC-02→Submit Vulnerability Report
+Name : Submit Vulnerability Report
+Actor : Ethical Hacker (Researcher)
+Description : Researcher submits a vulnerability report for an active program.
+Pre-condition : Researcher is logged in and has joined an active program.
+Post-condition : Report is saved, assigned a unique ID, and notification sent to triage team.
+Priority : High (FREQ-05, FREQ-06, FREQ-12)
+Basic Course of Action
+I.Researcher navigates to program page and clicks Submit Report .
+II.System displays structured report form (UI, Fields – Title, Description, Steps to Reproduce, Impact, Suggested Severity, Attachments).
+III.Researcher fills all required fields and attaches evidence (supported formats are images, text, video).
+IV.Researcher submits the report.
+V.System validates completeness and saves report.
+VI.System sends notification to triage specialist and organization.
+Alternate Course of Action
+I.A1. At step 3, Missing required fields → System highlights errors.
+II.A2. At step 4,Potential duplicate detected → System warns and suggests viewing similar reports (includes Deduplicate Reports).
+UC-03→ Validate Report
+Name : Validate Report
+Actor : Triage Specialist
+Description : Triage specialist reviews, validates, and updates the status of a submitted report.
+Pre-condition : Triage Specialist is logged in, report exists in triage queue.
+Post-condition : Report status and severity updated, notifications sent.
+Priority : High (FREQ-07, FREQ-08, FREQ-12, FREQ-17).
+Basic Course of Action
+I.Triage Specialist opens triage dashboard (UI, Triage Queue list).
+II.Specialist selects a report to review.
+III.System displays full report details and attachments.
+IV.Specialist reproduces issue, assigns severity using VRT taxonomy, deduplicates if needed, and updates status (Business Rule BR-03, Severity must follow platform VRT guidelines).
+V.Specialist adds internal comments and saves changes.
+VI.System logs action in audit trail and sends notifications to researcher and organization.
+Alternate Course of Action
+I.A1. Report is duplicate → Status set to Duplicate and linked to original report.
+II.A2. Report invalid → Status set to Invalid with explanation.
+UC-04 → Create Bug Bounty Program
+ Name : Create Bug Bounty Program
+Actor : Organization (Program Owner)
+Description : Organization creates and publishes a new bug bounty program.
+Pre-condition : Organization is logged in and has active subscription.
+Post-condition : Program is created, published, and visible to researchers.
+Priority : High (FREQ-03, FREQ-04)
+Basic Course of Action
+I.Organization navigates to dashboard and clicks Create Program .
+II.System displays program creation form (UI,Fields Name, Description, Type (Public/Private/VDP), Scope, Rules, Reward Tiers, Severity Guidelines).
+III.Organization fills details and submits (Business Rule BR-04, In-scope assets must be explicitly listed).
+IV.System saves draft.
+V.Organization reviews and clicks Publish.
+VI.System publishes program and notifies researchers/admin.
+Alternate Course of Action
+I.A1. Incomplete scope/rules → System prevents publishing with error.
+UC-05 → Approve Reward
+ Name : Approve Reward
+Actor : Organization / Finance Officer
+Description : Approve bounty payment for a validated report.
+Pre-condition : Report status is Valid, severity and reward tier defined.
+Post-condition : Bounty approved, payout tracked, researcher reputation updated.
+Priority : High (FREQ-10, FREQ-11, FREQ-20)
+Basic Course of Action
+I.Actor opens report details (UI, Report view with Approve Reward button).
+II.Actor reviews validation and sets/confirms reward amount (Business Rule BR-05, Reward must align with program tier).
+III.Actor approves bounty.
+IV.System updates report status, researcher reputation score, and payout status (Pending).
+V.System sends notification to researcher.
+Alternate Course of Action
+I.A1. Dispute over amount → Actor adjusts and adds comment.
+UC-06 → View Dashboard
+Name : View Dashboard
+Actor : All Authenticated Users (Researcher, Organization, Triage Specialist, Administrator)
+Description : User views personalized dashboard with relevant metrics and activities.
+Pre-condition : User is logged in.
+Post-condition : Dashboard data displayed.
+Priority : High (FREQ-13, FREQ-15)
+Basic Course of Action
+I.User logs in.
+II.System redirects to role-specific dashboard (UI, Customized views Researcher, submissions/earnings/leaderboard; Organization: program stats/reports).
+III.User views charts, recent activities, and analytics.
+Alternate Course of Action
+I.None significant. 
+UC-07→ Practice Vulnerability in Simulation     
+I.Name: practice Vulnerablity in Simulation
+II.Actor: Researcher
+III.Description: Researcher practices vulnerability discovery and reporting using simulated targets that mirror real bug bounty features.
+IV.Pre-condition: Researcher is authenticated.
+V.Post-condition: Feedback provided on simulated report.
+VI.Priority: High
+UC-08→ Perform Expert Code Review 
+I.Name: Perform Expert Code Review 
+II.Actor: Organization / Researcher 
+III.Description: Organization uploads code for manual review; researchers analyze for issues. 
+IV.Pre-condition: Code repository or files uploaded and linked. 
+V.Post-condition: Revi]ew report generated. Priority: High (FREQ-41) 
+VI.Basic Course of Action Organization initiates code review and uploads/links the code. System assigns matched researchers via BountyMatch. Reviewers manually analyze the code and add comments on issues. System compiles findings into a report.
+VII. Alternate Course of Action A1. Upload issues (e.g., file access error) → System notifies organization for re-upload and manual assignment.
+UC-09→ Integrate with SSDLC Tools 
+I.Name: Integrate with SSDLC Tools 
+II.Actor: Organization / Administrator 
+III.Description: Sync vulnerabilities with Jira/GitHub for workflow automation. 
+IV.Pre-condition: API keys configured.
+V. Post-condition: Issues synced bi-directionally.
+VI. Priority: High (FREQ-42, FREQ-43) 
+VII.Basic Course of Action Organization connects tools. System syncs reports as issues. Updates in tools reflect in platform. 
+VIII.Alternate Course of Action A1. Sync error → Retry with notification.
+IX.In the logic for Jira/GitHub sync, introduce an asynchronous message broker (like RabbitMQ) with a Dead Letter Queue. If the external API is down, the system should queue the sync request and retry with exponential backoff rather than failing silently.
+ UC-10→ Participate in Live Hacking Event 
+I.Name: Participate in Live Hacking Event 
+II.Actor: Researcher / Organization
+III.Description: Host/join time-bound hacking event for collaborative bug hunting.
+IV.Pre-condition: Event scheduled. 
+V.Post-condition: Findings integrated, metrics tracked. 
+VI.Priority: High (FREQ-44, FREQ-45) 
+VII.Basic Course of Action Organization schedules event. System invites researchers. Participants submit in real-time. System tracks and reports metrics. 
+VIII.Alternate Course of Action A1. Time limit exceeded → Close submissions.
+UC-11 → Conduct AI Red Teaming Engagement
+
+I.Name: Conduct AI Red Teaming Engagement
+II.Actor: Organization / Researcher (matched via BountyMatch)
+III.Description: Organization creates an AI Red Teaming engagement targeting AI systems; matched researchers test for security, safety, and trust vulnerabilities using specialized methodologies.
+IV.Pre-condition: Organization is authenticated, AI systems are identified, testing environment is prepared.
+V.Post-condition: AI vulnerabilities are discovered, validated, and reported with remediation recommendations.
+VI.Priority: High (FREQ-45, FREQ-48) 
+VII.Basic Course of Action:·  Organization creates an AI Red Teaming engagement by defining targets and ethical guidelines on the dashboard.System uses BountyMatch to assign AI security experts who perform jailbreak and prompt injection testing in a controlled environment.Triage specialists validate reports, and the system generates a final safety and trust analysis report for organizational remediation.
+VIII.Alternate Course of Action:·  A1. At step 3, if scope is missing or the environment is flagged as unsafe, the system blocks engagement creation and displays a validation error. A2. At step 7, if a submission violates ethical guidelines, the system automatically flags the report, suspends the researcher, and notifies the organization.
+UC-12: Perform Identity Verification (KYC) 
+Researchers must submit national ID/Passport details before they are allowed to link bank accounts or Telebirr profiles.
+
+　　　　　　　　2.3.3 Business Rule Documentation 
+Business rules define the policies, constraints, and operational guidelines that govern the Crowdsourced Bug Bounty Platform. Since the organization is a startup in the pre-launch/planning phase (no current operational system exists), these rules are proposed rules for the new commercial platform. They will be enforced automatically by the system (where possible) and manually by staff where required. The rules are derived from functional requirements (FREQ-01 to FREQ-22).
+The following table lists the key business rules:
+Table 2 .Bussiness Rule Documentation
+ Identifier	Name	Description	Reference	Revision History
+BR-01	User Registration Eligibility	Users must be provide a valid email, and select one role (Researcher, Organization, Triage Specialist, Finance Officer, Administrator). Only one account per email is permitted.	FREQ-01, FREQ-02; Ethiopian Data Protection Proclamation No. 1321/2023	Version 1.0 (Initial) – 20/12/2025
+BR-03	Severity Rating Assignment	Severity must be assigned using the platform’s Vulnerability Rating Taxonomy (VRT) from Critical to Low. Triage specialists must provide justification in comments.	FREQ-08; VRT standard	Version 1.0 (Initial) – 20/12/2025
+BR-04	Program Scope and Policy Definition	Organizations must explicitly define in-scope assets (e.g., domains, apps) and out-of-scope items. Any scope change must be re-approved and all active researchers notified.	FREQ-03, FREQ-04; ISO/IEC 29147	Version 1.0 (Initial) – 20/12/2025
+BR-05	Bounty Reward Determination	Organizations set custom bounty amounts based on report severity and their program policy.  	FREQ-10, FREQ-20	Version 1.0 (Initial) – 20/12/2025
+BR-06	 Platform Commission (Managed Programs and PTaaS)
+	 For managed bug bounty programs and PTaaS engagements, organizations pay the researcher bounty or engagement fee plus a 30% platformcommission. Commission is applied on top of the researcher payout or PTaaS fee and must be clearly shown in billing and financial reports.
+	 FREQ-10, FREQ-31, FREQ-36
+	 Version 1.1 (Updated to include PTaaS) – 01/02/2026
+
+BR-07	Duplicate Report Handling	First valid report receives full bounty (client-defined amount). Duplicate reports receive 50% of bounty if identical and submitted within 24 hours; otherwise, no reward. System auto-flags duplicates.	FREQ-07	Version 1.0 (Initial) – 20/12/2025
+BR-08	Payout Processing Timeline	Approved bounties must be processed within 30 days. Delays require notification to researcher admins will notified.
+no payouts can be processed until the researcher's KYC status is verified, ensuring compliance with the National Bank of Ethiopia and Ethiopian Revenue and Customs Authority tax withholding guidelines
+·  	FREQ-20; Ethiopian Revenue and Customs Authority	Version 1.0 (Initial) – 20/12/2025
+BR-09	Researcher Reputation Scoring	Reputation score starts at 0. Valid reports add 10–50 points (based on severity); invalid/duplicate reports deduct 20 points. Top 10 researchers displayed on public leaderboard.	FREQ-11; HackerOne signal system	Version 1.0 (Initial) – 20/12/2025
+BR-10	Vulnerability Disclosure Timeline	Organizations must acknowledge reports within 24 hours and remediate within 90 days. Researchers agree not to disclose publicly until fixed or 90-day grace period expires.	FREQ-09; OWASP Responsible Disclosure Guidelines	Version 1.0 (Initial) – 20/12/2025
+BR-11	Simulation Feature Mirroring 
+Rule
+	The simulation environment shall mirror real bug bounty features while using only simulated targets, data, and outcomes.
+	FREQ-24
+Mirroring real bug bounty features	Version 1.0 (Initial) – 01/01/2026
+BR-12	Simulation Isolation Rule
+	(Simulation Isolation Rule) to explicitly mandate Network/VPC-level isolation or completely separate cloud accounts for the simulation environment to prevent a simulated container escape from compromising the production database.
+ 	FREQ-27
+simulation separation	Version 1.0 (Initial) – 01/01/2026
+BR-13	Simulation Progression and Scoring
+	The simulation environment shall use an internal scoring and feedback system based on challenge completion and severity accuracy. Simulation scores and feedback are visible only to the user and do not contribute to public leaderboards, real rewards, or researcher reputation.
+	FREQ-23, FREQ-25, FREQ-26, FREQ-28
+	Version 1.0 (Initial) – 01/02/2026
+
+
+BR-14	PTaaS Engagement Governance
+	Each PTaaS engagement shall have a fixed, approved scope, methodology (e.g., OWASP, PTES), duration, and deliverables documented before start. Any scope or timeline change must be approved by the organization and recorded in the engagement audit trail.
+	FREQ-29, FREQ-30, FREQ-34, FREQ-36
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-15	PTaaS Retesting Policy
+	Confirmed PTaaS findings shall be eligible for one free retest within the defined retesting window (e.g., 12 months) after the organization marks them as fixed. Additional retests beyond this window or count may incur extra fees as defined in PTaaS commercial terms.
+	FREQ-37, FREQ-36
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-16	BountyMatch Assignment and Consent
+	BountyMatch recommendations shall be based only on researcher profile data, past performance, skills, and availability. Researchers must explicitly accept or decline PTaaS or program assignments suggested by BountyMatch; no researcher shall be auto-assigned without consent.
+	FREQ-32, FREQ-33, FREQ-39, FREQ-40, NFR-18
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-17	BountyMatch Fairness and Eligibility
+	BountyMatch shall not recommend researchers who are currently suspended, under investigation, or who have unresolved policy violations. Matching criteria and major changes to the matching algorithm must be documented and periodically reviewed by platform administrators.
+	FREQ-32, FREQ-39, NFR-02
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-18	Code Review Scope and Confidentiality
+	Expert code reviews shall be performed only on code explicitly uploaded or linked by the organization, and reviewers must agree to a confidentiality and non-disclosure policy before accessing repositories. Code review findings must focus on security and quality issues and shall not be used for any purpose outside the engagement.
+	FREQ-41, NFR-01, NFR-18
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-19	SSDLC Integration and Sync Authority
+	Only users with appropriate organizational roles may configure or modify integrations with external SSDLC tools such as Jira and GitHub.Bi-directional synchronization shall only update issues that originated from the platform or are explicitly linked, and all sync operations must be logged for audit and conflict resolution.
+	FREQ-42, NFR-02, NFR-07
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-20	Live Hacking Event Scope and Duration
+	Each live hacking event shall have a clearly defined time window, scope, and reward policy. Submissions shall be accepted only within the event duration, after which all new findings must go through the standard bug bounty workflow.
+	FREQ-43, FREQ-44
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-21	Live Event Metrics and Integration
+	All valid findings from live hacking events shall be integrated into the standard triage and analytics workflows, including severity assignment, reward approval, and dashboards. Event metrics such as total bugs found, participation rate, and reward distribution shall be stored for future benchmarking and reporting.
+	FREQ-44, FREQ-15
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-22	AI Red Teaming Scope & Authorized Environment
+	AI Red Teaming testing shall be performed only on AI systems explicitly listed as in-scope by the organization and only within the approved environment
+	FREQ-45, FREQ-46, NFR-02, NFR-18
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-23	Responsible AI Testing & Safety Boundaries
+	Researchers must follow responsible AI testing rules: no realworld harm, noprivacy/dataabuse, no illegal content generation, and no actions outside scope. Violations result in report rejection, account suspension, and audit logging
+	FREQ-46, NFR-18, NFR-07
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-24	AI Report Evidence Requirement
+
+	AI Red Teaming reports must include reproducible evidence (input/prompt,modelresponse/output,steps toreproduce,andclearimpact). Reports missing these are returned for correction or marked invalid.
+	 FREQ-47, FREQ-48
+	Version 1.0 (Initial) – 01/02/2026
+
+BR-25	AI Finding Classification
+	Every AI Red Teaming finding must be classified as Security, Safety, or Trust,and triage must record the justification before status can be set to Valid/Resolved.
+	FREQ-48
+	Version 1.0 (Initial) – 01/02/2026
+
+
+                  2.3.4  User Interface Prototype
+The user interface prototypes for the Crowdsourced Bug Bounty Platform were developed using a prototype approach to gather and validate user interface requirements. Low-fidelity wireframes were created and reviewed with stakeholders (ethical hackers and organizations) during requirement gathering interviews and questionnaires. These prototypes directly align with the documented use cases (UC-01 to UC-06) and functional requirements (FREQ-01 to FREQ-22), ensuring intuitive user interaction, role-based views, and support for core workflows.The prototypes emphasizes
+Simplicity and Accessibility : Clean layouts suitable for low-bandwidth environments in Ethiopia.
+Responsive Design: Mobile-friendly using Bootstrap (as planned in 1.4.3).
+ Registration Page (Referenced in UC-01: Register User)
+Description : Full-screen form centered on the page.
+Key UI Elements: Role selection dropdown, input fields (Full Name, Email, Password, Confirm Password), "Register" button, link to Login page, password strength meter.
+Alignment : Supports FREQ-01 and FREQ-02 (email verification triggered after submission).
+ Login Page (Referenced in UC-01 and all use cases requiring authentication)
+Description : Minimalist form with platform logo at top.
+Key UI Elements: Email and Password fields, Login button, Forgot Password? link, MFA code input .
+Alignment : Role-based redirect to dashboards after login.
+Researcher Dashboard (Referenced in UC-06  View Dashboard)
+Description : Grid layout with cards and tables.
+Key UI Elements : Welcome message, reputation score badge, earnings summary, leaderboard snippet, list of active programs, Browse Programs and Submit Report buttons, notifications sidebar (FREQ-12, FREQ-13, FREQ-18).
+Submit Vulnerability Report Form (Referenced in UC-02)
+Description : Step-by-step or single-page form with progress indicator.
+Key UI Elements : Required fields (Title, Description textarea, Steps to Reproduce numbered list, Impact dropdown, Suggested Severity), file upload drag-and-drop area (preview thumbnails), Submit and Save Draft buttons (FREQ-06, FREQ-21).
+ Create Bug Bounty Program Form (Referenced in UC-04)
+Description: Tabbed or multi-step wizard form.
+Key UI Elements: Tabs for General Info, Scope (in-scope/out-of-scope text boxes), Rules textarea, Program Type radio buttons (Public/Private/VDP), Save Draft  and  Publish buttons (FREQ-03, FREQ-04).
+Triage Queue and Report Validation Page (Referenced in UC-03)
+Description : Table-based queue with detail modal.
+Report Detail and Reward Approval Page (Referenced in UC-05)
+Description : Detailed view with approval section at bottom.
+Key UI Elements : Report content display, triage comments, custom bounty amount input field, commission breakdown 
+Organization Dashboard (Referenced in UC-06)
+Description : Analytics-focused layout with charts.
+Key UI Elements : Program list, vulnerability trend charts, reports table, financial summary card (bounties paid), quick links to create program or view reports (FREQ-13, FREQ-15, FREQ-19). 
+                            2.3.5 State chart diagram 
+State chart diagrams illustrate the lifecycle of key objects in the Crowdsourced Bug Bounty Platform, showing how instances of each class transition between states in response to events. The following diagrams are provided for the most important domain classes, based on the object-oriented analysis, use cases (UC-01 to UC-06), and functional requirements (FREQ-01 to FREQ-22).
+
+
+Image 2 user Registration state chart
+
+                                                 
+
+
+
+Image 3 Vulnerablity Report Life cycle
+
+
+
+
+   
+
+Image 4 Bug bounty program
+
+
+
+
+Image 5 Bounty Payment
+
+
+
+
+Image 6 Live Hacking Event 
+
+
+
+  
+  Image 7 Expert Code Review Statechart
+
+
+
+
+
+Image 8 SSDLC integration Statechart
+
+
+
+ 
+Image 9 PTaas Engagement
+
+
+                           
+
+Image 10  BountyMatch
+
+
+
+
+
+
+
+   Image 11 Simulation
+
+
+
+Image 12 Message
+
+      
+
+
+Image 13 Notification
+
+
+Image 14 Combined All Statechart Diagram
+
+　　　　　　　　　　2.3.6 Activity Diagram
+Activity diagrams model the detailed flow of activities and decisions within the major use cases of the Crowdsourced Bug Bounty Platform. The following diagrams are provided for the six primary use cases (UC-01 to UC-06) documented in 2.3.2.2, showing the sequence of actions, decisions, and parallel processes performed by actors and the system.
+ 
+　　　　　　　　　　　　　　　　　　　　　　Image 15Vulnerablity report Submisson A.D
+　　　　　　　　　　　　　　　　　　　　　　　　　　　　
+Image 16 User Registration A.diagram                                 
+
+ 
+
+
+
+
+
+
+
+
+Image 17 Report Validation A.D
+
+
+ 
+
+
+
+
+
+Image 18 Create Bounty Program
+
+　　　　　　　　　　　　　　　　　　　　　　　　Image 19 Reward Approval
+
+
+
+
+
+
+
+
+
+
+  
+
+
+Image 20View Dashboard A.D 
+　　　　　　　　　　　　　　　　Image 21 Practice Vulnerablity In simulation A.D
+
+
+
+
+                                              
+
+
+
+
+
+
+
+Image 22Expert Code Review A.D
+　　　　　　　　　　　　　　　　　　Image 23 SSDLC integration A.D
+
+
+
+
+
+
+
+
+
+
+
+
+
+Image 24 Live Hacking Event A.D 
+　　　　　　　　　　　　　　　　　　Image 25 AI Red Teaming Engagement
+
+
+
+
+
+
+
+
+                         2.3.7 Sequence Diagram
+Sequence diagrams model the chronological interactions between objects (and actors) to achieve the functionality of each use case. The following diagrams are provided for the six primary use cases (UC-01 to UC-06), showing message flows, object lifecycles, and system responses. 
+
+Image 26 Combined Sequence Diagram
+                                             
+　　　　　　　　　　　2.3.8 Analysis Class Model
+The analysis class model represents the static structure of the Crowdsourced Bug Bounty Platform using an object-oriented approach. It identifies key domain classes, their attributes, operations (methods), relationships, multiplicity, and roles, derived from the use cases, functional requirements (FREQ-01 to FREQ-22), activity diagrams, state charts, and sequence diagrams.
+
+Image 27 Analysis Class Model
+
+             
+
+
+　　　　　　　　　　　2.3.9 Logic Model
+The logic model section presents algorithms/pseudo-code for the critical processes of the  Bug Bounty Platform. These pseudo-codes describe the step-by-step logic for key operations derived from the use cases (UC-01 to UC-06), functional requirements (FREQ-01 to FREQ-22), and previous modeling diagrams. They provide a clear blueprint for implementation.
+Algorithm for UC-01: User Registration
+BEGIN RegisterUser(userDetails, selectedRole)
+    IF userDetails.email EXISTS IN Database THEN
+        RETURN "Email already registered"
+    END IF
+    IF userDetails.password NOT meet complexity requirements THEN
+        RETURN "Password too weak"
+    END IF
+    CREATE pendingUser WITH userDetails AND selectedRole
+    SET pendingUser.status = "PendingVerification"
+    SAVE pendingUser TO Database
+    verificationLink = GENERATE unique verification token
+    SEND email TO userDetails.email WITH verificationLink
+    RETURN "Verification email sent"
+END
+BEGIN VerifyEmail(token)
+    FIND user WITH matching token
+    IF user FOUND AND token valid THEN
+        SET user.status = "Active"
+        REMOVE token
+        SAVE user
+        RETURN "Account activated successfully"
+    ELSE
+        RETURN "Invalid or expired link"
+    END IF
+END
+
+Algorithm for UC-02: Submit Vulnerability Report
+BEGIN SubmitVulnerabilityReport(researcherID, programID, reportDetails, attachments)
+    IF researcher NOT joined programID THEN
+        RETURN "Not eligible for this program"
+    END IF
+    IF reportDetails missing required fields THEN
+        RETURN "Incomplete report"
+    END IF
+    IF attachments size > 10MB OR count > 5 THEN
+        RETURN "Attachment limits exceeded"
+    END IF
+    CREATE newReport
+    SET newReport.ID = GENERATE unique ID
+    SET newReport.status = "New"
+    SET newReport.submissionDate = CURRENT timestamp
+    ASSIGN reportDetails and attachments TO newReport
+    SAVE newReport TO Database
+    SEND notification TO triage specialists AND program owner
+    RETURN "Report submitted successfully - ID: " + newReport.ID
+END
+
+Algorithm for UC-03: Validate Report
+BEGIN ValidateReport(triageID, reportID, severity, status, comments)
+    LOAD report FROM Database USING reportID
+    IF report.status != "New" AND report.status != "Triaged" THEN
+        RETURN "Report already processed"
+    END IF
+    // Deduplication check
+    similarReports = SEARCH reports WITH similar title/description IN same program
+    IF similarReports FOUND THEN
+        SET report.status = "Duplicate"
+        LINK report TO original similarReport
+    ELSE
+        SET report.severity = severity (using VRT taxonomy)
+        SET report.status = status  // Valid, Invalid, or Triaged
+    END IF
+    ADD comments TO report
+    LOG audit trail (triageID, action, timestamp)
+    SAVE report
+    SEND notification TO researcher AND organization
+    RETURN "Report updated successfully"
+END
+
+Algorithm for UC-04: Create Bug Bounty Program
+BEGIN CreateBugBountyProgram(orgID, programDetails)
+    IF programDetails.scope OR rules missing THEN
+        RETURN "Scope and rules are mandatory"
+    END IF
+    CREATE newProgram
+    SET newProgram.ID = GENERATE unique ID
+    SET newProgram.status = "Draft"
+    ASSIGN programDetails TO newProgram
+    SAVE newProgram TO Database
+    RETURN "Draft saved - ID: " + newProgram.ID
+END
+BEGIN PublishProgram(programID)
+    LOAD program FROM Database
+    IF program.status != "Draft" THEN
+        RETURN "Only drafts can be published"
+    END IF
+    SET program.status = "Published"
+    SET program.publishDate = CURRENT date
+    SAVE program
+    SEND notification TO all researchers (or eligible based on matching)
+    RETURN "Program published successfully"
+END
+
+ BEGIN Saga_ApproveReward(reportID, researcherID, amount)
+    1. GENERATE unique transactionID (Idempotency Key)
+    
+    2. CALL WalletService.ReserveFunds(orgID, totalAmount, transactionID)
+       IF FAIL: ABORT ("Insufficient funds in organization account")
+
+    3. CALL PlatformService.CreditCommission(commissionAmount, transactionID)
+       IF FAIL: 
+          CALL WalletService.Compensate_ReleaseFunds(orgID, totalAmount, transactionID)
+          RETURN "System Error: Commission processing failed."
+
+    4. CALL ResearcherService.CreditWallet(researcherID, researcherBountyAmount, transactionID)
+       IF FAIL:
+          CALL PlatformService.Compensate_DebitCommission(transactionID)
+          CALL WalletService.Compensate_ReleaseFunds(orgID, totalAmount, transactionID)
+          RETURN "System Error: Researcher payout failed."
+
+    5. CALL TriageService.UpdateReportStatus(reportID, "Resolved", transactionID)
+       IF FAIL:
+          // CRITICAL: If status update fails, we must roll back the money!
+          CALL ResearcherService.Compensate_DebitWallet(researcherID, researcherBountyAmount, transactionID)
+          CALL PlatformService.Compensate_DebitCommission(transactionID)
+          CALL WalletService.Compensate_ReleaseFunds(orgID, totalAmount, transactionID)
+          RETURN "System Error: Could not update report status. Funds rolled back."
+
+    6. LOG "Transaction Successful" in AuditTrail
+    7. TRIGGER AsynchronousNotification(researcherID, "Payout Complete")
+END
+Algorithm for UC-06: View Dashboard
+BEGIN ViewDashboard(userID)
+    LOAD user FROM Database
+    DETERMINE user.role
+    SWITCH user.role
+        CASE "Researcher":
+            LOAD submittedReports, earnings, reputationRank, activePrograms
+        CASE "Organization":
+            LOAD ownedPrograms, submittedReportsCount, vulnerabilityTrends
+        CASE "TriageSpecialist":
+            LOAD triageQueue (New/Triaged reports)
+        CASE "Administrator":
+            LOAD platformStats (totalUsers, totalReports, revenue)
+        DEFAULT:
+            LOAD general overview
+    END SWITCH
+    RENDER dashboard WITH loaded data and charts
+    RETURN dashboard view
+END
+
+Algorithm for UC-07: Practice Vulnerability in Simulation
+BEGIN PracticeSimulation(researcherID, level)
+    IF level NOT IN ["Beginner", "Intermediate", "Advanced"] THEN
+        RETURN "Invalid level"
+    END IF
+    LOAD simulatedTarget FOR level
+    ALLOW vulnerability discovery AND report submission
+    SAVE simulatedReport
+    GENERATE feedback AND hints
+    RETURN "Simulation complete with feedback"
+END
+
+Algorithm for UC-08: Perform Expert Code Review
+BEGIN PerformCodeReview(orgID, codeUpload)
+    IF codeUpload missing OR invalid THEN
+        RETURN "Code upload required"
+    END IF
+    MATCH reviewers USING BountyMatch
+    ASSIGN code TO reviewers FOR manual analysis
+    COLLECT comments ON issues (e.g., dead code, dependencies)
+    COMPILE report
+    SEND notification TO organization
+    RETURN "Review complete"
+END
+
+Algorithm for UC-09: Integrate with SSDLC Tools
+BEGIN IntegrateSSDLC(toolType, apiKey)
+    IF toolType NOT IN ["Jira", "GitHub"] THEN
+        RETURN "Unsupported tool"
+    END IF
+    VALIDATE apiKey
+    SETUP bi-directional sync
+    SYNC reports AS issues
+    MONITOR AND update changes
+    RETURN "Integration successful"
+END
+
+Algorithm for UC-10: Participate in Live Hacking Event
+BEGIN ScheduleLiveEvent(orgID, eventDetails)
+    IF eventDetails.duration OR scope missing THEN
+        RETURN "Duration and scope mandatory"
+    END IF
+    CREATE event
+    SET event.status = "Scheduled"
+    INVITE matched researchers
+    SAVE event
+    SEND notifications
+    RETURN "Event scheduled"
+END
+BEGIN SubmitDuringEvent(researcherID, eventID, finding)
+    LOAD event
+    IF event.status != "Active" OR timeExpired THEN
+        RETURN "Event not active"
+    END IF
+    SAVE finding
+    UPDATE event.metrics (e.g., bugsFound +1)
+    INTEGRATE finding TO triage queue
+    RETURN "Finding submitted"
+END
+Algorithm for UC-11: AI Red Teaming
+BEGIN CreateAIRedTeamingEngagement(orgID, aiTargets, methodology)
+    IF aiTargets.missing OR methodology.missing THEN
+        RETURN "AI targets and methodology required"
+    END IF
+    IF aiTargets.environment != "Sandbox" AND NOT authorized THEN
+        RETURN "Production AI systems require explicit authorization"
+    END IF
+    CREATE aiEngagement
+    SET aiEngagement.type = "AI Red Teaming"
+    SET aiEngagement.status = "Draft"
+    ASSIGN aiTargets, methodology TO aiEngagement
+    SAVE aiEngagement
+    RETURN "AI Red Teaming engagement created - ID: " + aiEngagement.ID
+END
+BEGIN MatchAIResearchers(engagementID)
+    LOAD aiEngagement
+    MATCH researchers USING BountyMatch WITH filters:
+        - AI/ML security expertise
+        - Past AI vulnerability findings
+        - Relevant certifications
+    RETURN recommendedResearchers
+END
+BEGIN SubmitAIVulnerability(researcherID, engagementID, attackDetails)
+    IF attackDetails.violatesEthicalGuidelines THEN
+        FLAG violation
+        SUSPEND researcher
+        RETURN "Ethical violation detected"
+    END IF
+    CLASSIFY vulnerability AS Security/Safety/Trust
+    CREATE aiReport
+    SET aiReport.category = CLASSIFIED category
+    SET aiReport.attackType = attackDetails.type (e.g., prompt injection)
+    SAVE aiReport
+    SEND notification TO triage specialists
+    RETURN "AI vulnerability submitted"
+END
+　　　　　　　　　2.4 Non functional requirement
+Non-functional requirements specify the quality attributes and technical constraints of the Crowdsourced Bug Bounty Platform. These requirements ensure the system is secure, performant, reliable, usable, scalable, and maintainable, especially given its commercial nature and handling of sensitive vulnerability data.
+Table 3. Non Functional Requirement
+ID	Category	Requirement	Justification / Standard				
+NFR-01	Security	The system shall use HTTPS (TLS 1.3) for all communications and enforce secure headers (HSTS, CSP, X-Frame-Options).	Prevents man-in-the-middle attacks and ensures data confidentiality.				
+NFR-02	Security	The system shall implement role-based access control (RBAC) with least-privilege principle for all roles (Researcher, Organization, Triage Specialist, Finance Officer, Administrator).	Ensures users can only access authorized functions and data (FREQ-01, FREQ-14).				
+NFR-03	Security	The system shall hash passwords using bcrypt or Argon2 and enforce strong password policies (minimum 12 characters, mixed case, numbers, symbols).	Protects against credential stuffing and brute-force attacks.				
+NFR-04	Security	The system shall sanitize all inputs and use prepared statements to prevent SQL injection, XSS, and CSRF attacks.	Follows OWASP Top 10 (FREQ-22).				
+NFR-05	Security	The system shall encrypt sensitive data at rest (e.g., vulnerability details, attachments) using AES-256.	Protects stored vulnerability information from unauthorized access.				
+NFR-06	Security	The system shall implement rate limiting and CAPTCHA on login/report submission to prevent brute-force and spam.	Mitigates automated abuse.				
+NFR-07	Security	The system shall log all critical actions (registration, report submission, status changes, bounty approvals) with timestamps and user IDs for audit trails.	Supports compliance and forensic analysis (FREQ-17).				
+NFR-08	Performance	The system shall respond to user requests within 2 seconds under normal load (95th percentile).	Ensures good user experience even on low-bandwidth connections in Ethiopia.				
+NFR-09	Performance	The system shall support at least 1,000,00 concurrent users with no more than 5% degradation in response time.	Scalability for growing researcher and organization base.				
+NFR-10	Reliability	The system shall achieve above 90 % uptime annually, excluding scheduled maintenance.	Ensures continuous availability for time-sensitive vulnerability reporting.				
+NFR-11	Reliability	The system shall implement automatic backups daily and retain data for at least 90 days.	Enables disaster recovery and compliance with responsible disclosure timelines.				
+NFR-12	Usability	The system shall be intuitive, requiring no more than 3 clicks to perform core actions (e.g., submit report, view dashboard).	Reduces learning curve for non-technical users and researchers.				
+NFR-13	Usability	The system shall be fully responsive and usable on mobile devices (screen width ≥320px).	Supports access from smartphones in Ethiopia with high mobile penetration.				
+NFR-14	Usability	The system shall support English as the primary language, with clear, simple terminology.	Ensures accessibility for local and international users.				
+NFR-15	Scalability	The system shall be designed using a microservices/cloud-native architecture to allow horizontal scaling.	Prepares for future growth across Africa.				
+NFR-16	Maintainability	The system shall follow clean code practices, be well-documented, and use modular design.	Facilitates future enhancements and commercialization.				
+NFR-17	Compatibility	The system shall support modern browsers (latest Chrome, Firefox, Safari, Edge) and degrade gracefully on older versions.	Ensures broad accessibility.				
+NFR-18	Legal/Compliance	The system shall comply with Ethiopian data protection laws (Proclamation No. 1321/2023) and international responsible disclosure standards (ISO/IEC 29147).	Ensures legal operation and ethical handling of vulnerability data.				
+NFR-19	Handling malicious data	Specify that all attachments must be uploaded directly to a "Sandboxed Object Storage Area" that has no execution privileges and is completely decoupled from the application runtime environment.
+
+·  ·  					
+　　　　　 
+　　　　　　 2.5 System Requirement 
+　　　　　　　　　　　2.5.1 Hardware requirements 
+The Bug Bounty Platform is a web-based commercial application designed to be deployed on cloud infrastructure (e.g., AWS, DigitalOcean, or local Ethiopian data centers) for scalability and cost-effectiveness. The following hardware specifications represent the minimum and recommended requirements for successful deployment and operation.
+Table 4.  Hardware Requirement
+ Component	Minimum Requirement	Recommended Requirement	Justification				
+CPU	4 vCPUs (2.5 GHz or higher)	8 vCPUs (3.0 GHz or higher, e.g., Intel Xeon or AMD EPYC)	Handles concurrent report submissions, triage, notifications, and commission calculations.				
+RAM	16 GB	32 GB or higher	Supports in-memory caching (Redis), database queries, and file processing (attachments).				
+Storage (SSD)	100 GB	500 GB or higher (NVMe SSD preferred)	Stores vulnerability reports, attachments (PoC files, screenshots), database, and logs.				
+Network	5 Mbs bandwidth	10 Gbps bandwidth with load balancer	Ensures fast response times and secure file uploads/downloads.				
+Other	RAID 1 or higher for redundancy	Auto-scaling instance group with backup	Provides reliability and disaster recovery.				
+
+　　　　　　　　　　
+　　　　　　　　　　
+　　　　　　　　　　2.5.2 Software requirements 
+The Bug Bounty Platform is a web-based application designed to run on modern software environments. The following specifications outline the required operating systems, browsers, servers, databases, frameworks, and other software products (with versions) needed for successful deployment, development, and user access
+Table 5. Software Requirement
+Component	Required Software / Version	Justification			
+Operating System	Ubuntu 22.04 LTS (or later) or equivalent Linux distribution (e.g., CentOS Stream 9)	Stable, secure, widely supported for web servers and cloud deployment.			
+Web Server	Nginx 1.18 or higher	High performance, reverse proxy, load balancing, and HTTPS termination.			
+Application Runtime	Python 3.10 	Backend framework for robust, secure web application (as per 1.4.3 methodology).			
+Database Management System	PostgreSQL 14 or higher	Reliable, ACID-compliant, supports complex queries for reports and analytics.			
+Caching	Redis 7.0 or higher	Fast in-memory caching for sessions, notifications, and rate limiting.			
+Background Tasks	Celery 5.3+ with Redis/RabbitMQ as broker	Asynchronous processing (email notifications, commission calculations).			
+Containerization	Docker 24.0+ and Docker Compose	Consistent deployment across development, testing, and production.			
+Cloud/Orchestration	Kubernetes (optional for scaling) or Docker Swarm	Enables auto-scaling and high availability in production.			
+					
+
+
+　　　　　2.6 Key Abstraction with CRC Analysis
+CRC (Class-Responsibility-Collaboration) cards are used to identify the key domain objects in the Crowdsourced Bug Bounty Platform, their responsibilities, and how they collaborate. This analysis evolves into the class diagram and ensures a robust object-oriented design.                          
+Class	Responsibilities 	Collaborations 
+User	Register, login, view dashboard, update profile	System, Database, Email Service
+Researcher	Submit vulnerability report, attach evidence, track report status, view leaderboard	VulnerabilityReport, BugBountyProgram, Notification Service
+Organization	Create/publish bug bounty program, define scope/rules, approve reward, view analytics	BugBountyProgram, VulnerabilityReport, FinanceOfficer
+TriageSpecialist	Validate report, assign severity, deduplicate, update status, add comments	VulnerabilityReport, Database, Notification Service
+FinanceOfficer	Approve custom bounty amount, confirm commission payment	VulnerabilityReport, Commission Calculator, Wallet Service
+Administrator	Manage users/roles, audit activity, configure system	All classes, Database
+BugBountyProgram	Store program details (scope, rules, type), change status (Draft → Published → Archived)	Organization, VulnerabilityReport
+VulnerabilityReport	Store report details (title, description, evidence), change status (New → Valid → Resolved)	Researcher, TriageSpecialist, BugBountyProgram, BountyPayment
+BountyPayment	Calculate commission (30%), credit wallets, record transaction	FinanceOfficer, Wallet Service, Database
+SimulationEnvironment
+	 Manage simulated targets, difficulty levels, feedback, track challenge progress
+	Researcher, SimulationReport, VulnerabilityChallenge
+
+
+		
+		
+Table 6 . CRC   Analysis
+               2.6.1 Conceptual Modeling: Class Diagram
+The conceptual class diagram serves as the building block for the Crowdsourced Bug Bounty Platform. It represents the core domain objects, their attributes, operations, relationships, and multiplicity, refined from the CRC analysis (2.6) and the detailed analysis class model (2.3.8).
+
+ 
+Image 28 Class Diagram
+               
+
+The diagram illustrates
+Inheritance : User as an abstract superclass generalized to specialized roles (Researcher, Organization, TriageSpecialist, FinanceOfficer, Administrator).
+Associations and Multiplicity
+One Organization owns many BugBountyProgram (1..*).
+One Researcher submits many VulnerabilityReport (1..*).
+One BugBountyProgram contains many VulnerabilityReport (0..*).
+One VulnerabilityReport may have one BountyPayment (0..1).
+Automatic calculation of 30% platform commission in BountyPayment.
+This conceptual model provides the structural foundation for implementation, ensuring modularity, scalability, and clear object interactions.
+　　　　　　2.6.2 Identifying change cases 
+Change cases anticipate future modifications to the system requirements. The following potential changes are identified with likelihood and impact.
+Table 7. Change Cases
+Change Case ID	Description	Likelihood	Impact	Affected Components					
+CC-01	Add support for cryptocurrency payouts (e.g., Bitcoin, Ethereum)	Medium	High – Requires new wallet integration, tax compliance, security audit	BountyPayment, Wallet Service, FREQ-20					
+CC-02	Introduce AI-powered researcher-program matching and automated triage	High	High – Improves efficiency but needs training data and validation	TriageSpecialist, Researcher, FREQ-16					
+CC-03	Add mobile applications (iOS and Android) for researchers and organizations	High	Medium – Expands accessibility, requires native development	All UI components, responsive design					
+CC-04	Support multilingual interface (e.g., Amharic, French)	Medium	Medium – Enhances regional adoption in Africa	UI Prototypes, NFR-14					
+　　　　　　　　2.6.3 User Interface Prototyping
+User interface prototypes were developed to visualize the Crowdsourced Bug Bounty Platform and gather additional requirements from stakeholders during interviews and questionnaires. Low-fidelity wireframes were created using Figma and Draw.io to demonstrate key screens and user flows. These prototypes helped validate usability, role-based access, and interaction patterns aligned with the use cases (UC-01 to UC-06) and functional requirements (FREQ-01 to FREQ-22).
+
+
+
+
+
+
+
+Image 29. Home page prototype
+  
+Image 30.user registration prototype
+
+          
+
+
+
+
+Image 31.Researcher Dashbord
+
+
+                               
+
+
+Image 32.less featured Analytics
+
+                   
+
+
+
+
+
+Image 33. Report Submission prototype
+
+ 
+
+
+Image 34.report submission 2
+                       
+ 
+
+
+
+
+Image 35.  Bounty program Creation prototype
+                           
+
+ 
+
+
+Image 36. Customer pentest Dashboard
+
+                            
+
+
+
+
+Image 37. Customer Analytics Dashboard
+
+                                   
+
+
+
+Chapter Three
+ System Design
+The platform is designed to facilitate secure collaboration between ethical hackers (researchers) and organizations that require vulnerability assessment of their applications, systems, and AI models.
+　　　　　　　Purpose of the System Design
+Provide a robust, scalable, and maintainable architecture.
+Ensure performance, reliability, security, and usability for end users.
+Support modular growth, enabling addition of features like AI Red Teaming, PTaaS, wSimulation Engine, and BountyMatch.
+Ensure clear data persistence, component interaction, and deployment across servers.
+　　　　　　　　　3.1 Architectural Design
+The system uses a layered, modular architecture with components organized into presentation, application, domain, integration, and data layers.
+Introduce Database Read-Replicas to handle the heavy read operations of the Organization Analytics dashboards. Additionally, specify a dedicated Time-Series Database (like Elasticsearch or InfluxDB) specifically for the Analytics / Logs DB.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Image 38 Architectural Design
+
+
+
+
+
+
+　　　　　　　　　3.1.1 Component modeling
+A component diagram focuses on grouping classes and functionality into components (modules) and showing how they interact, rather than showing the full stack like the vertical architecture diagram. It’s basically like looking at the system from the component perspective.
+
+
+
+Image 39 Component modeling
+
+
+
+
+
+
+
+
+
+
+
+
+　　　　　　　　　　3.1.2 Deployment Modeling
+The deployment model for this Platform is based on a containerized microservice  architecture using Docker. This approach ensures that the different components frontend, backend, and isolated simulation environment run in their own dedicated execution environments while communicating over a secure internal network.
+
+Image 40 Deployment Model
+
+
+
+
+
+
+
+　　　　　　　3.2 Detail Design
+　　　　　　　　　　　3.2.1 Design Class Model
+The Design Class Model for the  Platform provides a detailed view of the system's internal structure. It translates the domain entities identified in the CRC analysis (such as Researcher, Organization, and VulnerabilityReport) into a technical implementation blueprint.
+
+Image 41  Design Class Model
+ 
+　　　　　　　　　　　　　3.2.2 Persistent model
+The persistence model of this project defines how object-oriented system components such as Users, Researchers, Organizations, Bug Bounty Programs, Vulnerability Reports, PTaaS engagements, AI Red Teaming activities, and Payments are mapped and persisted into relational database tables using PostgreSQL.
+Attribute	Type	Length	Key
+user_id	SERIAL	—	PK
+full_name	VARCHAR	150	
+email	VARCHAR	150	UNIQUE
+password_hash	VARCHAR	255	
+role	VARCHAR	50	
+status	VARCHAR	30	
+created_at	TIMESTAMP	—	
+Table 8 Users Persistence model
+
+
+Attribute	Type	Length	Key
+researcher_id	INT	—	PK, FK → users.user_id
+reputation_score	INT	—	
+earnings	DECIMAL	10,2	
+			
+Table 9 Researcher p.model
+
+iD	Researcher_ID	Transaction_Type	Amount (in Cents)	Reference_ID (Report ID)	Timestamp
+1	505	CREDIT_BOUNTY	+5000	REP-101	2026-03-01
+2	505	DEBIT_WITHDRAWAL	-2000	WITHDRAW-99	2026-03-05
+3	505	CREDIT_BONUS	+500	PROMO-2024	2026-03-06
+
+
+
+
+
+Attribute	Type	Length	Key
+organization_id	INT	—	PK, FK → users.user_id
+company_name	VARCHAR	150	
+subscription_status	VARCHAR	50	
+Table 10 Organization P.model
+
+
+
+Attribute	Type	Length	Key
+program_id	SERIAL	—	PK
+organization_id	INT	—	FK
+name	VARCHAR	150	
+description	TEXT	—	
+type	VARCHAR	50	
+scope	JSON	—	
+reward_tiers	JSON	—	
+status	VARCHAR	50	
+publish_date	TIMESTAMP	—	
+Table 11Bounty Program
+
+Attribute	Type	Length	Key
+report_id	SERIAL	—	PK
+program_id	INT	—	FK
+researcher_id	INT	—	FK
+title	VARCHAR	200	
+description	TEXT	—	
+severity	VARCHAR	50	
+status	VARCHAR	50	
+submitted_at	TIMESTAMP	—	
+Table 12 Vulnerablity Reports
+
+
+Attribute	Type	Length	Key
+payment_id	SERIAL	—	PK
+report_id	INT	—	FK
+researcher_amount	DECIMAL	10,2	
+commission_amount	DECIMAL	10,2	
+total_amount	DECIMAL	10,2	
+status	VARCHAR	50	
+Table 13Bounty paymen
+
+Attribute	Type	Length	Key
+ptaas_id	SERIAL	—	PK
+organization_id	INT	—	FK
+scope	TEXT	—	
+methodology	VARCHAR	100	
+start_date	DATE	—	
+end_date	DATE	—	
+status	VARCHAR	50	
+Table 14 PTaas Engagement
+
+
+Attribute	Type	Length	Key
+ai_engagement_id	SERIAL	—	PK
+organization_id	INT	—	FK
+ai_targets	JSON	—	
+methodology	VARCHAR	150	
+ethical_guidelines	TEXT	—	
+status	VARCHAR	50	
+Table 15 Ai red teaming Engagement
+
+
+
+Attribute	Type	Length	Key
+simulation_id	SERIAL	—	PK
+level	VARCHAR	50	
+target_name	VARCHAR	150	
+difficulty	VARCHAR	50	
+Table 16 Simulations
+
+Attribute	Type	Length	Key
+integration_id	SERIAL	—	PK
+organization_id	INT	—	FK
+tool_type	VARCHAR	100	
+api_key	VARCHAR	255	
+status	VARCHAR	50	
+Table 17 SSDL Integration
+
+
+From	To	Multiplicity	Role
+Users → Researchers	1 : 1	User acts as researcher	
+Users → Organizations	1 : 1	User acts as organization	
+Organizations → Programs	1 : *	Owns	
+Programs → Reports	1 : *	Contains	
+Researchers → Reports	1 : *	Submits	
+Reports → Payments	1 : 0..1	Generates	
+Organizations → PTaaS	1 : *	Requests	
+Organizations → AI Red Teaming	1 : *	Initiates	
+Organizations → SSDLC	1 : *	Integrates	
+Table 18 Unified Relationship
+　　　　　　3.3 User Interface Design
+User Interface (UI) Design refers to the process of designing the visual layout and interactive elements through which users interact with the system. It focuses on presenting system functionality in a clear, intuitive, and user-friendly manner to ensure efficient interaction between users and the application.
+
+
+Image 42hacker registration
+
+
+Image 43 Org registration form
+
+
+
+Image 44 Researcher Dashboard
+
+
+
+Image 45 Organisation Dashboard
+
+
+
+
+
+
+
+Image 46 Triage Specialist portal
+
+
+Image 47 Admin portal1
+
+
+Image 48 Admin portal2
+
+
+Image 49 Admin portal3
+
+
+
+Image 50 Finance Officer portal1
+
+
+Image 51 Finance officer portal2
+
+
+　　　　　　　
+　　　　　　　
+　　　　　　　3.4 Access control and security
+The Platform implements a Role-Based Access Control (RBAC) system with the principle of least privilege. Each user role has specific permissions aligned with their responsibilities, ensuring data confidentiality, integrity, and system security.
+　　　　　　User Roles and Access Levels
+I.Researcher (Ethical Hacker)
+Access Permissions
+Browse public and invited private bug bounty programs
+View program details (scope, rules, rewards, disclosure policy)
+Submit vulnerability reports with attachments
+View own submitted reports and their status
+Communicate with triage team via secure messaging
+Access bug bounty simulation environment (all levels)
+View own earnings, reputation score, and leaderboard ranking
+Update own profile and payment information
+Collaborate with other researchers on reports (reward splitting)
+Participate in live hacking events (if invited)
+Accept/Decline BountyMatch recommendations
+Access Restrictions
+Cannot view other researchers' reports
+Cannot access organization dashboards or analytics
+Cannot modify program scope or rules
+Cannot approve or reject reports
+Cannot access financial/payment processing systems
+Cannot view platform revenue or commission data
+Cannot access admin or triage portals
+Cannot modify other users' profiles or data
+II.Organization (Program Owner)
+Access Permissions
+Create and manage bug bounty programs (public/private/VDP)
+Define  program scope, rules, reward tiers, and disclosure policy
+View all reports submitted to their programs
+Communicate with researchers and triage team
+Request PTaaS engagements and code reviews
+View analytics dashboard (vulnerability trends, severity distribution)
+Approve bounty amounts for validated reports
+Manage organization team members and roles
+Configure SSDLC integrations (Jira, GitHub)
+Schedule live hacking events
+Create AI Red Teaming engagements
+View billing and payment history
+Export reports and compliance documentation
+Access Restrictions
+Cannot view reports from other organizations' programs
+Cannot access researcher personal information (beyond public profile)
+Cannot modify platform settings or configurations
+Cannot access triage queue or validate reports (managed service)
+Cannot process payments directly (Finance Officer role)
+Cannot access platform-wide analytics or revenue data
+Cannot modify other organizations' programs
+Cannot access simulation environment backend
+III.Triage Specialist (Platform Staff)
+Access Permissions
+View all submitted vulnerability reports across all programs
+Validate and assign severity using VRT taxonomy
+Update report status (New → Triaged → Valid/Invalid/Duplicate)
+Deduplicate reports and link to original submissions
+Communicate with researchers and organizations
+Add internal triage notes and comments
+Request additional information from researchers
+Assign reports to other triage specialists
+View triage queue and analytics
+Use duplicate checker and triage templates
+Recommend bounty amounts based on severity
+Access Restrictions
+Cannot approve or process payments
+Cannot create or modify programs
+Cannot access financial data or revenue analytics
+Cannot modify platform settings or user roles
+Cannot  delete reports (only mark as invalid/duplicate)
+Cannot access researcher payment information
+Cannot modify organization billing details
+Cannot access admin-level system configurations
+IV.Finance Officer (Platform Staff)
+Access Permissions
+View all pending payment approvals
+Approve  or reject bounty payments
+Process payments via configured payment methods
+View financial overview and revenue analytics
+Calculate and track platform commission (30%)
+Generate financial reports and invoices
+View transaction history and payment status
+Manage payment methods and settings
+Export financial data for accounting
+View researcher and organization payment details
+Handle PTaaS engagement payments
+Track bulk payments and processing status
+Access Restrictions
+Cannot validate or triage vulnerability reports
+Cannot create or modify programs
+Cannot access report technical details (only payment info)
+Cannot modify platform settings or user roles
+Cannot access triage queue or researcher communications
+Cannot modify severity or report status
+Cannot access simulation environment
+Cannot perform admin-level system operations
+V.Administrator (Platform Owner)
+Access Permissions
+Full access to all platform features and data
+Manage all user accounts and roles
+View platform-wide analytics and metrics
+Configure system settings and security policies
+Manage BountyMatch algorithm and matching criteria
+Oversee PTaaS, AI Red Teaming, and simulation modules
+Access audit logs and security monitoring
+Manage SSDLC integrations and API configurations
+Configure payment gateways and commission rates
+Moderate programs and enforce platform policies
+Suspend or ban users for policy violations
+Export all data for compliance and backup
+Manage live hacking events and promotional features
+Configure notification systems and email templates
+Access Restrictions
+Audit trail for all admin actions (logged and monitored)
+Two-factor authentication required for sensitive operations
+Cannot delete audit logs or system backups
+Requires approval for critical system changes (multi-admin approval)|  
+　　　　　　　Security Mechanisms
+Authentication
+Multi-Factor Authentication (MFA): Required for all roles
+Password Policy Minimum 12 characters, complexity requirements
+Session Management 30-minute timeout, secure token-based authentication
+Email Verification  Mandatory for account activation
+Authorization
+Role-Based Access Control (RBAC) Enforced at API and UI levels
+Least Privilege Principle Users granted minimum necessary permissions
+Dynamic Permission Checks Validated on every request
+Token-Based Authorization JWT tokens with role claims
+Data Protection
+Encryption at Rest AES-256 for sensitive data (reports, attachments, payment info)
+Encryption in Transit TLS 1.3 for all communications
+Data Isolation Organizations cannot access each other's data
+Secure File Upload Virus scanning, file type validation, size limits
+Audit and Monitoring
+Audit Logs All critical actions logged with timestamp, user ID, IP address
+Activity Tracking Report submissions, status changes, payment approvals
+Security Monitoring Failed login attempts, suspicious activities
+Compliance Logging Retention for 90 days minimum
+Input Validation
+SQL Injection Prevention Prepared statements, parameterized queries
+XSS Protection Input sanitization, output encoding
+CSRF Protection Anti-CSRF tokens on all forms
+Rate Limiting API throttling to prevent abuse
+Secure Communication
+In-Platform Messaging Encrypted, role-restricted
+Email Notifications No sensitive data in emails (links only)
+API Security API keys, rate limiting, IP whitelisting (optional)
+　　　　　　　Special Access Scenarios
+　　　　　　　
+  Simulation Environment
+Isolated Data  Completely separate from production platform data
+No Real Impact Simulated targets, no real organizations or rewards
+Access Researchers only (Admin for configuration)
+Data Retention Simulation progress stored per user
+BountyMatch™
+Algorithm Access Admin only for configuration
+Matching Data Based on public profile, skills, past performance.
+Privacy No personal information used in matching.
+Consent Required Researchers must accept/decline matches.
+PTaaS Engagements
+Scoped Access Only assigned researchers can view engagement details
+Time-Bound  Access expires after engagement completion
+Isolated Workflows Separate from regular  programs
+AI Red Teaming
+Specialized Access Only matched researchers with AI/ML expertise
+Ethical Guidelines Strict rules enforced, violations result in suspension
+Isolated Testing  Sandbox environments only
+SSDLC Integration
+API Keys  Organization-level, encrypted storage
+Bi-Directional Sync  Only for linked issues/vulnerabilities
+Audit Trail  All sync operations logged
+ Compliance and Standards
+ Adherence to
+OWASP Top 10 Security best practices implemented
+ISO/IEC 29147 Vulnerability disclosure standards
+Ethiopian Data Protection Proclamation No. 1321/2023 Data privacy compliance
+PCI DSS  For payment processing (if applicable)
+GDPR Principles  Data minimization, right to erasure (where applicable)
+ Access Control Enforcement
+Technical Implementation
+1. Middleware Layer Role checks before route access
+2. Database Level Row-level security policies
+3. API Gateway Permission validation on all endpoints
+4. UI Layer Role-based component rendering
+5. File Access Signed URLs with expiration for attachments
+Example Access Flow
+User Request → Authentication Check → Role Verification → 
+Permission Check → Resource Access → Audit Log → Response
+The BugBountyET platform implements a comprehensive, defense-in-depth security model with strict role-based access controls. Each role is carefully scoped to ensure users can perform their duties while maintaining data confidentiality, system integrity, and regulatory compliance. Regular security audits and penetration testing ensure ongoing protection of the platform and its users.
+References
+Bugcrowd. (2025). Bugcrowd Platform Documentation and Vulnerability Rating Taxonomy (VRT). Retrieved from https://docs.bugcrowd.com/
+HackerOne. (2025). HackerOne Platform Help Center and Signal Reputation System. Retrieved from https://docs.hackerone.com/
+ OWASP Foundation. (2023). OWASP Top 10 Web Application Security Risks. Retrieved from https://owasp.org/www-project-top-ten/
+ OWASP Foundation. (2023). Responsible Disclosure Guidelines. Retrieved from https://owasp.org/www-policy/legal/responsible-disclosure
+ International Organization for Standardization (ISO). (2018). ISO/IEC 29147:2018 – Information technology — Security techniques — Vulnerability disclosure. Geneva: ISO.
+National Bank of Ethiopia. (2024). Guidelines on Electronic Payments and Tax Withholding. Retrieved from https://nbe.gov.et/
+ Ethiopian Revenue and Customs Authority. (2024). Income Tax Proclamation for Digital Services. Retrieved from https://erca.gov.et/
+ Government of Ethiopia. (2023). Data Protection Proclamation No. 1321/2023. Federal Negarit Gazeta.
+ Bahir Dar University, Faculty of Computing. (2025). Annex I: Documentation Template for Requirement Analysis Document (RAD). Internal guideline document.
+ Unified Modeling Language (UML). (2024). OMG UML Specification Version 2.5.1. Object Management Group. Retrieved from https://www.omg.org/spec/UML/
+OWASP Foundation. (2024). OWASP Top 10 for Large Language Model Applications. Retrieved from https://owasp.org/www-project-top-10-for-large-language-model-applications/
+MITRE Corporation. (2024). MITRE ATLAS (Adversarial Threat Landscape for Artificial Intelligence Systems). Retrieved from https://atlas.mitre.org/
+National Institute of Standards and Technology (NIST). (2023). AI Risk Management Framework (AI RMF 1.0). NIST AI 100-1. Retrieved from https://www.nist.gov/itl/ai-risk-management-framework
+OpenAI. (2024). Framework for Evaluating and Red Teaming Language Models. Retrieved from https://openai.com/research/framework-for-evaluating-and-red-teaming-language-models
+
+
+
+Appendeces
+  Sample Questionnaire Used During Requirement Gathering
+　　　　Questionnaire for Ethical Hackers (Researchers)
+Have you ever participated in bug bounty programs? 
+What features do you consider most important in a bug bounty platform? 
+What challenges do you face when reporting vulnerabilities to Ethiopian organizations currently?
+Would you participate in a local Ethiopian bug bounty platform? Why or why not?
+ Any suggestions for features in a new Ethiopian bug bounty platform?
+　　　　　　　Questionnaire for Organizations
+Does your organization have a responsible disclosure policy? 
+How do you currently handle vulnerability reports?
+What is your budget range for security testing (penetration testing or bug bounty)?
+Would you launch a bug bounty program if a trusted local platform existed?  
+What concerns do you have about crowdsourced security testing (e.g., data confidentiality, false positives)?
+Preferred payout currency and method for researchers? )
+  Interview Questions Used During Requirement Gathering
+Interview Guide for Security Specialists
+Describe your current process for receiving and triaging vulnerability reports.
+What tools do you use for vulnerability management?
+How long does it typically take to acknowledge and validate a report?
+What severity classification system do you use (e.g., CVSS, custom)?
+Have you used international bug bounty platforms? What was your experience.

@@ -1,0 +1,139 @@
+@startuml Analytics_Reporting
+
+title Analytics Dashboard and Reporting - Activity Diagram
+
+|User|
+start
+:Login to Platform;
+:Navigate to Dashboard;
+
+|System|
+:Load Role-Based Dashboard;
+:Generate Visualizations;
+
+note right
+  Chart Types Used:
+  - Line charts (trends over time)
+  - Bar graphs (severity distribution)
+  - Pie charts (vulnerability types)
+  - Area charts (cumulative data)
+  - Heatmaps (activity patterns)
+  - Candlestick (payment trends)
+end note
+
+|User|
+:View Dashboard Metrics;
+
+note right
+  **Dashboard Metrics by Role:**
+  
+  Researcher:
+  - Reports submitted, earnings, reputation
+  
+  Organization:
+  - Programs, vulnerabilities, ROI
+  
+  Triage Specialist:
+  - Queue: 12 New, 8 In Review, 47 Today
+  - Avg Response Time: 2.5h
+  - Validation/Rejection rates
+  - Severity breakdown (Critical/High/Medium/Low)
+  - Reports by status (Validated/Rejected/In Progress)
+  
+  Admin:
+  - Platform stats, users, revenue
+end note
+
+:Click "Generate Report";
+:Select Report Type;
+
+if (Report Type?) then (Standard)
+  :Select Predefined Template;
+  :Set Date Range;
+else (Custom)
+  :Select Metrics;
+  :Configure Filters;
+  :Choose Visualization Type;
+  
+  note right
+    Available Charts:
+    - Line (trends)
+    - Bar (comparisons)
+    - Pie (distribution)
+    - Area (cumulative)
+    - Scatter (correlation)
+    - Heatmap (patterns)
+  end note
+  
+  :Set Date Range;
+endif
+
+:Click "Generate";
+
+|System|
+:Validate Parameters;
+:Query Database;
+:Aggregate Data;
+:Apply Filters;
+:Calculate Metrics;
+:Render Charts/Graphs;
+
+if (Large Dataset?) then (yes)
+  :Queue Background Job;
+  
+  |Celery Worker|
+  :Process Report Generation;
+  :Generate Charts;
+  :Create PDF;
+  :Upload to MinIO;
+  
+  |System|
+  :Send Completion Email;
+  
+  |User|
+  :Receive Email;
+  :Download Report;
+else (no)
+  :Generate Report Instantly;
+  :Render Visualizations;
+  
+  |User|
+  :View Interactive Report;
+endif
+
+:Select Export Format;
+
+if (PDF Format?) then (yes)
+  |System|
+  :Generate PDF with Charts;
+  :Download File;
+  |User|
+  :Save Report;
+  stop
+endif
+
+if (Excel Format?) then (yes)
+  |System|
+  :Generate Excel with Data;
+  :Download File;
+  |User|
+  :Save Report;
+  stop
+endif
+
+if (CSV Format?) then (yes)
+  |System|
+  :Generate CSV (Raw Data);
+  :Download File;
+  |User|
+  :Save Report;
+  stop
+endif
+
+|System|
+:Return JSON Data;
+|User|
+:Use API Response;
+stop
+
+@enduml
