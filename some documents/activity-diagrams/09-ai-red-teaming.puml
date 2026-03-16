@@ -1,0 +1,148 @@
+@startuml AI_Red_Teaming
+
+' ============================================
+' ACTIVITY DIAGRAM: AI Red Teaming Engagement
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+title AI Red Teaming Engagement - Activity Diagram
+
+|Organization|
+start
+:Login to Platform;
+:Navigate to AI Red Teaming;
+:Click "Create AI Security Assessment";
+
+:Select AI System Type\n(LLM, ML Model, AI Agent);
+:Define Testing Scope\n(Prompt Injection, Data Poisoning, etc.);
+:Provide AI System Access\n(API Endpoint, Credentials);
+:Set Testing Constraints;
+:Define Budget & Timeline;
+:Submit Engagement Request;
+
+|System|
+:Validate Request;
+:Create AI Engagement Record;
+:Match AI Security Experts;
+
+note right
+  Match based on:
+  - AI/ML expertise
+  - Attack technique knowledge
+  - Past AI assessments
+end note
+
+:Send Invitations;
+
+|AI Security Expert|
+:Receive Invitation;
+:Review AI System Details;
+:Assess Complexity;
+
+if (Accept Engagement?) then (yes)
+  :Accept Invitation;
+  
+  |System|
+  :Assign Expert;
+  :Grant System Access;
+  :Provide Testing Environment;
+  
+  |AI Security Expert|
+  :Setup Testing Tools;
+  :Access AI System;
+  :Review System Architecture;
+  
+  partition "Testing Phase" {
+    repeat
+      :Select Attack Vector;
+      note right
+        Attack Types:
+        - Prompt Injection
+        - Jailbreaking
+        - Data Poisoning
+        - Model Inversion
+        - Adversarial Examples
+        - Bias Exploitation
+      end note
+      
+      :Execute Attack;
+      :Monitor System Response;
+      
+      if (Vulnerability Found?) then (yes)
+        :Document AI Vulnerability;
+        :Record Attack Payload;
+        :Capture System Output;
+        :Assess Impact & Risk;
+        :Provide Mitigation;
+        :Submit Finding;
+        
+        |System|
+        :Store AI Vulnerability;
+        :Classify Severity;
+        :Notify Organization;
+        
+        |Organization|
+        :Review Finding;
+        :Acknowledge Receipt;
+        
+        |AI Security Expert|
+      endif
+      
+    repeat while (Testing Complete?) is (no)
+    ->yes;
+  }
+  
+  :Compile All Findings;
+  :Analyze Attack Patterns;
+  :Write Executive Summary;
+  :Provide Recommendations;
+  :Generate Final Report;
+  :Submit Report;
+  
+  |System|
+  :Upload Report to MinIO;
+  :Mark Engagement Complete;
+  :Calculate Payment;
+  :Notify Organization;
+  
+  |Organization|
+  :Download Report;
+  :Review AI Vulnerabilities;
+  :Assess Remediation Effort;
+  
+  if (Request Retest?) then (yes)
+    :Implement Fixes;
+    :Request Retest;
+    
+    |System|
+    :Create Retest Engagement;
+    :Notify Expert;
+    
+    |AI Security Expert|
+    :Perform Retest;
+    :Verify Fixes;
+    :Submit Retest Report;
+    
+    |Organization|
+    :Review Retest Results;
+  endif
+  
+  :Approve Payment;
+  
+  |System|
+  :Process Payment;
+  :Credit Expert Wallet;
+  
+  |AI Security Expert|
+  :Receive Payment;
+  stop
+  
+else (no)
+  :Decline Invitation;
+  
+  |System|
+  :Find Alternative Expert;
+  stop
+endif
+
+@enduml

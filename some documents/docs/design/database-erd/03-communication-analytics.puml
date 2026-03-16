@@ -1,0 +1,74 @@
+@startuml Communication_Analytics_ERD
+
+' ============================================
+' DATABASE ERD: Communication & Analytics Tables
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+!define PK <color:gold><&key></color>
+!define FK <color:silver><&link-intact></color>
+
+skinparam linetype ortho
+left to right direction
+
+title Communication & Analytics Tables
+
+' COMMUNICATION
+entity "notifications" as notifications {
+  PK notification_id : UUID
+  FK user_id : UUID
+  type : VARCHAR(50)
+  channel : VARCHAR(20)
+  status : VARCHAR(20)
+  created_at : TIMESTAMP
+}
+
+entity "messages" as messages {
+  PK message_id : UUID
+  FK sender_id : UUID
+  FK recipient_id : UUID
+  subject : VARCHAR(200)
+  is_read : BOOLEAN
+}
+
+entity "comments" as comments {
+  PK comment_id : UUID
+  FK report_id : UUID
+  FK user_id : UUID
+  content : TEXT
+  is_internal : BOOLEAN
+}
+
+entity "webhook_endpoints" as webhooks {
+  PK endpoint_id : UUID
+  FK organization_id : UUID
+  url : VARCHAR(500)
+  events : JSON
+}
+
+' ANALYTICS
+entity "researcher_metrics" as r_metrics {
+  PK metrics_id : UUID
+  FK researcher_id : UUID
+  total_reports : INTEGER
+  success_rate : DECIMAL(5,2)
+  reputation_score : DECIMAL(5,2)
+}
+
+entity "organization_metrics" as o_metrics {
+  PK metrics_id : UUID
+  FK organization_id : UUID
+  total_reports_received : INTEGER
+  mttr : INTEGER
+  roi : DECIMAL(10,2)
+}
+
+entity "platform_metrics" as p_metrics {
+  PK metrics_id : UUID
+  date : DATE
+  total_users : INTEGER
+  total_reports : INTEGER
+  platform_revenue : DECIMAL(15,2)
+}
+
+@enduml

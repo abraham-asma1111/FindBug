@@ -1,0 +1,123 @@
+@startuml Core_Tables_ERD
+
+' ============================================
+' DATABASE ERD: Core Tables (Users, Programs, Reports, Payments)
+' Bug Bounty and Its Simulation Platform
+' ============================================
+
+!define PK <color:gold><&key></color>
+!define FK <color:silver><&link-intact></color>
+
+skinparam linetype ortho
+left to right direction
+
+title Core Database Tables - Users, Programs, Reports, Payments
+
+' USER MANAGEMENT
+entity "users" as users {
+  PK user_id : UUID
+  email : VARCHAR(255) UNIQUE
+  password_hash : VARCHAR(60)
+  full_name : VARCHAR(100)
+  role : VARCHAR(20)
+  is_staff : BOOLEAN DEFAULT false
+  status : VARCHAR(20)
+  email_verified : BOOLEAN DEFAULT false
+  last_login_at : TIMESTAMP
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "researchers" as researchers {
+  PK researcher_id : UUID
+  FK user_id : UUID
+  reputation_score : DECIMAL(5,2)
+  total_earnings : DECIMAL(15,2)
+}
+
+entity "organizations" as organizations {
+  PK organization_id : UUID
+  FK user_id : UUID
+  company_name : VARCHAR(200)
+  subscription_type : VARCHAR(20)
+}
+
+entity "staff_invitations" as staff_invitations {
+  PK invitation_id : UUID
+  FK user_id : UUID
+  FK created_by : UUID
+  invitation_token : VARCHAR(255) UNIQUE
+  expires_at : TIMESTAMP
+  status : VARCHAR(20)
+  created_at : TIMESTAMP
+}
+
+entity "staff_permissions" as staff_permissions {
+  PK permission_id : UUID
+  FK user_id : UUID
+  permission_name : VARCHAR(100)
+  resource : VARCHAR(100)
+  granted_by : UUID
+  granted_at : TIMESTAMP
+}
+
+entity "admin_sessions" as admin_sessions {
+  PK session_id : UUID
+  FK user_id : UUID
+  jwt_token_hash : VARCHAR(255)
+  ip_address : VARCHAR(45)
+  user_agent : TEXT
+  expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+' BUG BOUNTY
+entity "bounty_programs" as programs {
+  PK program_id : UUID
+  FK organization_id : UUID
+  name : VARCHAR(200)
+  status : VARCHAR(20)
+  budget : DECIMAL(15,2)
+}
+
+entity "vulnerability_reports" as reports {
+  PK report_id : UUID
+  FK program_id : UUID
+  FK researcher_id : UUID
+  title : VARCHAR(200)
+  severity : VARCHAR(20)
+  status : VARCHAR(20)
+  reward_amount : DECIMAL(15,2)
+}
+
+' PAYMENTS
+entity "bounty_payments" as payments {
+  PK payment_id : UUID
+  FK report_id : UUID
+  FK researcher_id : UUID
+  amount : DECIMAL(15,2)
+  status : VARCHAR(20)
+}
+
+entity "researcher_balances" as balances {
+  PK balance_id : UUID
+  FK researcher_id : UUID
+  available_balance : DECIMAL(15,2)
+  total_earned : DECIMAL(15,2)
+}
+
+' RELATIONSHIPS
+researchers ||--o| users
+organizations ||--o| users
+staff_invitations }o--|| users : "invited user"
+staff_invitations }o--|| users : "created by"
+staff_permissions }o--|| users
+admin_sessions }o--|| users
+programs }o--|| organizations
+reports }o--|| programs
+reports }o--|| researchers
+payments |o--|| reports
+balances ||--|| researchers
+payments }o--|| researchers
+
+@enduml

@@ -1,0 +1,298 @@
+@startuml Database_Schema_ERD
+
+' ============================================
+' DATABASE SCHEMA - Entity Relationship Diagram
+' Bug Bounty and Its Simulation Platform
+' PostgreSQL Database Design
+' ============================================
+
+!define PK <color:gold><&key></color>
+!define FK <color:silver><&link-intact></color>
+!define UK <color:blue><&star></color>
+
+' Vertical layout (top to bottom)
+skinparam linetype ortho
+top to bottom direction
+skinparam nodesep 80
+skinparam ranksep 80
+
+title Bug Bounty Platform - Database Schema (ERD)
+
+' ============================================
+' USER MANAGEMENT
+' ============================================
+
+entity "users" as users {
+  PK user_id : UUID
+  UK email : VARCHAR(255)
+  password_hash : VARCHAR(60)
+  full_name : VARCHAR(100)
+  role : VARCHAR(20)
+  status : VARCHAR(20)
+  email_verified : BOOLEAN
+  phone : VARCHAR(20)
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+  last_login_at : TIMESTAMP
+}
+
+entity "researchers" as researchers {
+  PK researcher_id : UUID
+  FK user_id : UUID
+  bio : TEXT
+  website : VARCHAR(500)
+  github : VARCHAR(255)
+  twitter : VARCHAR(255)
+  reputation_score : DECIMAL(5,2)
+  rank : INTEGER
+  total_earnings : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "organizations" as organizations {
+  PK organization_id : UUID
+  FK user_id : UUID
+  company_name : VARCHAR(200)
+  industry : VARCHAR(100)
+  website : VARCHAR(500)
+  subscription_type : VARCHAR(20)
+  subscription_expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "triage_specialists" as triage_specialists {
+  PK specialist_id : UUID
+  FK user_id : UUID
+  specialization : JSON
+  years_experience : INTEGER
+  accuracy_rate : DECIMAL(5,2)
+  created_at : TIMESTAMP
+}
+
+entity "administrators" as administrators {
+  PK admin_id : UUID
+  FK user_id : UUID
+  admin_level : VARCHAR(20)
+  permissions : JSON
+  created_at : TIMESTAMP
+}
+
+entity "kyc_verifications" as kyc_verifications {
+  PK kyc_id : UUID
+  FK user_id : UUID
+  status : VARCHAR(20)
+  document_type : VARCHAR(50)
+  document_number : VARCHAR(100)
+  document_front : VARCHAR(500)
+  document_back : VARCHAR(500)
+  selfie_photo : VARCHAR(500)
+  verified_by : UUID
+  verified_at : TIMESTAMP
+  rejection_reason : TEXT
+  expires_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+
+' ============================================
+' BUG BOUNTY CORE
+' ============================================
+
+entity "bounty_programs" as programs {
+  PK program_id : UUID
+  FK organization_id : UUID
+  name : VARCHAR(200)
+  description : TEXT
+  type : VARCHAR(20)
+  status : VARCHAR(20)
+  start_date : TIMESTAMP
+  end_date : TIMESTAMP
+  budget : DECIMAL(15,2)
+  is_private : BOOLEAN
+  eligibility_criteria : JSON
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "program_scopes" as program_scopes {
+  PK scope_id : UUID
+  FK program_id : UUID
+  asset_type : VARCHAR(50)
+  asset_identifier : VARCHAR(500)
+  is_in_scope : BOOLEAN
+  description : TEXT
+  created_at : TIMESTAMP
+}
+
+entity "reward_tiers" as reward_tiers {
+  PK tier_id : UUID
+  FK program_id : UUID
+  severity : VARCHAR(20)
+  min_amount : DECIMAL(15,2)
+  max_amount : DECIMAL(15,2)
+  created_at : TIMESTAMP
+}
+
+entity "vulnerability_reports" as reports {
+  PK report_id : UUID
+  FK program_id : UUID
+  FK researcher_id : UUID
+  title : VARCHAR(200)
+  description : TEXT
+  severity : VARCHAR(20)
+  status : VARCHAR(20)
+  vulnerability_type : VARCHAR(100)
+  cvss_score : DECIMAL(3,1)
+  steps_to_reproduce : TEXT
+  impact : TEXT
+  proof_of_concept : TEXT
+  reward_amount : DECIMAL(15,2)
+  submitted_at : TIMESTAMP
+  triaged_at : TIMESTAMP
+  validated_at : TIMESTAMP
+  resolved_at : TIMESTAMP
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "attachments" as attachments {
+  PK attachment_id : UUID
+  FK report_id : UUID
+  file_name : VARCHAR(255)
+  file_path : VARCHAR(500)
+  file_size : BIGINT
+  mime_type : VARCHAR(100)
+  uploaded_at : TIMESTAMP
+}
+
+entity "comments" as comments {
+  PK comment_id : UUID
+  FK report_id : UUID
+  FK user_id : UUID
+  FK parent_comment_id : UUID
+  content : TEXT
+  is_internal : BOOLEAN
+  is_edited : BOOLEAN
+  edited_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' TRIAGE & VALIDATION
+' ============================================
+
+entity "triage_queue" as triage_queue {
+  PK queue_id : UUID
+  FK report_id : UUID
+  priority : INTEGER
+  assigned_to : UUID
+  status : VARCHAR(20)
+  created_at : TIMESTAMP
+  assigned_at : TIMESTAMP
+}
+
+entity "validation_results" as validation_results {
+  PK validation_id : UUID
+  FK report_id : UUID
+  FK validator_id : UUID
+  is_valid : BOOLEAN
+  severity_rating : VARCHAR(20)
+  cvss_score : DECIMAL(3,1)
+  recommended_reward : DECIMAL(15,2)
+  notes : TEXT
+  validated_at : TIMESTAMP
+}
+
+' ============================================
+' PAYMENT SYSTEM
+' ============================================
+
+entity "bounty_payments" as payments {
+  PK payment_id : UUID
+  FK report_id : UUID
+  FK researcher_id : UUID
+  amount : DECIMAL(15,2)
+  status : VARCHAR(20)
+  approved_by : UUID
+  approved_at : TIMESTAMP
+  processed_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "researcher_balances" as balances {
+  PK balance_id : UUID
+  FK researcher_id : UUID
+  available_balance : DECIMAL(15,2)
+  pending_balance : DECIMAL(15,2)
+  total_earned : DECIMAL(15,2)
+  total_withdrawn : DECIMAL(15,2)
+  updated_at : TIMESTAMP
+}
+
+entity "payout_requests" as payouts {
+  PK payout_id : UUID
+  FK researcher_id : UUID
+  amount : DECIMAL(15,2)
+  payment_method : VARCHAR(50)
+  payment_details : JSON
+  status : VARCHAR(20)
+  processed_by : UUID
+  processed_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "transactions" as transactions {
+  PK transaction_id : UUID
+  FK user_id : UUID
+  type : VARCHAR(50)
+  amount : DECIMAL(15,2)
+  status : VARCHAR(20)
+  reference_id : UUID
+  gateway_response : JSON
+  created_at : TIMESTAMP
+}
+
+' ============================================
+' RELATIONSHIPS - USER MANAGEMENT
+' ============================================
+
+users ||--o| researchers : "is_a"
+users ||--o| organizations : "is_a"
+users ||--o| triage_specialists : "is_a"
+users ||--o| administrators : "is_a"
+users ||--o{ kyc_verifications : "has"
+
+' ============================================
+' RELATIONSHIPS - BUG BOUNTY
+' ============================================
+
+organizations ||--o{ programs : "creates"
+programs ||--o{ program_scopes : "defines"
+programs ||--o{ reward_tiers : "has"
+programs ||--o{ reports : "receives"
+researchers ||--o{ reports : "submits"
+reports ||--o{ attachments : "has"
+reports ||--o{ comments : "has"
+users ||--o{ comments : "writes"
+comments ||--o{ comments : "replies_to"
+
+' ============================================
+' RELATIONSHIPS - TRIAGE
+' ============================================
+
+reports ||--o| triage_queue : "queued"
+triage_specialists ||--o{ triage_queue : "assigned"
+reports ||--o{ validation_results : "validated"
+users ||--o{ validation_results : "validates"
+
+' ============================================
+' RELATIONSHIPS - PAYMENT
+' ============================================
+
+reports ||--o| payments : "paid_for"
+researchers ||--o{ payments : "receives"
+researchers ||--|| balances : "has"
+researchers ||--o{ payouts : "requests"
+users ||--o{ transactions : "has"
+
+@enduml

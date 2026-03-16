@@ -1,0 +1,169 @@
+@startuml Design_Domain_Simulation
+
+' ============================================
+' Design Class Model - Domain Layer
+' Module 6: Bug Bounty Simulation Environment
+' ============================================
+
+skinparam classAttributeIconSize 0
+
+class SimulatedEnvironment {
+    - simulationId: UUID {PK, unique, not null}
+    - name: String {max=255, not null}
+    - difficultyLevel: DifficultyLevel {enum, not null}
+    - targetName: String {max=255, not null}
+    - targetUrl: String {max=500, not null}
+    - vulnerabilityType: String {max=100, not null}
+    - description: Text {max=2000, not null}
+    - hints: JSON {array of strings, nullable}
+    - solution: Text {max=5000, encrypted, not null}
+    - points: Integer {min=0, default=0}
+    - timeLimit: Integer {minutes, nullable}
+    - isActive: Boolean {default=true}
+    - totalAttempts: Integer {default=0}
+    - successfulAttempts: Integer {default=0}
+    - createdAt: DateTime {default=now()}
+    
+    + launch(researcherId: UUID): SimulationSession throws ValidationException
+    + submitReport(sessionId: UUID, data: SimulationReportDTO): SimulationReport
+    + provideFeedback(reportId: UUID): FeedbackDTO
+    + getHint(level: Integer): String
+    + validateSolution(submission: String): Boolean
+}
+
+enum DifficultyLevel {
+    BEGINNER
+    INTERMEDIATE
+    ADVANCED
+    EXPERT
+}
+
+class SimulationSession {
+    - sessionId: UUID {PK, unique, not null}
+    - simulationId: UUID {FK->SimulatedEnvironment.simulationId, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - startedAt: DateTime {default=now()}
+    - completedAt: DateTime {nullable}
+    - status: SessionStatus {enum, default=ACTIVE}
+    - hintsUsed: Integer {default=0}
+    - timeSpent: Integer {minutes, default=0}
+    - score: Integer {default=0}
+    - isCompleted: Boolean {default=false}
+    
+    + start(): void
+    + complete(): void
+    + pause(): void
+    + resume(): void
+    + calculateScore(): Integer
+}
+
+enum SessionStatus {
+    ACTIVE
+    PAUSED
+    COMPLETED
+    ABANDONED
+    EXPIRED
+}
+
+class SimulationReport {
+    - reportId: UUID {PK, unique, not null}
+    - sessionId: UUID {FK->SimulationSession.sessionId, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, not null}
+    - title: String {max=255, not null}
+    - vulnerabilityType: String {max=100, not null}
+    - severity: SeverityLevel {enum, not null}
+    - description: Text {max=5000, not null}
+    - stepsToReproduce: Text {max=5000, not null}
+    - impact: Text {max=2000, not null}
+    - affectedComponents: Text {max=1000, not null}
+    - suggestedFix: Text {max=2000, nullable}
+    - cvssScore: Decimal(3,1) {nullable}
+    - flag: String {max=255, not null}
+    - score: Integer {min=0, default=0}
+    - feedback: Text {max=2000, nullable}
+    - isCorrect: Boolean {default=false}
+    - submittedAt: DateTime {default=now()}
+    - evaluatedAt: DateTime {nullable}
+    
+    + submit(data: SimulationReportDTO): SimulationReport throws ValidationException
+    + evaluate(): FeedbackDTO
+    + calculateScore(): Integer
+    + validateFlag(): Boolean
+}
+
+class ProofOfWork {
+    - proofId: UUID {PK, unique, not null}
+    - reportId: UUID {FK->SimulationReport.reportId, not null}
+    - evidenceType: EvidenceType {enum, not null}
+    - fileName: String {max=255, not null}
+    - fileUrl: String {max=500, not null}
+    - fileSize: Integer {bytes, not null}
+    - mimeType: String {max=100, not null}
+    - description: Text {max=500, nullable}
+    - uploadedAt: DateTime {default=now()}
+    
+    + upload(file: File): String throws FileUploadException
+    + validate(): Boolean
+    + generateThumbnail(): String
+}
+
+enum EvidenceType {
+    SCREENSHOT
+    VIDEO
+    HTTP_REQUEST
+    HTTP_RESPONSE
+    PAYLOAD
+    EXPLOIT_CODE
+    NETWORK_CAPTURE
+    LOG_FILE
+}
+
+class ReportTemplate {
+    - templateId: UUID {PK, unique, not null}
+    - vulnerabilityType: String {max=100, not null}
+    - templateName: String {max=255, not null}
+    - sections: JSON {array of objects, not null}
+    - requiredFields: JSON {array of strings, not null}
+    - exampleReport: Text {max=10000, nullable}
+    - isActive: Boolean {default=true}
+    
+    + getTemplate(vulnType: String): ReportTemplateDTO
+    + validateReport(report: SimulationReportDTO): Boolean
+}
+
+class WriteupGuideline {
+    - guidelineId: UUID {PK, unique, not null}
+    - title: String {max=255, not null}
+    - content: Text {max=10000, not null}
+    - category: String {max=100, not null}
+    - examples: JSON {array of objects, nullable}
+    - bestPractices: JSON {array of strings, not null}
+    - commonMistakes: JSON {array of strings, not null}
+    
+    + getGuidelines(category: String): List<WriteupGuidelineDTO>
+}
+
+class SimulationProgress {
+    - progressId: UUID {PK, unique, not null}
+    - researcherId: UUID {FK->Researcher.researcherId, unique, not null}
+    - totalChallengesAttempted: Integer {default=0}
+    - totalChallengesCompleted: Integer {default=0}
+    - totalPoints: Integer {default=0}
+    - currentLevel: DifficultyLevel {enum, default=BEGINNER}
+    - lastActivityAt: DateTime {default=now()}
+    
+    + updateProgress(): void
+    + calculateLevel(): DifficultyLevel
+    + getStatistics(): SimulationStatsDTO
+}
+
+' Relationships
+Researcher "1" -- "0..*" SimulatedEnvironment : practices
+SimulatedEnvironment "1" -- "0..*" SimulationSession : creates
+SimulationSession "1" -- "0..*" SimulationReport : generates
+SimulationReport "1" -- "0..*" ProofOfWork : includes
+SimulationReport "0..*" -- "1" ReportTemplate : follows
+Researcher "1" -- "1" SimulationProgress : tracks
+WriteupGuideline "0..*" -- "0..*" SimulationReport : guides
+
+@enduml
