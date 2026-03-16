@@ -1,0 +1,56 @@
+# FastAPI and Server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# Validation and Settings
+pydantic==2.10.5
+pydantic-settings==2.1.0
+email-validator==2.2.0
+
+# Authentication and Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+pyotp==2.9.0
+
+# Redis and Caching
+redis==5.0.1
+hiredis==2.2.3
+
+# Celery (Background Tasks)
+celery==5.3.4
+
+# Object Storage (MinIO/S3)
+boto3==1.29.7
+minio==7.2.0
+
+# HTTP Client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Utilities
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+faker==20.1.0
+
+# Code Quality
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+isort==5.12.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.4.14
