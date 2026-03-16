@@ -106,7 +106,7 @@ services:
       - minio
     networks:
       - production-network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
   # Backend API (FastAPI - Simulation - ISOLATED)
   backend-simulation:
@@ -128,7 +128,7 @@ services:
       - redis
     networks:
       - simulation-network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
   # Celery Worker (Async Tasks)
   celery-worker:
