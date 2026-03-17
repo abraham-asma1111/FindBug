@@ -63,3 +63,11 @@ class UserRepository:
         """Update last login timestamp"""
         user.last_login_at = datetime.utcnow()
         return self.update(user)
+    
+    def get_by_refresh_token(self, token_hash: str) -> Optional[User]:
+        """Get user by refresh token hash"""
+        return self.db.query(User).filter(User.refresh_token == token_hash).first()
+    
+    def get_by_password_reset_token(self, token_hash: str) -> Optional[User]:
+        """Get user by password reset token hash"""
+        return self.db.query(User).filter(User.password_reset_token == token_hash).first()

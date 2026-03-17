@@ -6,7 +6,7 @@ FastAPI Backend Server
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1.endpoints import auth
+from src.api.v1.endpoints import auth, profile, domain, sso
 
 # Version and metadata
 VERSION = "1.0.0"
@@ -32,6 +32,9 @@ app.add_middleware(
 
 # Register API Routers
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(profile.router, prefix="/api/v1")
+app.include_router(domain.router, prefix="/api/v1")
+app.include_router(sso.router, prefix="/api/v1")
 
 
 # Health Check Endpoint
