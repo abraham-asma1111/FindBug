@@ -421,9 +421,12 @@ async def refresh_token(
             detail=str(e)
         )
     except Exception as e:
+        print(f"[ERROR] Refresh token failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token refresh failed. Please try again."
+            detail=f"Token refresh failed: {str(e)}"
         )
 
 
@@ -562,3 +565,186 @@ async def logout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout failed. Please try again."
         )
+
+
+
+# ============================================================================
+# KYC ENDPOINTS (Persona Integration)
+# ============================================================================
+
+@router.post(
+    "/kyc/start",
+    response_model=dict,
+    summary="Start KYC Verification",
+    description="Start Persona KYC verification for researcher (requires email verification)"
+)
+async def start_kyc_verification(
+    request: Request,
+    current_user: User = Depends(get_current_verified_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Start KYC verification using Persona
+    
+    Flow:
+    1. Create Persona inquiry session
+    2. Return inquiry_id and session_token to frontend
+    3. Frontend loads Persona SDK with session_token
+    4. User completes ID + selfie verification
+    5. Persona sends webhook with results
+    """
+    from src.core.kyc_service import PersonaKYCService
+    from src.domain.repositories.researcher_repository import ResearcherRepository
+    
+    # Only researchers can do KYC
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="KYC verification is only for researchers"
+        )
+    
+    researcher_repo = ResearcherRepository(db)
+    researcher = researcher_repo.get_by_user_id(str(current_user.id))
+    
+    if not researcher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Researcher profile not found"
+        )
+    
+    # Check if already verified
+    if researcher.kyc_status == "verified":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="KYC already verified"
+        )
+    
+    try:
+        kyc_service = PersonaKYCService()
+        inquiry_data = kyc_service.create_inquiry(
+            researcher_id=str(researcher.id),
+            email=current_user.email,
+            first_name=researcher.first_name,
+            last_name=researcher.last_name
+        )
+        
+        # Update researcher with inquiry_id
+        researcher.kyc_status = "pending"
+        db.commit()
+        
+        # Log security event
+        SecurityAudit.log_event(
+            user_id=str(current_user.id),
+            event_type="kyc_started",
+            ip_address=request.client.host,
+            details={"inquiry_id": inquiry_data["inquiry_id"]}
+        )
+        
+        return {
+            "inquiry_id": inquiry_data["inquiry_id"],
+            "session_token": inquiry_data["session_token"],
+            "status": inquiry_data["status"],
+            "message": "KYC verification session created. Please complete verification in the Persona widget."
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start KYC verification: {str(e)}"
+        )
+
+
+@router.get(
+    "/kyc/status",
+    response_model=dict,
+    summary="Get KYC Status",
+    description="Get current KYC verification status for researcher"
+)
+async def get_kyc_status(
+    current_user: User = Depends(get_current_verified_user),
+    db: Session = Depends(get_db)
+):
+    """Get KYC verification status"""
+    from src.domain.repositories.researcher_repository import ResearcherRepository
+    
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="KYC status is only for researchers"
+        )
+    
+    researcher_repo = ResearcherRepository(db)
+    researcher = researcher_repo.get_by_user_id(str(current_user.id))
+    
+    if not researcher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Researcher profile not found"
+        )
+    
+    return {
+        "kyc_status": researcher.kyc_status or "not_started",
+        "message": f"KYC status: {researcher.kyc_status or 'not_started'}"
+    }
+
+
+@router.post(
+    "/kyc/webhook",
+    status_code=status.HTTP_200_OK,
+    summary="Persona Webhook",
+    description="Webhook endpoint for Persona to send verification results"
+)
+async def persona_webhook(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Receive webhook from Persona when verification completes
+    
+    Persona sends webhooks for:
+    - inquiry.completed - Verification finished
+    - inquiry.failed - Verification failed
+    - inquiry.expired - Session expired
+    """
+    from src.core.kyc_service import PersonaKYCService
+    from src.domain.repositories.researcher_repository import ResearcherRepository
+    
+    # Get raw body for signature verification
+    body = await request.body()
+    signature = request.headers.get("Persona-Signature", "")
+    
+    # Verify webhook signature
+    kyc_service = PersonaKYCService()
+    if not kyc_service.verify_webhook_signature(body.decode(), signature):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature"
+        )
+    
+    # Parse webhook data
+    webhook_data = await request.json()
+    result = kyc_service.process_webhook(webhook_data)
+    
+    # Update researcher KYC status
+    researcher_repo = ResearcherRepository(db)
+    researcher = researcher_repo.get(result["researcher_id"])
+    
+    if researcher:
+        researcher.kyc_status = result["kyc_status"]
+        if result["verified_at"]:
+            # Store verification timestamp if needed
+            pass
+        db.commit()
+        
+        # Log security event
+        SecurityAudit.log_event(
+            user_id=str(researcher.user_id),
+            event_type="kyc_completed",
+            ip_address=request.client.host,
+            details={
+                "kyc_status": result["kyc_status"],
+                "inquiry_id": result["inquiry_id"]
+            }
+        )
+    
+    return {"status": "processed"}

@@ -145,3 +145,24 @@ class ChangePasswordRequest(BaseModel):
 class MessageResponse(BaseModel):
     """Generic message response"""
     message: str
+
+
+# KYC Schemas
+class StartKYCResponse(BaseModel):
+    """Response for starting KYC verification"""
+    inquiry_id: str
+    session_token: str
+    status: str
+    message: str
+
+class KYCStatusResponse(BaseModel):
+    """Response for KYC status check"""
+    kyc_status: str
+    inquiry_id: Optional[str] = None
+    document_type: Optional[str] = None
+    verified_at: Optional[str] = None
+    message: str
+
+class PersonaWebhookRequest(BaseModel):
+    """Persona webhook payload"""
+    data: dict
