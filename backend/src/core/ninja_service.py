@@ -1,5 +1,4 @@
 """
-Ninja Service - Bugcrowd 2026 Ninja Email Alias System
 Generates platform-specific email aliases for researchers
 """
 import hashlib
@@ -10,7 +9,7 @@ from typing import Dict, Optional
 class NinjaEmailService:
     """Service for managing Bugcrowd-style ninja email aliases"""
     
-    NINJA_DOMAIN = "bugcrowdninja.com"
+    NINJA_DOMAIN = "findbugninja.com"
     
     @classmethod
     def generate_ninja_email(cls, username: str, user_id: str) -> str:

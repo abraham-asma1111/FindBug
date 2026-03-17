@@ -231,8 +231,8 @@ class AuthService:
             "message": "Registration successful. Please check your email to verify your account. Domain verification will be required for full access."
         }
     
-    def login(self, email: str, password: str, request: any = None) -> Dict[str, any]:
-        """User login"""
+    def login(self, email: str, password: str, mfa_code: Optional[str] = None, request: any = None) -> Dict[str, any]:
+        """User login with optional MFA verification"""
         
         # Get user
         user = self.user_repo.get_by_email(email.lower())
@@ -302,6 +302,32 @@ class AuthService:
             
             raise ValueError("Invalid credentials")
         
+        # Check if MFA is enabled
+        if user.mfa_enabled:
+            if not mfa_code:
+                # MFA required but not provided
+                return {
+                    "access_token": "",
+                    "token_type": "bearer",
+                    "user_id": str(user.id),
+                    "email": user.email,
+                    "role": user.role.value,
+                    "mfa_required": True,
+                    "mfa_enabled": True
+                }
+            
+            # Verify MFA code
+            if not self.verify_mfa_login(str(user.id), mfa_code):
+                # Log failed MFA attempt
+                if request:
+                    SecurityAudit.log_security_event(
+                        "MFA_FAILURE",
+                        str(user.id),
+                        {"email": email},
+                        request
+                    )
+                raise ValueError("Invalid MFA code")
+        
         # Reset failed login attempts
         if user.failed_login_attempts > 0:
             user = self.user_repo.reset_failed_login(user)
@@ -309,7 +335,7 @@ class AuthService:
         # Update last login
         user = self.user_repo.update_last_login(user)
         
-        # Generate JWT token
+        # Generate JWT access token
         token_data = {
             "sub": user.email,
             "user_id": str(user.id),
@@ -317,21 +343,34 @@ class AuthService:
         }
         access_token = TokenSecurity.create_access_token(token_data)
         
+        # Generate refresh token
+        refresh_token = TokenSecurity.create_refresh_token()
+        refresh_token_hash = TokenSecurity.hash_refresh_token(refresh_token)
+        refresh_expires = datetime.utcnow() + timedelta(days=30)
+        
+        # Store refresh token
+        user.refresh_token = refresh_token_hash
+        user.refresh_token_expires = refresh_expires
+        self.user_repo.update(user)
+        
         # Log successful login
         if request:
             SecurityAudit.log_security_event(
                 "LOGIN_SUCCESS",
                 str(user.id),
-                {"email": user.email, "role": user.role.value},
+                {"email": user.email, "role": user.role.value, "mfa_used": user.mfa_enabled},
                 request
             )
         
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "user_id": str(user.id),
             "email": user.email,
-            "role": user.role.value
+            "role": user.role.value,
+            "mfa_required": False,
+            "mfa_enabled": user.mfa_enabled
         }
 
     def verify_email(self, token: str) -> Dict[str, any]:
@@ -423,7 +462,7 @@ class AuthService:
         totp = pyotp.TOTP(secret)
         qr_uri = totp.provisioning_uri(
             name=user.email,
-            issuer_name="Bug Bounty Platform"
+            issuer_name="FindBug Platform"
         )
         
         return {
@@ -504,4 +543,156 @@ class AuthService:
         return {
             "message": "MFA disabled successfully",
             "mfa_enabled": False
+        }
+
+    def refresh_access_token(self, refresh_token: str) -> Dict[str, any]:
+        """Refresh access token using refresh token"""
+        
+        # Hash the refresh token
+        token_hash = TokenSecurity.hash_refresh_token(refresh_token)
+        
+        # Find user with this refresh token
+        user = self.user_repo.get_by_refresh_token(token_hash)
+        if not user:
+            raise ValueError("Invalid refresh token")
+        
+        # Check if token is expired
+        if user.refresh_token_expires and datetime.utcnow() > user.refresh_token_expires:
+            raise ValueError("Refresh token expired. Please login again.")
+        
+        # Generate new access token
+        token_data = {
+            "sub": user.email,
+            "user_id": str(user.id),
+            "role": user.role.value
+        }
+        access_token = TokenSecurity.create_access_token(token_data)
+        
+        # Generate new refresh token
+        new_refresh_token = TokenSecurity.create_refresh_token()
+        new_refresh_token_hash = TokenSecurity.hash_refresh_token(new_refresh_token)
+        new_refresh_expires = datetime.utcnow() + timedelta(days=30)
+        
+        # Update user with new refresh token
+        user.refresh_token = new_refresh_token_hash
+        user.refresh_token_expires = new_refresh_expires
+        self.user_repo.update(user)
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer"
+        }
+    
+    def forgot_password(self, email: str) -> Dict[str, any]:
+        """Initiate password reset flow"""
+        
+        user = self.user_repo.get_by_email(email.lower())
+        if not user:
+            # Don't reveal if email exists
+            return {
+                "message": "If the email exists, a password reset link has been sent."
+            }
+        
+        # Generate password reset token
+        reset_token = EmailService.generate_verification_token()
+        token_hash = EmailService.hash_token(reset_token)
+        token_expires = datetime.utcnow() + timedelta(minutes=15)
+        
+        # Update user
+        user.password_reset_token = token_hash
+        user.password_reset_token_expires = token_expires
+        self.user_repo.update(user)
+        
+        # Send password reset email
+        EmailService.send_password_reset_email(email, reset_token)
+        
+        return {
+            "message": "If the email exists, a password reset link has been sent."
+        }
+    
+    def reset_password(self, token: str, new_password: str) -> Dict[str, any]:
+        """Reset password using reset token"""
+        
+        # Validate password strength
+        is_valid, error = PasswordSecurity.validate_password_strength(new_password)
+        if not is_valid:
+            raise ValueError(error)
+        
+        # Hash the token
+        token_hash = EmailService.hash_token(token)
+        
+        # Find user with this token
+        user = self.user_repo.get_by_password_reset_token(token_hash)
+        if not user:
+            raise ValueError("Invalid or expired reset token")
+        
+        # Check if token is expired
+        if user.password_reset_token_expires and datetime.utcnow() > user.password_reset_token_expires:
+            raise ValueError("Reset token has expired. Please request a new one.")
+        
+        # Update password
+        user.password_hash = PasswordSecurity.hash_password(new_password)
+        user.password_reset_token = None
+        user.password_reset_token_expires = None
+        user.password_changed_at = datetime.utcnow()
+        
+        # Invalidate all refresh tokens (force re-login)
+        user.refresh_token = None
+        user.refresh_token_expires = None
+        
+        self.user_repo.update(user)
+        
+        return {
+            "message": "Password reset successfully. Please login with your new password."
+        }
+    
+    def change_password(self, user_id: str, current_password: str, new_password: str) -> Dict[str, any]:
+        """Change password (requires current password)"""
+        
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        
+        # Verify current password
+        if not PasswordSecurity.verify_password(current_password, user.password_hash):
+            raise ValueError("Current password is incorrect")
+        
+        # Validate new password strength
+        is_valid, error = PasswordSecurity.validate_password_strength(new_password)
+        if not is_valid:
+            raise ValueError(error)
+        
+        # Check if new password is same as current
+        if PasswordSecurity.verify_password(new_password, user.password_hash):
+            raise ValueError("New password must be different from current password")
+        
+        # Update password
+        user.password_hash = PasswordSecurity.hash_password(new_password)
+        user.password_changed_at = datetime.utcnow()
+        
+        # Invalidate all refresh tokens (force re-login on other devices)
+        user.refresh_token = None
+        user.refresh_token_expires = None
+        
+        self.user_repo.update(user)
+        
+        return {
+            "message": "Password changed successfully. Please login again."
+        }
+    
+    def logout(self, user_id: str) -> Dict[str, any]:
+        """Logout user (invalidate refresh token)"""
+        
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        
+        # Invalidate refresh token
+        user.refresh_token = None
+        user.refresh_token_expires = None
+        self.user_repo.update(user)
+        
+        return {
+            "message": "Logged out successfully"
         }

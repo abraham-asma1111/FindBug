@@ -51,15 +51,19 @@ class LoginRequest(BaseModel):
     """Request schema for login"""
     email: EmailStr
     password: str
+    mfa_code: Optional[str] = Field(None, min_length=6, max_length=6, description="MFA code if enabled")
 
 
 class TokenResponse(BaseModel):
     """Response schema for authentication token"""
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
     user_id: str
     email: str
     role: str
+    mfa_required: Optional[bool] = Field(None, description="True if MFA code is required")
+    mfa_enabled: Optional[bool] = Field(None, description="True if user has MFA enabled")
 
 
 class RegisterResponse(BaseModel):
@@ -105,4 +109,39 @@ class DisableMFARequest(BaseModel):
 class MFAStatusResponse(BaseModel):
     """Response schema for MFA status"""
     mfa_enabled: bool
+    message: str
+
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request schema for refreshing access token"""
+    refresh_token: str
+
+
+class RefreshTokenResponse(BaseModel):
+    """Response schema for refresh token"""
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request schema for forgot password"""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request schema for password reset"""
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request schema for password change"""
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    """Generic message response"""
     message: str

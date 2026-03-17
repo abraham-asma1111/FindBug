@@ -205,6 +205,26 @@ class TokenSecurity:
         except JWTError:
             return None
 
+    @staticmethod
+    def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+        """
+        Decode and validate JWT access token
+
+        Returns:
+            Token payload if valid, None otherwise
+        """
+        return TokenSecurity.verify_token(token)
+
+    @staticmethod
+    def create_refresh_token() -> str:
+        """Create a secure refresh token"""
+        return secrets.token_urlsafe(64)
+
+    @staticmethod
+    def hash_refresh_token(token: str) -> str:
+        """Hash refresh token for storage"""
+        return hashlib.sha256(token.encode()).hexdigest()
+
 
 # ============================================================================
 # OWASP A03:2021 - Injection
