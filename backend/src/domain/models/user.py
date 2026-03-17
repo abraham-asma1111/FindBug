@@ -46,6 +46,8 @@ class User(Base):
     # Security Tracking
     failed_login_attempts = Column(Integer, default=0)
     last_login_at = Column(DateTime, nullable=True)
+    last_login_ip = Column(String(45), nullable=True)
+    last_login_device = Column(String(255), nullable=True)
     
     # MFA (Multi-Factor Authentication)
     mfa_enabled = Column(Boolean, default=False)
@@ -59,6 +61,12 @@ class User(Base):
     
     # Password Management
     password_changed_at = Column(DateTime, nullable=True)
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_token_expires = Column(DateTime, nullable=True)
+    
+    # Refresh Token
+    refresh_token = Column(String(500), nullable=True)
+    refresh_token_expires = Column(DateTime, nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

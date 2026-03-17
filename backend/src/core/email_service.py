@@ -184,6 +184,30 @@ class EmailService:
             print(f"❌ Failed to send MFA code: {e}")
             return False
 
+    @staticmethod
+    def send_password_reset_email(email: str, reset_token: str):
+        """
+        Send password reset email
+
+        Args:
+            email: User email address
+            reset_token: Password reset token
+        """
+        reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+
+        print(f"\n{'='*60}")
+        print(f"📧 PASSWORD RESET EMAIL")
+        print(f"{'='*60}")
+        print(f"To: {email}")
+        print(f"Subject: Reset Your Password")
+        print(f"\nClick the link below to reset your password:")
+        print(f"{reset_link}")
+        print(f"\nThis link will expire in 15 minutes.")
+        print(f"If you didn't request this, please ignore this email.")
+        print(f"{'='*60}\n")
+
+        # TODO: Replace with actual email service (SendGrid, AWS SES, etc.)
+
 
 class BusinessEmailValidator:
     """Validate business emails for organizations"""

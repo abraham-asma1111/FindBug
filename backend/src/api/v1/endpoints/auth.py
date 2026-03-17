@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.core.security import SecurityAudit, InputSanitization
 from src.services.auth_service import AuthService
+from src.domain.models.user import User
 from src.domain.repositories import UserRepository, ResearcherRepository, OrganizationRepository
+from src.api.v1.middlewares import get_current_user, get_current_verified_user
 from src.api.v1.schemas.auth import (
     RegisterResearcherRequest,
     RegisterOrganizationRequest,
@@ -19,7 +21,13 @@ from src.api.v1.schemas.auth import (
     EnableMFAResponse,
     VerifyMFARequest,
     DisableMFARequest,
-    MFAStatusResponse
+    MFAStatusResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    ChangePasswordRequest,
+    MessageResponse
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -184,6 +192,7 @@ async def login(
         result = auth_service.login(
             email=data.email,
             password=data.password,
+            mfa_code=data.mfa_code,
             request=request
         )
         
@@ -282,27 +291,19 @@ async def resend_verification(
 async def enable_mfa(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
-    current_user_id: str = None  # TODO: Get from JWT token
+    current_user: User = Depends(get_current_verified_user)
 ):
     """
     Enable MFA for user account.
     Returns QR code URI and backup codes.
     """
     try:
-        # TODO: Extract user_id from JWT token
-        # For now, using a placeholder
-        if not current_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required"
-            )
-        
-        result = auth_service.enable_mfa(current_user_id)
+        result = auth_service.enable_mfa(str(current_user.id))
         
         # Log MFA enablement
         SecurityAudit.log_security_event(
             "MFA_ENABLED",
-            current_user_id,
+            str(current_user.id),
             {},
             request
         )
@@ -331,22 +332,16 @@ async def verify_mfa_setup(
     data: VerifyMFARequest,
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
-    current_user_id: str = None  # TODO: Get from JWT token
+    current_user: User = Depends(get_current_verified_user)
 ):
     """Verify MFA code to complete MFA setup"""
     try:
-        if not current_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required"
-            )
-        
-        result = auth_service.verify_mfa_setup(current_user_id, data.code)
+        result = auth_service.verify_mfa_setup(str(current_user.id), data.code)
         
         # Log MFA verification
         SecurityAudit.log_security_event(
             "MFA_VERIFIED",
-            current_user_id,
+            str(current_user.id),
             {},
             request
         )
@@ -375,22 +370,16 @@ async def disable_mfa(
     data: DisableMFARequest,
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
-    current_user_id: str = None  # TODO: Get from JWT token
+    current_user: User = Depends(get_current_verified_user)
 ):
     """Disable MFA (requires password confirmation)"""
     try:
-        if not current_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required"
-            )
-        
-        result = auth_service.disable_mfa(current_user_id, data.password)
+        result = auth_service.disable_mfa(str(current_user.id), data.password)
         
         # Log MFA disablement
         SecurityAudit.log_security_event(
             "MFA_DISABLED",
-            current_user_id,
+            str(current_user.id),
             {},
             request
         )
@@ -406,4 +395,170 @@ async def disable_mfa(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to disable MFA. Please try again."
+        )
+
+
+
+@router.post(
+    "/refresh",
+    response_model=RefreshTokenResponse,
+    summary="Refresh Access Token",
+    description="Get new access token using refresh token"
+)
+async def refresh_token(
+    data: RefreshTokenRequest,
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Refresh access token"""
+    try:
+        result = auth_service.refresh_access_token(data.refresh_token)
+        return RefreshTokenResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Token refresh failed. Please try again."
+        )
+
+
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    summary="Forgot Password",
+    description="Request password reset email"
+)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Request password reset"""
+    try:
+        result = auth_service.forgot_password(data.email)
+        return MessageResponse(**result)
+    
+    except Exception as e:
+        # Always return success to prevent email enumeration
+        return MessageResponse(message="If the email exists, a password reset link has been sent.")
+
+
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    summary="Reset Password",
+    description="Reset password using token from email"
+)
+async def reset_password(
+    data: ResetPasswordRequest,
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Reset password with token"""
+    try:
+        result = auth_service.reset_password(data.token, data.new_password)
+        
+        # Log password reset
+        SecurityAudit.log_security_event(
+            "PASSWORD_RESET",
+            None,
+            {},
+            request
+        )
+        
+        return MessageResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password reset failed. Please try again."
+        )
+
+
+@router.post(
+    "/change-password",
+    response_model=MessageResponse,
+    summary="Change Password",
+    description="Change password (requires authentication)"
+)
+async def change_password(
+    data: ChangePasswordRequest,
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Change password (authenticated)"""
+    try:
+        result = auth_service.change_password(
+            str(current_user.id),
+            data.current_password,
+            data.new_password
+        )
+        
+        # Log password change
+        SecurityAudit.log_security_event(
+            "PASSWORD_CHANGED",
+            str(current_user.id),
+            {},
+            request
+        )
+        
+        return MessageResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password change failed. Please try again."
+        )
+
+
+@router.post(
+    "/logout",
+    response_model=MessageResponse,
+    summary="Logout",
+    description="Logout user (invalidate refresh token)"
+)
+async def logout(
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Logout user"""
+    try:
+        result = auth_service.logout(str(current_user.id))
+        
+        # Log logout
+        SecurityAudit.log_security_event(
+            "LOGOUT",
+            str(current_user.id),
+            {},
+            request
+        )
+        
+        return MessageResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Logout failed. Please try again."
         )
