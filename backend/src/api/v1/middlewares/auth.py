@@ -152,3 +152,9 @@ async def get_current_staff(
         )
     
     return current_user
+
+
+# Aliases for convenience
+require_organization = get_current_organization
+require_researcher = get_current_researcher
+require_staff = get_current_staff
