@@ -33,9 +33,15 @@ class SSOLoginRequest(BaseModel):
     summary="Configure SSO",
     description="Configure SSO for organization (admin only)"
 )
+@router.get(
+    "/configure",
+    response_model=dict,
+    summary="Configure SSO (GET)",
+    description="Configure SSO for organization (admin only) (GET method)"
+)
 async def configure_sso(
-    data: ConfigureSSORequest,
-    request: Request,
+    data: ConfigureSSORequest = None,
+    request: Request = None,
     current_user: User = Depends(get_current_organization),
     db: Session = Depends(get_db)
 ):
@@ -48,6 +54,13 @@ async def configure_sso(
     3. Stores SSO configuration
     4. Enables SSO for organization
     """
+    # Handle GET requests without data
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SSO configuration data required"
+        )
+    
     organization_repo = OrganizationRepository(db)
     organization = organization_repo.get_by_user_id(str(current_user.id))
     
@@ -93,8 +106,13 @@ async def configure_sso(
     summary="Initiate SSO Login",
     description="Initiate SSO login flow for organization"
 )
+@router.get(
+    "/login",
+    summary="Initiate SSO Login (GET)",
+    description="Initiate SSO login flow for organization (GET method)"
+)
 async def sso_login(
-    data: SSOLoginRequest,
+    data: SSOLoginRequest = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -105,6 +123,13 @@ async def sso_login(
     2. System looks up organization SSO config
     3. Redirects to IdP SSO URL with SAML request
     """
+    # Handle GET requests without data
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Organization domain required"
+        )
+    
     organization_repo = OrganizationRepository(db)
     
     # Find organization by domain
@@ -268,14 +293,20 @@ async def get_sso_status(
     }
 
 
-@router.delete(
+@router.post(
     "/disable",
     response_model=dict,
     summary="Disable SSO",
     description="Disable SSO for organization"
 )
+@router.get(
+    "/disable",
+    response_model=dict,
+    summary="Disable SSO (GET)",
+    description="Disable SSO for organization (GET method)"
+)
 async def disable_sso(
-    request: Request,
+    request: Request = None,
     current_user: User = Depends(get_current_organization),
     db: Session = Depends(get_db)
 ):

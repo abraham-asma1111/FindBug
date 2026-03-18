@@ -48,9 +48,16 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     summary="Register as Researcher",
     description="Register a new security researcher account - Extended ERD"
 )
+@router.get(
+    "/register/researcher",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register as Researcher (GET)",
+    description="Register a new security researcher account - Extended ERD (GET method)"
+)
 async def register_researcher(
-    data: RegisterResearcherRequest,
-    request: Request,
+    data: RegisterResearcherRequest = None,
+    request: Request = None,
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -61,6 +68,13 @@ async def register_researcher(
     - Password: min 8 chars, uppercase, lowercase, digit, special char
     - Optional: bio, website, github, twitter
     """
+    # Handle GET requests without data
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration data required"
+        )
+    
     try:
         result = auth_service.register_researcher(
             email=data.email,
@@ -112,9 +126,16 @@ async def register_researcher(
     summary="Register as Organization",
     description="Register a new organization account - Extended ERD"
 )
+@router.get(
+    "/register/organization",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register as Organization (GET)",
+    description="Register a new organization account - Extended ERD (GET method)"
+)
 async def register_organization(
-    data: RegisterOrganizationRequest,
-    request: Request,
+    data: RegisterOrganizationRequest = None,
+    request: Request = None,
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -126,6 +147,13 @@ async def register_organization(
     - Company name: min 2 chars
     - Optional: industry, website, subscription_type
     """
+    # Handle GET requests without data
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration data required"
+        )
+    
     try:
         result = auth_service.register_organization(
             email=data.email,
@@ -173,9 +201,15 @@ async def register_organization(
     summary="User Login",
     description="Authenticate user and receive JWT token"
 )
+@router.get(
+    "/login",
+    response_model=TokenResponse,
+    summary="User Login (GET)",
+    description="Authenticate user and receive JWT token (GET method)"
+)
 async def login(
-    data: LoginRequest,
-    request: Request,
+    data: LoginRequest = None,
+    request: Request = None,
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -188,6 +222,13 @@ async def login(
     - Failed login attempt tracking
     - Security event logging
     """
+    # Handle GET requests without data
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Login credentials required"
+        )
+    
     try:
         result = auth_service.login(
             email=data.email,
