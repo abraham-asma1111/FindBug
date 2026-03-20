@@ -193,6 +193,90 @@ class BountyService:
         
         return report
     
+    def process_bounty_payment(
+        self,
+        report_id: UUID,
+        approved_by: UUID,
+        payment_method: str = "manual",
+        payment_details: Optional[dict] = None
+    ) -> dict:
+        """
+        Process bounty payment using enhanced payout service.
+        
+        Creates BountyPayment record and processes via Saga pattern.
+        
+        Args:
+            report_id: Report ID
+            approved_by: User who approved payment
+            payment_method: telebirr, cbe_birr, bank_transfer, manual
+            payment_details: Payment gateway details
+            
+        Returns:
+            Payment result
+        """
+        report = self.report_repo.get_by_id(report_id)
+        
+        if not report:
+            raise ValueError("Report not found")
+        
+        if report.bounty_status != 'approved':
+            raise ValueError("Only approved bounties can be processed for payment")
+        
+        if not report.bounty_amount:
+            raise ValueError("Bounty amount not set")
+        
+        try:
+            # Use enhanced payout service
+            from src.services.enhanced_payout_service import EnhancedPayoutService
+            payout_service = EnhancedPayoutService(self.db)
+            
+            # Create payment record
+            payment = payout_service.create_bounty_payment(
+                report_id=report_id,
+                researcher_amount=report.bounty_amount,
+                approved_by=approved_by
+            )
+            
+            # Process payment via Saga
+            result = payout_service.process_payment_saga(
+                payment_id=payment.payment_id,
+                payment_method=payment_method,
+                payment_details=payment_details
+            )
+            
+            # Update report status
+            if result["success"]:
+                report.bounty_status = 'paid'
+                report.updated_at = datetime.utcnow()
+                report.last_activity_at = datetime.utcnow()
+                report.triage_notes = (report.triage_notes or "") + f"\n\nPayment Reference: {result['transaction_id']}"
+                report = self.report_repo.update(report)
+                
+                # Update researcher earnings (FREQ-11)
+                from src.services.reputation_service import ReputationService
+                reputation_service = ReputationService(self.db)
+                reputation_service.update_reputation(
+                    researcher_id=report.researcher_id,
+                    report=report
+                )
+                
+                # Send payment confirmation notification (FREQ-12)
+                from src.services.notification_service import NotificationService
+                notification_service = NotificationService(self.db)
+                notification_service.notify_bounty_paid(report=report)
+                
+                # Log audit trail (FREQ-17)
+                self.audit_service.log_bounty_paid(
+                    report_id=report_id,
+                    paid_by=approved_by,
+                    amount=report.bounty_amount
+                )
+            
+            return result
+            
+        except Exception as e:
+            raise ValueError(f"Payment processing failed: {str(e)}")
+    
     def mark_as_paid(
         self,
         report_id: UUID,
@@ -202,7 +286,8 @@ class BountyService:
         """
         Mark bounty as paid - FREQ-10, FREQ-20.
         
-        Called after payment is processed through payment gateway.
+        DEPRECATED: Use process_bounty_payment() instead.
+        This method is kept for backward compatibility.
         """
         report = self.report_repo.get_by_id(report_id)
         

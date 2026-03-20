@@ -50,6 +50,14 @@ from .ai_red_teaming import (
     ReportStatus
 )
 from .message import Message, Conversation
+from .bounty_payment import BountyPayment, Wallet, WalletTransaction
+from .subscription import (
+    OrganizationSubscription,
+    SubscriptionPayment,
+    SubscriptionTierPricing,
+    SubscriptionTier,
+    SubscriptionStatus
+)
 
 __all__ = [
     "User",
@@ -120,4 +128,12 @@ __all__ = [
     "ReportStatus",
     "Message",
     "Conversation",
+    "BountyPayment",
+    "Wallet",
+    "WalletTransaction",
+    "OrganizationSubscription",
+    "SubscriptionPayment",
+    "SubscriptionTierPricing",
+    "SubscriptionTier",
+    "SubscriptionStatus",
 ]
