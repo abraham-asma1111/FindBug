@@ -163,8 +163,18 @@ class PTaaSService:
         finding_data: dict, 
         discovered_by: int
     ) -> PTaaSFinding:
-        """Create a new finding"""
-        finding_dict = {**finding_data, 'discovered_by': discovered_by}
+        """Create a new finding with mandatory field validation - FREQ-35"""
+        # Check if mandatory fields are complete
+        mandatory_complete = self.check_mandatory_fields_complete(finding_data)
+        
+        finding_dict = {
+            **finding_data, 
+            'discovered_by': discovered_by,
+            'mandatory_fields_complete': mandatory_complete,
+            'template_version': '1.0',
+            'status': 'SUBMITTED'
+        }
+        
         finding = self.repository.create_finding(finding_dict)
         
         self.audit_service.log_action(
@@ -172,7 +182,11 @@ class PTaaSService:
             action="CREATE_PTAAS_FINDING",
             resource_type="PTaaSFinding",
             resource_id=finding.id,
-            details={"severity": finding.severity, "engagement_id": finding.engagement_id}
+            details={
+                "severity": finding.severity,
+                "engagement_id": finding.engagement_id,
+                "mandatory_complete": mandatory_complete
+            }
         )
         
         return finding
@@ -280,4 +294,152 @@ class PTaaSService:
             'renewal_amount': engagement.base_price,
             'platform_commission': engagement.platform_commission_amount,
             'total_amount': engagement.total_price
+        }
+
+    # Finding Validation - FREQ-35
+    def validate_finding(
+        self,
+        finding_id: int,
+        validated_by: int,
+        validated: bool,
+        retest_required: bool = False,
+        retest_notes: Optional[str] = None
+    ) -> Optional[PTaaSFinding]:
+        """
+        Validate a finding - FREQ-35
+        Marks finding as validated by organization/staff
+        """
+        update_data = {
+            'validated': validated,
+            'validated_by': validated_by,
+            'validated_at': datetime.utcnow(),
+            'retest_required': retest_required,
+            'retest_notes': retest_notes
+        }
+        
+        finding = self.repository.update_finding(finding_id, update_data)
+        
+        if finding:
+            self.audit_service.log_action(
+                user_id=validated_by,
+                action="VALIDATE_PTAAS_FINDING",
+                resource_type="PTaaSFinding",
+                resource_id=finding_id,
+                details={
+                    "validated": validated,
+                    "retest_required": retest_required,
+                    "engagement_id": finding.engagement_id
+                }
+            )
+        
+        return finding
+    
+    def get_finding(self, finding_id: int) -> Optional[PTaaSFinding]:
+        """Get finding by ID"""
+        return self.repository.get_finding_by_id(finding_id)
+    
+    def check_mandatory_fields_complete(self, finding_data: dict) -> bool:
+        """
+        Check if all mandatory fields are complete - FREQ-35
+        
+        Mandatory fields:
+        - proof_of_exploit
+        - impact_analysis
+        - remediation (with steps)
+        - affected_component
+        - reproduction_steps
+        """
+        mandatory_fields = [
+            'proof_of_exploit',
+            'impact_analysis',
+            'remediation',
+            'affected_component',
+            'reproduction_steps',
+            'remediation_steps',
+            'technical_impact',
+            'business_impact',
+            'remediation_priority',
+            'remediation_effort',
+            'vulnerability_type'
+        ]
+        
+        # Check all mandatory fields are present and not empty
+        for field in mandatory_fields:
+            value = finding_data.get(field)
+            if not value:
+                return False
+            
+            # For string fields, check minimum length
+            if isinstance(value, str) and len(value.strip()) < 10:
+                return False
+            
+            # For list fields, check not empty
+            if isinstance(value, list) and len(value) == 0:
+                return False
+            
+            # For dict fields, check not empty
+            if isinstance(value, dict) and len(value) == 0:
+                return False
+        
+        return True
+    
+    def get_finding_template(self) -> Dict[str, Any]:
+        """
+        Get structured finding template - FREQ-35
+        Returns template with field descriptions and requirements
+        """
+        return {
+            "template_version": "1.0",
+            "sections": {
+                "basic_information": {
+                    "title": {"type": "string", "required": True, "min_length": 3},
+                    "description": {"type": "string", "required": True, "min_length": 10},
+                    "severity": {"type": "enum", "required": True, "values": ["Critical", "High", "Medium", "Low", "Info"]},
+                    "affected_component": {"type": "string", "required": True}
+                },
+                "proof_of_exploit": {
+                    "description": "Mandatory: Detailed proof that the vulnerability exists and can be exploited",
+                    "proof_of_exploit": {"type": "text", "required": True, "min_length": 50},
+                    "exploit_code": {"type": "text", "required": False},
+                    "exploit_screenshots": {"type": "array", "required": False},
+                    "exploit_video_url": {"type": "url", "required": False},
+                    "reproduction_steps": {"type": "text", "required": True, "min_length": 20}
+                },
+                "impact_analysis": {
+                    "description": "Mandatory: Comprehensive analysis of the vulnerability's impact",
+                    "impact_analysis": {"type": "text", "required": True, "min_length": 50},
+                    "business_impact": {"type": "enum", "required": True, "values": ["Critical", "High", "Medium", "Low"]},
+                    "technical_impact": {
+                        "type": "object",
+                        "required": True,
+                        "fields": {
+                            "confidentiality": {"type": "enum", "values": ["High", "Low", "None"]},
+                            "integrity": {"type": "enum", "values": ["High", "Low", "None"]},
+                            "availability": {"type": "enum", "values": ["High", "Low", "None"]}
+                        }
+                    },
+                    "affected_users": {"type": "string", "required": False},
+                    "data_at_risk": {"type": "text", "required": False}
+                },
+                "remediation": {
+                    "description": "Mandatory: Detailed remediation recommendations",
+                    "remediation": {"type": "text", "required": True, "min_length": 50},
+                    "remediation_priority": {"type": "enum", "required": True, "values": ["Immediate", "High", "Medium", "Low"]},
+                    "remediation_effort": {"type": "enum", "required": True, "values": ["Low", "Medium", "High", "Very High"]},
+                    "remediation_steps": {"type": "array", "required": True, "min_items": 1},
+                    "code_fix_example": {"type": "text", "required": False}
+                },
+                "classification": {
+                    "vulnerability_type": {"type": "string", "required": True},
+                    "cwe_id": {"type": "string", "required": False},
+                    "owasp_category": {"type": "string", "required": False},
+                    "cvss_score": {"type": "decimal", "required": False, "range": [0, 10]}
+                },
+                "attack_vector": {
+                    "attack_vector": {"type": "enum", "required": False, "values": ["Network", "Adjacent", "Local", "Physical"]},
+                    "attack_complexity": {"type": "enum", "required": False, "values": ["Low", "High"]},
+                    "privileges_required": {"type": "enum", "required": False, "values": ["None", "Low", "High"]},
+                    "user_interaction": {"type": "enum", "required": False, "values": ["None", "Required"]}
+                }
+            }
         }
