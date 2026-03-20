@@ -6,7 +6,7 @@ FastAPI Backend Server
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial
+from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, simulation
 
 # Version and metadata
 VERSION = "1.0.0"
@@ -41,6 +41,10 @@ app.include_router(triage.router, prefix="/api/v1")
 app.include_router(bounty.router, prefix="/api/v1")
 app.include_router(reputation.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
+app.include_router(matching.router, prefix="/api/v1")
 app.include_router(ptaas.router, prefix="/api/v1")
 app.include_router(code_review.router, prefix="/api/v1")
 app.include_router(integration.router, prefix="/api/v1")
@@ -49,6 +53,7 @@ app.include_router(ai_red_teaming.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(subscription.router, prefix="/api/v1")
 app.include_router(financial.router, prefix="/api/v1")
+app.include_router(simulation.router, prefix="/api/v1")
 
 
 # Health Check Endpoint
