@@ -59,6 +59,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # RabbitMQ (Message Broker for SSDLC Integration - FREQ-42)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: bugbounty-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    networks:
+      - production-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   # MinIO (S3-compatible File Storage)
   minio:
     image: minio/minio:latest
@@ -94,8 +114,8 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
       - JWT_SECRET_KEY=${JWT_SECRET:-your-secret-key-change-in-production}
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/2
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
     volumes:
       - ./backend:/app
     ports:
@@ -104,6 +124,7 @@ services:
       - postgres-production
       - redis
       - minio
+      - rabbitmq
     networks:
       - production-network
     command: uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
@@ -140,8 +161,8 @@ services:
       - MODE=PRODUCTION
       - DATABASE_URL=postgresql://bugbounty_user:${POSTGRES_PASSWORD:-changeme123}@postgres-production:5432/bug_bounty_production
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/2
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
@@ -150,10 +171,11 @@ services:
     depends_on:
       - postgres-production
       - redis
+      - rabbitmq
       - backend-production
     networks:
       - production-network
-    command: celery -A app.celery_app worker --loglevel=info
+    command: celery -A backend.src.core.message_broker worker --loglevel=info --queues=integration.sync,integration.webhook,dlq
 
   # Celery Beat (Scheduled Tasks)
   celery-beat:
@@ -165,13 +187,14 @@ services:
       - MODE=PRODUCTION
       - DATABASE_URL=postgresql://bugbounty_user:${POSTGRES_PASSWORD:-changeme123}@postgres-production:5432/bug_bounty_production
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
-      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/2
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/1
     volumes:
       - ./backend:/app
     depends_on:
       - postgres-production
       - redis
+      - rabbitmq
       - celery-worker
     networks:
       - production-network
@@ -258,3 +281,4 @@ volumes:
   postgres_sim_data:
   redis_data:
   minio_data:
+  rabbitmq_data:

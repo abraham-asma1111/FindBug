@@ -15,6 +15,28 @@ from .ptaas_dashboard import PTaaSTestingPhase, PTaaSChecklistItem, PTaaSCollabo
 from .ptaas_triage import PTaaSFindingTriage, PTaaSExecutiveReport, PTaaSFindingPrioritization
 from .ptaas_retest import PTaaSRetestRequest, PTaaSRetestPolicy, PTaaSRetestHistory
 from .matching import MatchingConfiguration, ResearcherAssignment
+from .code_review import CodeReviewEngagement, CodeReviewFinding
+from .integration import (
+    ExternalIntegration,
+    SyncLog,
+    IntegrationFieldMapping,
+    IntegrationWebhookEvent,
+    IntegrationTemplate,
+    IntegrationType,
+    IntegrationStatus,
+    SyncAction,
+    SyncStatus,
+    TransformationType
+)
+from .live_event import (
+    LiveHackingEvent,
+    EventParticipation,
+    EventInvitation,
+    EventMetrics,
+    EventStatus,
+    ParticipationStatus,
+    InvitationStatus
+)
 
 __all__ = [
     "User",
@@ -54,4 +76,23 @@ __all__ = [
     "PTaaSRetestHistory",
     "MatchingConfiguration",
     "ResearcherAssignment",
+    "CodeReviewEngagement",
+    "CodeReviewFinding",
+    "ExternalIntegration",
+    "SyncLog",
+    "IntegrationFieldMapping",
+    "IntegrationWebhookEvent",
+    "IntegrationTemplate",
+    "IntegrationType",
+    "IntegrationStatus",
+    "SyncAction",
+    "SyncStatus",
+    "TransformationType",
+    "LiveHackingEvent",
+    "EventParticipation",
+    "EventInvitation",
+    "EventMetrics",
+    "EventStatus",
+    "ParticipationStatus",
+    "InvitationStatus",
 ]

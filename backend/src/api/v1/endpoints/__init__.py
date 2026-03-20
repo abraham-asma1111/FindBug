@@ -1,6 +1,6 @@
 """
 API Endpoints Package
 """
-from . import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, ptaas
+from . import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, ptaas, code_review, integration, live_events
 
-__all__ = ["auth", "profile", "domain", "sso", "programs", "reports", "triage", "bounty", "reputation", "notifications", "ptaas"]
+__all__ = ["auth", "profile", "domain", "sso", "programs", "reports", "triage", "bounty", "reputation", "notifications", "ptaas", "code_review", "integration", "live_events"]
