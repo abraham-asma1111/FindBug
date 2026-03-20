@@ -45,6 +45,7 @@ app.include_router(ptaas.router, prefix="/api/v1")
 app.include_router(code_review.router, prefix="/api/v1")
 app.include_router(integration.router, prefix="/api/v1")
 app.include_router(live_events.router, prefix="/api/v1")
+app.include_router(ai_red_teaming.router, prefix="/api/v1")
 
 
 # Health Check Endpoint
