@@ -58,6 +58,16 @@ from .subscription import (
     SubscriptionTier,
     SubscriptionStatus
 )
+from .simulation import (
+    SimulationChallenge,
+    SimulationInstance,
+    SimulationProgress,
+    SimulationReport,
+    SimulationSolution,
+    SimulationSolutionComment,
+    SimulationSolutionLike,
+    SimulationLeaderboard
+)
 
 __all__ = [
     "User",
@@ -139,4 +149,12 @@ __all__ = [
     "SubscriptionTierPricing",
     "SubscriptionTier",
     "SubscriptionStatus",
+    "SimulationChallenge",
+    "SimulationInstance",
+    "SimulationProgress",
+    "SimulationReport",
+    "SimulationSolution",
+    "SimulationSolutionComment",
+    "SimulationSolutionLike",
+    "SimulationLeaderboard",
 ]
