@@ -11,6 +11,7 @@ from .report import VulnerabilityReport, ReportAttachment, ReportComment, Report
 from .notification import Notification, NotificationType, NotificationPriority
 from .analytics import ResearcherMetrics, OrganizationMetrics, PlatformMetrics, AnalyticsReport
 from .ptaas import PTaaSEngagement, PTaaSFinding, PTaaSDeliverable, PTaaSProgressUpdate
+from .matching import MatchingConfiguration, ResearcherAssignment
 
 __all__ = [
     "User",
@@ -38,4 +39,6 @@ __all__ = [
     "PTaaSFinding",
     "PTaaSDeliverable",
     "PTaaSProgressUpdate",
+    "MatchingConfiguration",
+    "ResearcherAssignment",
 ]
