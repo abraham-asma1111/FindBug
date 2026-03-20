@@ -49,6 +49,7 @@ from .ai_red_teaming import (
     AIClassification,
     ReportStatus
 )
+from .message import Message, Conversation
 
 __all__ = [
     "User",
@@ -117,4 +118,6 @@ __all__ = [
     "AIAttackType",
     "AIClassification",
     "ReportStatus",
+    "Message",
+    "Conversation",
 ]
