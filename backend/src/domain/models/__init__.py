@@ -37,6 +37,18 @@ from .live_event import (
     ParticipationStatus,
     InvitationStatus
 )
+from .ai_red_teaming import (
+    AIRedTeamingEngagement,
+    AITestingEnvironment,
+    AIVulnerabilityReport,
+    AIFindingClassification,
+    AISecurityReport,
+    AIModelType,
+    EngagementStatus,
+    AIAttackType,
+    AIClassification,
+    ReportStatus
+)
 
 __all__ = [
     "User",
@@ -95,4 +107,14 @@ __all__ = [
     "EventStatus",
     "ParticipationStatus",
     "InvitationStatus",
+    "AIRedTeamingEngagement",
+    "AITestingEnvironment",
+    "AIVulnerabilityReport",
+    "AIFindingClassification",
+    "AISecurityReport",
+    "AIModelType",
+    "EngagementStatus",
+    "AIAttackType",
+    "AIClassification",
+    "ReportStatus",
 ]
