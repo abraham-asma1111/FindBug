@@ -379,6 +379,41 @@ entity "sync_logs" as sync_logs {
   created_at : TIMESTAMP
 }
 
+entity "integration_field_mappings" as field_mappings {
+  PK mapping_id : UUID
+  FK integration_id : UUID
+  source_field : VARCHAR(100)
+  target_field : VARCHAR(100)
+  transformation : VARCHAR(50)
+  is_required : BOOLEAN
+  default_value : TEXT
+  created_at : TIMESTAMP
+}
+
+entity "integration_webhook_events" as webhook_events {
+  PK event_id : UUID
+  FK integration_id : UUID
+  event_type : VARCHAR(100)
+  payload : JSON
+  headers : JSON
+  signature : VARCHAR(500)
+  is_verified : BOOLEAN
+  processed : BOOLEAN
+  processed_at : TIMESTAMP
+  created_at : TIMESTAMP
+}
+
+entity "integration_templates" as integration_templates {
+  PK template_id : UUID
+  name : VARCHAR(100)
+  integration_type : VARCHAR(50)
+  description : TEXT
+  default_config : JSON
+  field_mappings : JSON
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+
 ' ============================================
 ' RELATIONSHIPS
 ' ============================================
@@ -867,6 +902,8 @@ researchers ||--o{ matching_invitations
 
 organizations ||--o{ integrations
 integrations ||--o{ sync_logs
+integrations ||--o{ field_mappings
+integrations ||--o{ webhook_events
 
 organizations ||--o{ ptaas
 researchers ||--o{ ptaas
@@ -876,4 +913,5 @@ organizations ||--o{ ai_engagements
 researchers ||--o{ ai_engagements
 organizations ||--o{ events
 researchers ||--o{ participations
+researchers ||--o{ sim_sessions
 researchers ||--o{ sim_sessions

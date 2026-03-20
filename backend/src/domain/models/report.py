@@ -83,6 +83,7 @@ class VulnerabilityReport(Base):
     bounty_approver = relationship("User", foreign_keys=[bounty_approved_by])
     attachments = relationship("ReportAttachment", back_populates="report", cascade="all, delete-orphan")
     comments = relationship("ReportComment", back_populates="report", cascade="all, delete-orphan")
+    live_event = relationship("LiveHackingEvent", back_populates="submissions")
     duplicate_reports = relationship(
         "VulnerabilityReport",
         foreign_keys=[duplicate_of],
