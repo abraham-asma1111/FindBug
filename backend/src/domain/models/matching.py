@@ -258,3 +258,85 @@ class MatchingMetrics(Base):
     __table_args__ = (
         Index('ix_matching_metrics_request_id', 'request_id'),
     )
+
+
+
+class MatchingConfiguration(Base):
+    """Matching Configuration model - FREQ-33."""
+    
+    __tablename__ = "matching_configurations"
+    
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id = Column(PGUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, unique=True)
+    
+    # Matching criteria weights (FREQ-33)
+    skill_weight = Column(Numeric(3, 2), nullable=False, server_default="0.30")
+    reputation_weight = Column(Numeric(3, 2), nullable=False, server_default="0.20")
+    performance_weight = Column(Numeric(3, 2), nullable=False, server_default="0.20")
+    expertise_weight = Column(Numeric(3, 2), nullable=False, server_default="0.20")
+    availability_weight = Column(Numeric(3, 2), nullable=False, server_default="0.10")
+    
+    # Minimum thresholds
+    min_overall_score = Column(Numeric(5, 2), nullable=False, server_default="50.00")
+    min_reputation = Column(Integer, nullable=False, server_default="0")
+    min_experience_years = Column(Integer, nullable=False, server_default="0")
+    
+    # Approval settings (FREQ-33)
+    require_approval = Column(Boolean, nullable=False, server_default="true")
+    auto_approve_threshold = Column(Numeric(5, 2), nullable=True)  # Auto-approve if score >= threshold
+    approval_timeout_hours = Column(Integer, nullable=False, server_default="48")
+    
+    # Preferences
+    preferred_timezones = Column(JSONB, nullable=True)
+    excluded_researchers = Column(JSONB, nullable=True)  # List of researcher IDs to exclude
+    preferred_researchers = Column(JSONB, nullable=True)  # List of researcher IDs to prefer
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    organization = relationship("Organization")
+    
+    __table_args__ = (
+        Index('ix_matching_configurations_organization_id', 'organization_id'),
+    )
+
+
+class ResearcherAssignment(Base):
+    """Researcher Assignment model - FREQ-33 (Approval workflow)."""
+    
+    __tablename__ = "researcher_assignments"
+    
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    engagement_id = Column(Integer, nullable=False)  # PTaaS engagement ID
+    engagement_type = Column(String(50), nullable=False)  # ptaas, bug_bounty, etc.
+    researcher_id = Column(PGUUID(as_uuid=True), ForeignKey("researchers.id"), nullable=False)
+    organization_id = Column(PGUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    
+    # Match details
+    match_score = Column(Numeric(5, 2), nullable=False)
+    match_details = Column(JSONB, nullable=False)  # Detailed scoring breakdown
+    
+    # Assignment status (FREQ-33)
+    status = Column(String(20), nullable=False, server_default="pending")  # pending, approved, rejected, expired
+    
+    # Approval workflow
+    proposed_by = Column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)  # System or user
+    proposed_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    reviewed_by = Column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_notes = Column(Text, nullable=True)
+    
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Relationships
+    researcher = relationship("Researcher")
+    organization = relationship("Organization")
+    
+    __table_args__ = (
+        Index('ix_researcher_assignments_engagement_id', 'engagement_id'),
+        Index('ix_researcher_assignments_researcher_id', 'researcher_id'),
+        Index('ix_researcher_assignments_organization_id', 'organization_id'),
+        Index('ix_researcher_assignments_status', 'status'),
+    )
