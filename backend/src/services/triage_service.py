@@ -20,6 +20,10 @@ class TriageService:
     def __init__(self, db: Session):
         self.db = db
         self.report_repo = ReportRepository(db)
+        
+        # Initialize audit service
+        from src.services.audit_service import AuditService
+        self.audit_service = AuditService(db)
     
     def get_triage_queue(
         self,
@@ -162,6 +166,14 @@ class TriageService:
             notification_service = NotificationService(self.db)
             notification_service.notify_report_status_changed(
                 report=report,
+                old_status=old_status,
+                new_status=status
+            )
+            
+            # Log audit trail (FREQ-17)
+            self.audit_service.log_report_status_changed(
+                report_id=report_id,
+                changed_by=triage_specialist_id,
                 old_status=old_status,
                 new_status=status
             )

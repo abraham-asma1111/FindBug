@@ -17,6 +17,10 @@ class BountyService:
     def __init__(self, db: Session):
         self.db = db
         self.report_repo = ReportRepository(db)
+        
+        # Initialize audit service
+        from src.services.audit_service import AuditService
+        self.audit_service = AuditService(db)
     
     def calculate_bounty_amount(
         self,
@@ -136,6 +140,13 @@ class BountyService:
         notification_service = NotificationService(self.db)
         notification_service.notify_bounty_approved(report=report)
         
+        # Log audit trail (FREQ-17)
+        self.audit_service.log_bounty_approved(
+            report_id=report_id,
+            approved_by=approved_by,
+            amount=bounty_amount
+        )
+        
         return report
     
     def reject_bounty(
@@ -223,6 +234,13 @@ class BountyService:
         from src.services.notification_service import NotificationService
         notification_service = NotificationService(self.db)
         notification_service.notify_bounty_paid(report=report)
+        
+        # Log audit trail (FREQ-17)
+        self.audit_service.log_bounty_paid(
+            report_id=report_id,
+            paid_by=paid_by,
+            amount=report.bounty_amount
+        )
         
         return report
     

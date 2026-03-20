@@ -9,6 +9,7 @@ from .staff import Staff
 from .program import BountyProgram, ProgramScope, RewardTier, ProgramInvitation, ProgramParticipation
 from .report import VulnerabilityReport, ReportAttachment, ReportComment, ReportStatusHistory
 from .notification import Notification, NotificationType, NotificationPriority
+from .analytics import ResearcherMetrics, OrganizationMetrics, PlatformMetrics, AnalyticsReport
 
 __all__ = [
     "User",
@@ -28,4 +29,8 @@ __all__ = [
     "Notification",
     "NotificationType",
     "NotificationPriority",
+    "ResearcherMetrics",
+    "OrganizationMetrics",
+    "PlatformMetrics",
+    "AnalyticsReport",
 ]
