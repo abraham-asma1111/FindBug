@@ -988,3 +988,285 @@ def get_assignment_details(
             "expires_at": assignment.expires_at.isoformat()
         }
     }
+
+
+# FREQ-39: Personalized Recommendations for Researchers
+@router.get("/recommendations/personalized")
+def get_personalized_recommendations(
+    include_bug_bounty: bool = True,
+    include_ptaas: bool = True,
+    limit_per_type: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get personalized recommendations for researcher - FREQ-39.
+    
+    Provides:
+    - Active bug bounty programs matching researcher profile
+    - PTaaS opportunities matching expertise
+    - Match scores and reasons
+    - Difficulty levels and estimated compensation
+    """
+    # Only researchers can get recommendations
+    if current_user.role != "RESEARCHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can access recommendations"
+        )
+    
+    service = MatchingService(db)
+    return service.get_personalized_recommendations(
+        current_user.id,
+        include_bug_bounty,
+        include_ptaas,
+        limit_per_type
+    )
+
+
+@router.get("/recommendations/bug-bounty")
+def get_bug_bounty_recommendations(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get bug bounty program recommendations - FREQ-39.
+    
+    Returns active programs matching researcher's skills and experience.
+    """
+    if current_user.role != "RESEARCHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can access recommendations"
+        )
+    
+    service = MatchingService(db)
+    recommendations = service.get_personalized_recommendations(
+        current_user.id,
+        include_bug_bounty=True,
+        include_ptaas=False,
+        limit_per_type=limit
+    )
+    
+    return {
+        'programs': recommendations['bug_bounty_programs'],
+        'total': len(recommendations['bug_bounty_programs']),
+        'researcher_profile': {
+            'skills': recommendations['summary'].get('researcher_skills', []),
+            'reputation': recommendations['summary'].get('researcher_reputation', 0)
+        }
+    }
+
+
+@router.get("/recommendations/ptaas")
+def get_ptaas_recommendations(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get PTaaS opportunity recommendations - FREQ-39.
+    
+    Returns available PTaaS engagements matching researcher's expertise.
+    """
+    if current_user.role != "RESEARCHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can access recommendations"
+        )
+    
+    service = MatchingService(db)
+    recommendations = service.get_personalized_recommendations(
+        current_user.id,
+        include_bug_bounty=False,
+        include_ptaas=True,
+        limit_per_type=limit
+    )
+    
+    return {
+        'opportunities': recommendations['ptaas_opportunities'],
+        'total': len(recommendations['ptaas_opportunities']),
+        'researcher_profile': {
+            'skills': recommendations['summary'].get('researcher_skills', []),
+            'reputation': recommendations['summary'].get('researcher_reputation', 0)
+        }
+    }
+
+
+# FREQ-40: BountyMatch Performance Metrics
+from datetime import datetime, timedelta
+
+@router.get("/metrics/performance")
+def get_matching_performance_metrics(
+    organization_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get BountyMatch performance metrics - FREQ-40.
+    
+    Available to:
+    - Platform admins (all data)
+    - Organization members (their organization data)
+    
+    Metrics include:
+    - Match success rate
+    - Researcher acceptance rate
+    - Average match scores
+    - Time to assignment
+    - Trends over time
+    """
+    # Access control
+    if current_user.role not in ["ADMIN", "STAFF"]:
+        # Non-admin users can only see their organization's metrics
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        organization_id = current_user.organization_id
+    
+    # Parse dates
+    start_dt = datetime.fromisoformat(start_date) if start_date else None
+    end_dt = datetime.fromisoformat(end_date) if end_date else None
+    
+    service = MatchingService(db)
+    return service.get_matching_performance_metrics(
+        organization_id,
+        start_dt,
+        end_dt
+    )
+
+
+@router.get("/metrics/organization/{organization_id}")
+def get_organization_matching_stats(
+    organization_id: int,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get matching statistics for organization - FREQ-40.
+    
+    Shows organization-specific matching performance.
+    """
+    # Access control
+    if current_user.role not in ["ADMIN", "STAFF"]:
+        if current_user.organization_id != organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+    
+    # Parse dates
+    start_dt = datetime.fromisoformat(start_date) if start_date else None
+    end_dt = datetime.fromisoformat(end_date) if end_date else None
+    
+    service = MatchingService(db)
+    return service.get_organization_matching_stats(
+        organization_id,
+        start_dt,
+        end_dt
+    )
+
+
+@router.get("/metrics/researcher/{researcher_id}")
+def get_researcher_matching_stats(
+    researcher_id: int,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get matching statistics for researcher - FREQ-40.
+    
+    Shows how well researcher is being matched to opportunities.
+    """
+    # Access control
+    if current_user.role not in ["ADMIN", "STAFF"]:
+        if current_user.id != researcher_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+    
+    # Parse dates
+    start_dt = datetime.fromisoformat(start_date) if start_date else None
+    end_dt = datetime.fromisoformat(end_date) if end_date else None
+    
+    service = MatchingService(db)
+    return service.get_researcher_matching_stats(
+        researcher_id,
+        start_dt,
+        end_dt
+    )
+
+
+@router.get("/metrics/dashboard")
+def get_matching_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get comprehensive matching dashboard - FREQ-40.
+    
+    Provides overview of matching system performance.
+    Available to admins and organization members.
+    """
+    service = MatchingService(db)
+    
+    # Determine scope based on user role
+    organization_id = None
+    if current_user.role not in ["ADMIN", "STAFF"]:
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+        organization_id = current_user.organization_id
+    
+    # Get metrics for different time periods
+    now = datetime.utcnow()
+    
+    # Last 7 days
+    last_week = service.get_matching_performance_metrics(
+        organization_id,
+        now - timedelta(days=7),
+        now
+    )
+    
+    # Last 30 days
+    last_month = service.get_matching_performance_metrics(
+        organization_id,
+        now - timedelta(days=30),
+        now
+    )
+    
+    # Last 90 days
+    last_quarter = service.get_matching_performance_metrics(
+        organization_id,
+        now - timedelta(days=90),
+        now
+    )
+    
+    return {
+        'dashboard_generated_at': now.isoformat(),
+        'organization_id': organization_id,
+        'is_platform_admin': current_user.role in ["ADMIN", "STAFF"],
+        'periods': {
+            'last_7_days': last_week,
+            'last_30_days': last_month,
+            'last_90_days': last_quarter
+        },
+        'summary': {
+            'current_success_rate': last_month['success_metrics']['match_success_rate'],
+            'current_acceptance_rate': last_month['success_metrics']['researcher_acceptance_rate'],
+            'trend': last_month['trends']['trend_direction'],
+            'total_assignments_this_month': last_month['overview']['total_assignments']
+        }
+    }

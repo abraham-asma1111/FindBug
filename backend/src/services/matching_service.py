@@ -1316,3 +1316,580 @@ class MatchingService:
         self.db.commit()
         
         return expired_count
+
+
+    # FREQ-39: Personalized Recommendations for Researchers
+    
+    def get_personalized_recommendations(
+        self,
+        researcher_id: int,
+        include_bug_bounty: bool = True,
+        include_ptaas: bool = True,
+        limit_per_type: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Get comprehensive personalized recommendations - FREQ-39.
+        
+        Provides researchers with:
+        - Active bug bounty programs matching their profile
+        - PTaaS opportunities matching their expertise
+        - Personalized match scores and reasons
+        """
+        recommendations = {
+            'researcher_id': researcher_id,
+            'generated_at': datetime.utcnow().isoformat(),
+            'bug_bounty_programs': [],
+            'ptaas_opportunities': [],
+            'summary': {}
+        }
+        
+        # Get researcher profile
+        researcher = self.db.query(Researcher).filter(
+            Researcher.id == researcher_id
+        ).first()
+        
+        if not researcher:
+            return recommendations
+        
+        # Get bug bounty recommendations
+        if include_bug_bounty:
+            recommendations['bug_bounty_programs'] = self._get_enhanced_program_recommendations(
+                researcher,
+                limit_per_type
+            )
+        
+        # Get PTaaS recommendations
+        if include_ptaas:
+            recommendations['ptaas_opportunities'] = self._get_enhanced_ptaas_recommendations(
+                researcher,
+                limit_per_type
+            )
+        
+        # Generate summary
+        recommendations['summary'] = {
+            'total_bug_bounty': len(recommendations['bug_bounty_programs']),
+            'total_ptaas': len(recommendations['ptaas_opportunities']),
+            'high_match_count': len([
+                r for r in recommendations['bug_bounty_programs'] + recommendations['ptaas_opportunities']
+                if r.get('match_score', 0) >= 80
+            ]),
+            'researcher_skills': researcher.profile[0].skills if researcher.profile else [],
+            'researcher_reputation': researcher.reputation_score
+        }
+        
+        return recommendations
+    
+    def _get_enhanced_program_recommendations(
+        self,
+        researcher: Researcher,
+        limit: int
+    ) -> List[Dict]:
+        """Enhanced bug bounty program recommendations - FREQ-39"""
+        profile = researcher.profile[0] if researcher.profile else None
+        if not profile:
+            return []
+        
+        # Get active public programs
+        programs = self.db.query(BountyProgram).filter(
+            BountyProgram.status == 'public',
+            BountyProgram.deleted_at.is_(None)
+        ).all()
+        
+        scored_programs = []
+        for program in programs:
+            # Calculate comprehensive match score
+            match_details = self._calculate_comprehensive_program_match(
+                researcher,
+                program
+            )
+            
+            if match_details['overall_score'] >= 40:  # Minimum threshold
+                scored_programs.append({
+                    'program_id': program.id,
+                    'program_name': program.name,
+                    'organization_id': program.organization_id,
+                    'match_score': match_details['overall_score'],
+                    'match_reasons': match_details['reasons'],
+                    'reward_range': {
+                        'min': float(program.min_bounty) if program.min_bounty else 0,
+                        'max': float(program.max_bounty) if program.max_bounty else 0
+                    },
+                    'scope_summary': program.scope_summary if hasattr(program, 'scope_summary') else None,
+                    'difficulty_level': match_details.get('difficulty_level', 'Medium'),
+                    'estimated_time': match_details.get('estimated_time', 'Unknown'),
+                    'recommendation_type': 'bug_bounty'
+                })
+        
+        # Sort by match score
+        scored_programs.sort(key=lambda x: x['match_score'], reverse=True)
+        
+        return scored_programs[:limit]
+    
+    def _get_enhanced_ptaas_recommendations(
+        self,
+        researcher: Researcher,
+        limit: int
+    ) -> List[Dict]:
+        """Enhanced PTaaS opportunity recommendations - FREQ-39"""
+        profile = researcher.profile[0] if researcher.profile else None
+        if not profile:
+            return []
+        
+        # Get available PTaaS engagements
+        from backend.src.domain.models.ptaas import PTaaSEngagement
+        
+        engagements = self.db.query(PTaaSEngagement).filter(
+            PTaaSEngagement.status.in_(['DRAFT', 'PENDING_APPROVAL', 'ACTIVE']),
+            or_(
+                PTaaSEngagement.assigned_researchers.is_(None),
+                func.jsonb_array_length(PTaaSEngagement.assigned_researchers) < PTaaSEngagement.team_size
+            )
+        ).all()
+        
+        scored_engagements = []
+        for engagement in engagements:
+            # Calculate comprehensive match score
+            match_details = self._calculate_comprehensive_ptaas_match(
+                researcher,
+                engagement
+            )
+            
+            if match_details['overall_score'] >= 50:  # Minimum threshold
+                scored_engagements.append({
+                    'engagement_id': engagement.id,
+                    'engagement_name': engagement.name,
+                    'organization_id': engagement.organization_id,
+                    'methodology': engagement.testing_methodology,
+                    'match_score': match_details['overall_score'],
+                    'match_reasons': match_details['reasons'],
+                    'duration_days': engagement.duration_days,
+                    'pricing_model': engagement.pricing_model,
+                    'estimated_compensation': float(engagement.base_price / engagement.team_size) if engagement.team_size > 0 else 0,
+                    'team_size': engagement.team_size,
+                    'start_date': engagement.start_date.isoformat() if engagement.start_date else None,
+                    'compliance_requirements': engagement.compliance_requirements,
+                    'difficulty_level': match_details.get('difficulty_level', 'Medium'),
+                    'recommendation_type': 'ptaas'
+                })
+        
+        # Sort by match score
+        scored_engagements.sort(key=lambda x: x['match_score'], reverse=True)
+        
+        return scored_engagements[:limit]
+    
+    def _calculate_comprehensive_program_match(
+        self,
+        researcher: Researcher,
+        program: BountyProgram
+    ) -> Dict[str, Any]:
+        """Calculate comprehensive match score for bug bounty program - FREQ-39"""
+        profile = researcher.profile[0] if researcher.profile else None
+        if not profile:
+            return {'overall_score': 0, 'reasons': []}
+        
+        score = 0
+        reasons = []
+        
+        # Skills match (30 points)
+        researcher_skills = set(profile.skills or [])
+        program_skills = set(program.required_skills or [])
+        
+        if program_skills:
+            skill_match = len(researcher_skills & program_skills) / len(program_skills)
+            skill_score = skill_match * 30
+            score += skill_score
+            if skill_score >= 20:
+                reasons.append(f"Strong skills match ({int(skill_match * 100)}%)")
+        
+        # Reputation match (20 points)
+        if researcher.reputation_score >= 80:
+            score += 20
+            reasons.append("High reputation score")
+        elif researcher.reputation_score >= 60:
+            score += 15
+            reasons.append("Good reputation score")
+        elif researcher.reputation_score >= 40:
+            score += 10
+        
+        # Past performance (20 points)
+        past_reports = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.researcher_id == researcher.id,
+            VulnerabilityReport.program_id == program.id
+        ).count()
+        
+        if past_reports > 0:
+            score += 20
+            reasons.append(f"Previous participation ({past_reports} reports)")
+        
+        # Experience level match (15 points)
+        if profile.experience_years >= 5:
+            score += 15
+            reasons.append("Experienced researcher")
+        elif profile.experience_years >= 3:
+            score += 10
+        elif profile.experience_years >= 1:
+            score += 5
+        
+        # Reward tier match (15 points)
+        if program.max_bounty:
+            if program.max_bounty >= 10000:
+                score += 15 if researcher.reputation_score >= 70 else 5
+                if researcher.reputation_score >= 70:
+                    reasons.append("High-value program match")
+            elif program.max_bounty >= 5000:
+                score += 10
+            else:
+                score += 5
+        
+        # Determine difficulty level
+        difficulty = 'Medium'
+        if program.max_bounty and program.max_bounty >= 10000:
+            difficulty = 'High'
+        elif program.max_bounty and program.max_bounty < 1000:
+            difficulty = 'Low'
+        
+        return {
+            'overall_score': min(score, 100),
+            'reasons': reasons,
+            'difficulty_level': difficulty,
+            'estimated_time': '1-2 weeks'
+        }
+    
+    def _calculate_comprehensive_ptaas_match(
+        self,
+        researcher: Researcher,
+        engagement: 'PTaaSEngagement'
+    ) -> Dict[str, Any]:
+        """Calculate comprehensive match score for PTaaS engagement - FREQ-39"""
+        profile = researcher.profile[0] if researcher.profile else None
+        if not profile:
+            return {'overall_score': 0, 'reasons': []}
+        
+        score = 0
+        reasons = []
+        
+        # Methodology skills match (30 points)
+        methodology_skills = {
+            'OWASP': ['web_security', 'api_security', 'authentication', 'authorization'],
+            'PTES': ['network_security', 'penetration_testing', 'exploitation'],
+            'NIST': ['compliance', 'risk_assessment', 'security_controls']
+        }
+        
+        required_skills = methodology_skills.get(engagement.testing_methodology, [])
+        researcher_skills = set(profile.skills or [])
+        
+        if required_skills:
+            skill_match = len(set(required_skills) & researcher_skills) / len(required_skills)
+            skill_score = skill_match * 30
+            score += skill_score
+            if skill_score >= 20:
+                reasons.append(f"{engagement.testing_methodology} methodology match")
+        
+        # Reputation (20 points)
+        if researcher.reputation_score >= 80:
+            score += 20
+            reasons.append("High reputation for PTaaS")
+        elif researcher.reputation_score >= 60:
+            score += 15
+        elif researcher.reputation_score >= 40:
+            score += 10
+        
+        # PTaaS experience (20 points)
+        from backend.src.domain.models.ptaas import PTaaSFinding
+        past_ptaas = self.db.query(PTaaSFinding).filter(
+            PTaaSFinding.discovered_by == researcher.id
+        ).count()
+        
+        if past_ptaas >= 10:
+            score += 20
+            reasons.append(f"Extensive PTaaS experience ({past_ptaas} findings)")
+        elif past_ptaas >= 5:
+            score += 15
+            reasons.append("Good PTaaS experience")
+        elif past_ptaas >= 1:
+            score += 10
+        
+        # Compliance knowledge (15 points)
+        if engagement.compliance_requirements:
+            compliance_skills = {'pci_dss', 'hipaa', 'gdpr', 'sox', 'iso27001'}
+            if compliance_skills & researcher_skills:
+                score += 15
+                reasons.append("Compliance expertise")
+        
+        # Availability (15 points)
+        if profile.hours_available_per_week >= 20:
+            score += 15
+            reasons.append("High availability")
+        elif profile.hours_available_per_week >= 10:
+            score += 10
+        elif profile.hours_available_per_week >= 5:
+            score += 5
+        
+        # Determine difficulty
+        difficulty = 'Medium'
+        if engagement.testing_methodology in ['PTES', 'NIST']:
+            difficulty = 'High'
+        elif engagement.duration_days and engagement.duration_days > 30:
+            difficulty = 'High'
+        
+        return {
+            'overall_score': min(score, 100),
+            'reasons': reasons,
+            'difficulty_level': difficulty,
+            'estimated_time': f"{engagement.duration_days} days" if engagement.duration_days else 'Unknown'
+        }
+
+
+    # FREQ-40: BountyMatch Performance Metrics
+    
+    def get_matching_performance_metrics(
+        self,
+        organization_id: Optional[int] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """
+        Get comprehensive BountyMatch performance metrics - FREQ-40.
+        
+        Tracks:
+        - Match success rate
+        - Researcher acceptance rate
+        - Average match score
+        - Time to assignment
+        - Researcher satisfaction
+        """
+        from backend.src.domain.models.matching import ResearcherAssignment
+        
+        # Default to last 30 days if no date range specified
+        if not end_date:
+            end_date = datetime.utcnow()
+        if not start_date:
+            start_date = end_date - timedelta(days=30)
+        
+        # Base query for assignments
+        query = self.db.query(ResearcherAssignment).filter(
+            ResearcherAssignment.created_at >= start_date,
+            ResearcherAssignment.created_at <= end_date
+        )
+        
+        # Filter by organization if specified
+        if organization_id:
+            query = query.filter(ResearcherAssignment.organization_id == organization_id)
+        
+        assignments = query.all()
+        
+        # Calculate metrics
+        total_assignments = len(assignments)
+        approved_assignments = len([a for a in assignments if a.status == 'APPROVED'])
+        rejected_assignments = len([a for a in assignments if a.status == 'REJECTED'])
+        pending_assignments = len([a for a in assignments if a.status == 'PROPOSED'])
+        
+        # Match success rate (approved / total)
+        match_success_rate = (approved_assignments / total_assignments * 100) if total_assignments > 0 else 0
+        
+        # Researcher acceptance rate (approved / (approved + rejected))
+        total_decided = approved_assignments + rejected_assignments
+        acceptance_rate = (approved_assignments / total_decided * 100) if total_decided > 0 else 0
+        
+        # Average match score
+        match_scores = [a.match_score for a in assignments if a.match_score]
+        avg_match_score = sum(match_scores) / len(match_scores) if match_scores else 0
+        
+        # Time to assignment (from proposed to approved)
+        assignment_times = []
+        for a in assignments:
+            if a.status == 'APPROVED' and a.approved_at and a.created_at:
+                time_diff = (a.approved_at - a.created_at).total_seconds() / 3600  # hours
+                assignment_times.append(time_diff)
+        
+        avg_time_to_assignment = sum(assignment_times) / len(assignment_times) if assignment_times else 0
+        
+        # Assignment type breakdown
+        ptaas_assignments = len([a for a in assignments if a.assignment_type == 'PTAAS'])
+        program_assignments = len([a for a in assignments if a.assignment_type == 'PROGRAM'])
+        
+        # Score distribution
+        high_score_matches = len([s for s in match_scores if s >= 80])
+        medium_score_matches = len([s for s in match_scores if 60 <= s < 80])
+        low_score_matches = len([s for s in match_scores if s < 60])
+        
+        return {
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'days': (end_date - start_date).days
+            },
+            'overview': {
+                'total_assignments': total_assignments,
+                'approved': approved_assignments,
+                'rejected': rejected_assignments,
+                'pending': pending_assignments
+            },
+            'success_metrics': {
+                'match_success_rate': round(match_success_rate, 2),
+                'researcher_acceptance_rate': round(acceptance_rate, 2),
+                'average_match_score': round(avg_match_score, 2),
+                'average_time_to_assignment_hours': round(avg_time_to_assignment, 2)
+            },
+            'assignment_breakdown': {
+                'ptaas_engagements': ptaas_assignments,
+                'bug_bounty_programs': program_assignments
+            },
+            'score_distribution': {
+                'high_score_80_plus': high_score_matches,
+                'medium_score_60_79': medium_score_matches,
+                'low_score_below_60': low_score_matches
+            },
+            'trends': self._calculate_matching_trends(
+                organization_id,
+                start_date,
+                end_date
+            )
+        }
+    
+    def _calculate_matching_trends(
+        self,
+        organization_id: Optional[int],
+        start_date: datetime,
+        end_date: datetime
+    ) -> Dict[str, Any]:
+        """Calculate trending metrics over time - FREQ-40"""
+        from backend.src.domain.models.matching import ResearcherAssignment
+        
+        # Split period into weeks
+        weeks = []
+        current_date = start_date
+        while current_date < end_date:
+            week_end = min(current_date + timedelta(days=7), end_date)
+            
+            query = self.db.query(ResearcherAssignment).filter(
+                ResearcherAssignment.created_at >= current_date,
+                ResearcherAssignment.created_at < week_end
+            )
+            
+            if organization_id:
+                query = query.filter(ResearcherAssignment.organization_id == organization_id)
+            
+            week_assignments = query.all()
+            week_approved = len([a for a in week_assignments if a.status == 'APPROVED'])
+            week_total = len(week_assignments)
+            
+            weeks.append({
+                'week_start': current_date.isoformat(),
+                'total_assignments': week_total,
+                'approved_assignments': week_approved,
+                'success_rate': round((week_approved / week_total * 100) if week_total > 0 else 0, 2)
+            })
+            
+            current_date = week_end
+        
+        return {
+            'weekly_data': weeks,
+            'trend_direction': self._determine_trend_direction(weeks)
+        }
+    
+    def _determine_trend_direction(self, weekly_data: List[Dict]) -> str:
+        """Determine if metrics are improving, declining, or stable"""
+        if len(weekly_data) < 2:
+            return 'insufficient_data'
+        
+        # Compare first half to second half
+        mid_point = len(weekly_data) // 2
+        first_half_avg = sum(w['success_rate'] for w in weekly_data[:mid_point]) / mid_point if mid_point > 0 else 0
+        second_half_avg = sum(w['success_rate'] for w in weekly_data[mid_point:]) / (len(weekly_data) - mid_point)
+        
+        diff = second_half_avg - first_half_avg
+        
+        if diff > 5:
+            return 'improving'
+        elif diff < -5:
+            return 'declining'
+        else:
+            return 'stable'
+    
+    def get_researcher_matching_stats(
+        self,
+        researcher_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """
+        Get matching statistics for specific researcher - FREQ-40.
+        
+        Shows how well the researcher is being matched to opportunities.
+        """
+        from backend.src.domain.models.matching import ResearcherAssignment
+        
+        if not end_date:
+            end_date = datetime.utcnow()
+        if not start_date:
+            start_date = end_date - timedelta(days=90)  # Last 90 days
+        
+        # Get assignments for researcher
+        assignments = self.db.query(ResearcherAssignment).filter(
+            ResearcherAssignment.researcher_id == researcher_id,
+            ResearcherAssignment.created_at >= start_date,
+            ResearcherAssignment.created_at <= end_date
+        ).all()
+        
+        total = len(assignments)
+        approved = len([a for a in assignments if a.status == 'APPROVED'])
+        rejected = len([a for a in assignments if a.status == 'REJECTED'])
+        
+        # Calculate acceptance rate
+        acceptance_rate = (approved / total * 100) if total > 0 else 0
+        
+        # Average match score for this researcher
+        match_scores = [a.match_score for a in assignments if a.match_score]
+        avg_score = sum(match_scores) / len(match_scores) if match_scores else 0
+        
+        return {
+            'researcher_id': researcher_id,
+            'period': {
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat()
+            },
+            'assignments': {
+                'total_proposed': total,
+                'accepted': approved,
+                'rejected': rejected,
+                'pending': total - approved - rejected
+            },
+            'performance': {
+                'acceptance_rate': round(acceptance_rate, 2),
+                'average_match_score': round(avg_score, 2),
+                'match_quality': 'excellent' if avg_score >= 80 else 'good' if avg_score >= 60 else 'fair'
+            }
+        }
+    
+    def get_organization_matching_stats(
+        self,
+        organization_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """
+        Get matching statistics for specific organization - FREQ-40.
+        
+        Shows how well researchers are being matched to organization's opportunities.
+        """
+        metrics = self.get_matching_performance_metrics(
+            organization_id,
+            start_date,
+            end_date
+        )
+        
+        # Add organization-specific insights
+        from backend.src.domain.models.matching import MatchingConfiguration
+        
+        config = self.db.query(MatchingConfiguration).filter(
+            MatchingConfiguration.organization_id == organization_id
+        ).first()
+        
+        metrics['configuration'] = {
+            'has_custom_config': config is not None,
+            'auto_approval_threshold': config.auto_approval_threshold if config else None,
+            'minimum_score_threshold': config.minimum_score_threshold if config else None
+        }
+        
+        return metrics
