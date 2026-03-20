@@ -25,6 +25,10 @@ hiredis==2.2.3
 
 # Celery (Background Tasks)
 celery==5.3.4
+kombu==5.3.4
+
+# Message Broker
+amqp==5.2.0
 
 # Object Storage (MinIO/S3)
 boto3==1.29.7
