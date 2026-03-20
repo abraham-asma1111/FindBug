@@ -10,6 +10,7 @@ from .program import BountyProgram, ProgramScope, RewardTier, ProgramInvitation,
 from .report import VulnerabilityReport, ReportAttachment, ReportComment, ReportStatusHistory
 from .notification import Notification, NotificationType, NotificationPriority
 from .analytics import ResearcherMetrics, OrganizationMetrics, PlatformMetrics, AnalyticsReport
+from .ptaas import PTaaSEngagement, PTaaSFinding, PTaaSDeliverable, PTaaSProgressUpdate
 
 __all__ = [
     "User",
@@ -33,4 +34,8 @@ __all__ = [
     "OrganizationMetrics",
     "PlatformMetrics",
     "AnalyticsReport",
+    "PTaaSEngagement",
+    "PTaaSFinding",
+    "PTaaSDeliverable",
+    "PTaaSProgressUpdate",
 ]
