@@ -152,15 +152,22 @@ def upload_attachment(
                 detail="File size exceeds 50MB limit"
             )
         
-        # TODO: Save file to storage (S3 or local)
-        # TODO: Scan file for viruses
-        # For now, just return success
+        # Upload attachment
+        attachment = service.upload_attachment(
+            report_id=report_id,
+            file=file,
+            user_id=current_user.id
+        )
         
         return {
             "message": "Attachment uploaded successfully",
-            "filename": file.filename,
-            "size": file_size,
-            "type": file.content_type
+            "attachment_id": str(attachment.id),
+            "filename": attachment.filename,
+            "original_filename": attachment.original_filename,
+            "size": attachment.file_size,
+            "type": attachment.file_type,
+            "is_safe": attachment.is_safe,
+            "uploaded_at": attachment.uploaded_at
         }
     
     except PermissionError as e:
@@ -350,6 +357,358 @@ def get_program_reports(
             "total": len(reports),
             "limit": limit,
             "offset": offset
+        }
+    
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+
+@router.get("/reports/{report_id}/tracking")
+@router.post("/reports/{report_id}/tracking")
+def get_report_tracking(
+    report_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed tracking information for a report - FREQ-18.
+    
+    Returns timeline, status history, and current state.
+    """
+    service = ReportService(db)
+    
+    try:
+        # Verify access
+        report = service.get_report_by_id(
+            report_id=report_id,
+            user_id=current_user.id,
+            user_role=current_user.role
+        )
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Report not found"
+            )
+        
+        tracking_info = service.get_report_tracking_info(report_id)
+        
+        return tracking_info
+    
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+@router.get("/reports/{report_id}/attachments")
+@router.post("/reports/{report_id}/attachments")
+def get_report_attachments(
+    report_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all attachments for a report - FREQ-21.
+    """
+    service = ReportService(db)
+    
+    try:
+        # Verify access
+        report = service.get_report_by_id(
+            report_id=report_id,
+            user_id=current_user.id,
+            user_role=current_user.role
+        )
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Report not found"
+            )
+        
+        attachments = service.get_attachments(report_id)
+        
+        return {
+            "attachments": [
+                {
+                    "id": str(att.id),
+                    "filename": att.filename,
+                    "original_filename": att.original_filename,
+                    "file_type": att.file_type,
+                    "file_size": att.file_size,
+                    "is_safe": att.is_safe,
+                    "uploaded_at": att.uploaded_at
+                }
+                for att in attachments
+            ],
+            "total": len(attachments)
+        }
+    
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+@router.post("/attachments/{attachment_id}/delete")
+def delete_attachment(
+    attachment_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an attachment - FREQ-21.
+    
+    Only report owner or admin can delete attachments.
+    """
+    service = ReportService(db)
+    
+    try:
+        service.delete_attachment(
+            attachment_id=attachment_id,
+            user_id=current_user.id,
+            user_role=current_user.role
+        )
+        
+        return {"message": "Attachment deleted successfully"}
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+@router.get("/organization/reports/summary")
+@router.post("/organization/reports/summary")
+def get_organization_report_summary(
+    program_id: Optional[UUID] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get report summary for organization - FREQ-19.
+    
+    Provides overview of all reports across programs or for a specific program.
+    """
+    if current_user.role != "organization":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations can view report summaries"
+        )
+    
+    service = ReportService(db)
+    
+    summary = service.get_organization_report_summary(
+        organization_id=current_user.organization.id,
+        program_id=program_id
+    )
+    
+    return summary
+
+
+
+@router.get("/researcher/reports/statistics")
+@router.post("/researcher/reports/statistics")
+def get_researcher_report_statistics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get researcher's report statistics - FREQ-18.
+    
+    Provides overview of all submitted reports with status breakdown.
+    """
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can view their statistics"
+        )
+    
+    service = ReportService(db)
+    
+    # Get all reports
+    all_reports = service.get_researcher_reports(
+        researcher_id=current_user.researcher.id,
+        limit=1000
+    )
+    
+    # Calculate statistics
+    from collections import defaultdict
+    
+    status_counts = defaultdict(int)
+    severity_counts = defaultdict(int)
+    total_bounties = 0
+    pending_bounties = 0
+    
+    for report in all_reports:
+        status_counts[report.status] += 1
+        
+        if report.assigned_severity:
+            severity_counts[report.assigned_severity] += 1
+        
+        if report.bounty_amount:
+            total_bounties += float(report.bounty_amount)
+            if report.bounty_status == "pending":
+                pending_bounties += float(report.bounty_amount)
+    
+    return {
+        "total_reports": len(all_reports),
+        "status_breakdown": dict(status_counts),
+        "severity_breakdown": dict(severity_counts),
+        "bounties": {
+            "total_earned": total_bounties,
+            "pending": pending_bounties,
+            "paid": total_bounties - pending_bounties
+        },
+        "success_rate": round(
+            (status_counts.get("valid", 0) / len(all_reports) * 100) if all_reports else 0,
+            2
+        )
+    }
+
+
+@router.get("/researcher/reports/timeline")
+@router.post("/researcher/reports/timeline")
+def get_researcher_reports_timeline(
+    days: int = 30,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get researcher's report submission timeline - FREQ-18.
+    
+    Shows report submissions over time.
+    """
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can view their timeline"
+        )
+    
+    from datetime import timedelta
+    from collections import defaultdict
+    
+    service = ReportService(db)
+    
+    # Get reports from last N days
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    all_reports = service.get_researcher_reports(
+        researcher_id=current_user.researcher.id,
+        limit=1000
+    )
+    
+    # Filter by date and group by day
+    daily_counts = defaultdict(int)
+    daily_status = defaultdict(lambda: defaultdict(int))
+    
+    for report in all_reports:
+        if report.submitted_at >= start_date:
+            day = report.submitted_at.date().isoformat()
+            daily_counts[day] += 1
+            daily_status[day][report.status] += 1
+    
+    # Build timeline
+    timeline = []
+    current_date = start_date.date()
+    end_date = datetime.utcnow().date()
+    
+    while current_date <= end_date:
+        day_str = current_date.isoformat()
+        timeline.append({
+            "date": day_str,
+            "count": daily_counts.get(day_str, 0),
+            "status_breakdown": dict(daily_status.get(day_str, {}))
+        })
+        current_date += timedelta(days=1)
+    
+    return {
+        "timeline": timeline,
+        "period_days": days,
+        "total_reports": sum(daily_counts.values())
+    }
+
+
+@router.get("/reports/{report_id}/activity")
+@router.post("/reports/{report_id}/activity")
+def get_report_activity(
+    report_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all activity for a report - FREQ-18.
+    
+    Shows comments, status changes, and other events.
+    """
+    service = ReportService(db)
+    
+    try:
+        # Verify access
+        report = service.get_report_by_id(
+            report_id=report_id,
+            user_id=current_user.id,
+            user_role=current_user.role
+        )
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Report not found"
+            )
+        
+        # Get tracking info (includes timeline and status history)
+        tracking = service.get_report_tracking_info(report_id)
+        
+        # Get comments
+        comments = service.get_comments(
+            report_id=report_id,
+            user_role=current_user.role
+        )
+        
+        # Combine into activity feed
+        activity = []
+        
+        # Add timeline events
+        for event in tracking["timeline"]:
+            activity.append({
+                "type": "event",
+                "event_type": event["event"],
+                "timestamp": event["timestamp"],
+                "description": event["description"]
+            })
+        
+        # Add comments
+        for comment in comments:
+            activity.append({
+                "type": "comment",
+                "timestamp": comment.created_at,
+                "author_role": comment.author_role,
+                "comment_text": comment.comment_text,
+                "is_internal": comment.is_internal
+            })
+        
+        # Sort by timestamp
+        activity.sort(key=lambda x: x["timestamp"], reverse=True)
+        
+        return {
+            "report_id": str(report_id),
+            "report_number": report.report_number,
+            "activity": activity,
+            "total_events": len(activity)
         }
     
     except PermissionError as e:
