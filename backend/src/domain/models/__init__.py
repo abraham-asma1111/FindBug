@@ -11,6 +11,9 @@ from .report import VulnerabilityReport, ReportAttachment, ReportComment, Report
 from .notification import Notification, NotificationType, NotificationPriority
 from .analytics import ResearcherMetrics, OrganizationMetrics, PlatformMetrics, AnalyticsReport
 from .ptaas import PTaaSEngagement, PTaaSFinding, PTaaSDeliverable, PTaaSProgressUpdate
+from .ptaas_dashboard import PTaaSTestingPhase, PTaaSChecklistItem, PTaaSCollaborationUpdate, PTaaSMilestone
+from .ptaas_triage import PTaaSFindingTriage, PTaaSExecutiveReport, PTaaSFindingPrioritization
+from .ptaas_retest import PTaaSRetestRequest, PTaaSRetestPolicy, PTaaSRetestHistory
 from .matching import MatchingConfiguration, ResearcherAssignment
 
 __all__ = [
@@ -39,6 +42,16 @@ __all__ = [
     "PTaaSFinding",
     "PTaaSDeliverable",
     "PTaaSProgressUpdate",
+    "PTaaSTestingPhase",
+    "PTaaSChecklistItem",
+    "PTaaSCollaborationUpdate",
+    "PTaaSMilestone",
+    "PTaaSFindingTriage",
+    "PTaaSExecutiveReport",
+    "PTaaSFindingPrioritization",
+    "PTaaSRetestRequest",
+    "PTaaSRetestPolicy",
+    "PTaaSRetestHistory",
     "MatchingConfiguration",
     "ResearcherAssignment",
 ]
