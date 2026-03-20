@@ -28,6 +28,15 @@ from .integration import (
     SyncStatus,
     TransformationType
 )
+from .live_event import (
+    LiveHackingEvent,
+    EventParticipation,
+    EventInvitation,
+    EventMetrics,
+    EventStatus,
+    ParticipationStatus,
+    InvitationStatus
+)
 from .ai_red_teaming import (
     AIRedTeamingEngagement,
     AITestingEnvironment,
@@ -100,6 +109,16 @@ __all__ = [
     "SyncAction",
     "SyncStatus",
     "TransformationType",
+    "LiveHackingEvent",
+    "EventParticipation",
+    "EventInvitation",
+    "LiveHackingEvent",
+    "EventParticipation",
+    "EventInvitation",
+    "EventMetrics",
+    "EventStatus",
+    "ParticipationStatus",
+    "InvitationStatus",
     "AIRedTeamingEngagement",
     "AITestingEnvironment",
     "AIVulnerabilityReport",
