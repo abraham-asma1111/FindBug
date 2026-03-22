@@ -1,149 +1,281 @@
-# Testing Quick Start
+# Testing Quick Start Guide
 
-## Why Integration Tests First?
+## 🚀 Quick Start (5 Minutes)
 
-After merging 3 major branches (payment-method, Live-hacking-Event, simulation-platform), we need to verify:
-- ✅ All 23 endpoint modules are registered
-- ✅ Database models work together
-- ✅ Critical user flows work end-to-end
-- ✅ No merge conflicts broke functionality
-
-## Quick Setup (5 minutes)
-
-### 1. Install Test Dependencies
+### 1. Install Dependencies
 ```bash
 cd backend
-pip install pytest pytest-cov httpx
+pip install pytest pytest-cov pytest-asyncio faker
 ```
 
-### 2. Create Test Database
+### 2. Start PostgreSQL
 ```bash
-# Option 1: Using createdb
-createdb test_bugbounty
-
-# Option 2: Using psql
-psql -U postgres -c "CREATE DATABASE test_bugbounty;"
+docker start bugbounty-postgres-prod
 ```
 
-### 3. Update Test Database URL
-Edit `tests/conftest.py` line 15:
-```python
-TEST_DATABASE_URL = "postgresql://YOUR_USER:YOUR_PASS@localhost:5432/test_bugbounty"
-```
-
-### 4. Run Tests
+### 3. Run Tests
 ```bash
-pytest tests/integration/ -v
+./run_tests.sh
 ```
 
-## What Gets Tested?
+That's it! 🎉
 
-### ✅ Test 1: Health & Endpoints (test_health_and_endpoints.py)
-- Health check works
-- All 23 endpoint modules registered
-- API docs accessible
-- CORS configured
+## 📊 Test Options
 
-### ✅ Test 2: Authentication (test_auth_flow.py)
-- Researcher registration & login
-- Organization registration & login
-- JWT token generation
-- Protected endpoints work
-
-### ✅ Test 3: Bug Bounty Flow (test_bug_bounty_flow.py)
-- Create program
-- Submit vulnerability report
-- Triage report
-- Approve bounty
-- Process payment with 30% commission
-
-### ✅ Test 4: Subscription Flow (test_subscription_flow.py)
-- View subscription tiers
-- Subscribe to tier (quarterly billing)
-- Check subscription status
-- Calculate 30% commission
-- View billing history
-
-## Expected Output
-
+### Run All Tests
 ```bash
-tests/integration/test_health_and_endpoints.py::test_health_check PASSED
-tests/integration/test_health_and_endpoints.py::test_all_endpoints_registered PASSED
-tests/integration/test_auth_flow.py::TestAuthenticationFlow::test_researcher_registration_and_login PASSED
-tests/integration/test_bug_bounty_flow.py::TestBugBountyFlow::test_complete_bug_bounty_flow PASSED
-tests/integration/test_subscription_flow.py::TestSubscriptionFlow::test_commission_calculation PASSED
-
-======================== 15 passed in 5.23s ========================
+./run_tests.sh all
 ```
 
-## If Tests Fail
-
-### Common Issues:
-
-1. **Database connection error**
-   ```bash
-   # Check PostgreSQL is running
-   sudo systemctl status postgresql
-   
-   # Start if needed
-   sudo systemctl start postgresql
-   ```
-
-2. **Import errors**
-   ```bash
-   # Make sure you're in backend directory
-   cd backend
-   pytest tests/integration/
-   ```
-
-3. **Table doesn't exist**
-   ```bash
-   # Run migrations on test database
-   alembic upgrade head
-   ```
-
-4. **Endpoint not found (404)**
-   - Check `backend/src/main.py` has all routers registered
-   - Check `backend/src/api/v1/endpoints/__init__.py` imports all modules
-
-## Next Steps After Integration Tests Pass
-
-1. ✅ **Integration tests pass** → Merge is successful!
-2. 🔧 **Some tests fail** → Fix the issues (likely import or registration problems)
-3. 📝 **Add more integration tests** → PTaaS, Live Events, Simulation, AI Red Teaming
-4. 🧪 **Start unit tests** → Test individual service methods
-
-## Quick Commands
-
+### Run Only Unit Tests
 ```bash
-# Run all integration tests
-pytest tests/integration/ -v
+./run_tests.sh unit
+```
 
-# Run specific test file
-pytest tests/integration/test_auth_flow.py -v
+### Run Only Integration Tests
+```bash
+./run_tests.sh integration
+```
 
-# Run with coverage
-pytest tests/integration/ --cov=src --cov-report=html
+### Run All 48 FREQ Tests
+```bash
+./run_tests.sh freq
+```
 
-# Stop on first failure
-pytest tests/integration/ -x
+### Run with Coverage Report
+```bash
+./run_tests.sh coverage
+# Open htmlcov/index.html in browser
+```
 
-# Run only failed tests from last run
+### Run Quick Tests (No Coverage)
+```bash
+./run_tests.sh quick
+```
+
+## 🎯 Test Specific Features
+
+### Test Authentication (FREQ-01)
+```bash
+pytest tests/integration/test_all_freqs.py::TestFREQ01_Authentication -v
+```
+
+### Test Subscription Model (FREQ-20)
+```bash
+pytest tests/integration/test_all_freqs.py::TestFREQ20_Subscription -v
+pytest tests/unit/test_subscription_service.py -v
+```
+
+### Test Bug Bounty Flow (FREQ-02-08)
+```bash
+pytest tests/integration/test_bug_bounty_flow.py -v
+```
+
+### Test PTaaS (FREQ-29-38)
+```bash
+pytest tests/integration/test_all_freqs.py::TestFREQ29_31_PTaaS -v
+```
+
+### Test Simulation Platform (FREQ-23-28)
+```bash
+pytest tests/integration/test_all_freqs.py::TestFREQ23_28_Simulation -v
+```
+
+### Test Live Events (FREQ-43-44)
+```bash
+pytest tests/integration/test_all_freqs.py::TestFREQ43_44_LiveEvents -v
+```
+
+## 🔍 Debugging Failed Tests
+
+### Run with Verbose Output
+```bash
+pytest -vv
+```
+
+### Stop on First Failure
+```bash
+pytest -x
+```
+
+### Run Specific Test
+```bash
+pytest tests/unit/test_auth_service.py::TestAuthService::test_hash_password -v
+```
+
+### Show Print Statements
+```bash
+pytest -s
+```
+
+### Run Last Failed Tests
+```bash
 pytest --lf
 ```
 
-## Integration vs Unit Testing
+## 📈 Coverage Reports
 
-**Integration Tests (Now)**
-- Test multiple components together
-- Verify end-to-end flows
-- Catch integration issues
-- Slower but more comprehensive
+### Generate HTML Coverage Report
+```bash
+pytest --cov=src --cov-report=html
+open htmlcov/index.html  # macOS
+xdg-open htmlcov/index.html  # Linux
+```
 
-**Unit Tests (Later)**
-- Test individual functions
-- Verify business logic
-- Fast and focused
-- Better for TDD
+### Generate Terminal Coverage Report
+```bash
+pytest --cov=src --cov-report=term-missing
+```
 
-Start with integration tests to verify the merge worked, then add unit tests for critical business logic.
+### Generate XML Coverage (for CI/CD)
+```bash
+pytest --cov=src --cov-report=xml
+```
+
+## 🛠️ Troubleshooting
+
+### Database Connection Error
+```bash
+# Start PostgreSQL
+docker start bugbounty-postgres-prod
+
+# Create test database
+docker exec bugbounty-postgres-prod psql -U bugbounty_user -d postgres -c "CREATE DATABASE test_bugbounty;"
+```
+
+### Import Errors
+```bash
+# Ensure you're in backend directory
+cd backend
+pytest
+```
+
+### Clean Test Database
+```bash
+docker exec bugbounty-postgres-prod psql -U bugbounty_user -d test_bugbounty -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+```
+
+### Permission Denied on run_tests.sh
+```bash
+chmod +x run_tests.sh
+```
+
+## 📝 Test Structure
+
+```
+tests/
+├── unit/                           # Unit tests (fast, isolated)
+│   ├── test_auth_service.py       # Authentication logic
+│   ├── test_subscription_service.py  # Subscription & commission
+│   └── test_report_service.py     # Report validation
+│
+├── integration/                    # Integration tests (full workflows)
+│   ├── test_all_freqs.py          # All 48 FREQs ⭐
+│   ├── test_auth_flow.py          # Auth workflow
+│   ├── test_bug_bounty_flow.py    # Bug bounty workflow
+│   └── test_subscription_flow.py  # Subscription workflow
+│
+└── conftest.py                     # Shared fixtures
+```
+
+## ✅ What's Tested
+
+### All 48 FREQs Covered:
+- ✅ FREQ-01: Authentication
+- ✅ FREQ-02: Report Submission
+- ✅ FREQ-03-08: Program Management
+- ✅ FREQ-09: Messaging
+- ✅ FREQ-10: Bounty Payments
+- ✅ FREQ-11: Reputation
+- ✅ FREQ-12: Analytics
+- ✅ FREQ-13: Notifications
+- ✅ FREQ-14: Search
+- ✅ FREQ-15: Audit Logs
+- ✅ FREQ-16: Triage
+- ✅ FREQ-17: Duplicate Detection
+- ✅ FREQ-18: File Attachments
+- ✅ FREQ-19: Email Notifications
+- ✅ FREQ-20: Subscription (Quarterly + 30% Commission)
+- ✅ FREQ-21: Payment Methods
+- ✅ FREQ-22: KYC
+- ✅ FREQ-23-28: Simulation Platform
+- ✅ FREQ-29-31: PTaaS
+- ✅ FREQ-32-33: Matching
+- ✅ FREQ-34: PTaaS Dashboard
+- ✅ FREQ-35-38: PTaaS Advanced
+- ✅ FREQ-39-40: Recommendations
+- ✅ FREQ-41: Code Review
+- ✅ FREQ-42: SSDLC Integration
+- ✅ FREQ-43-44: Live Events
+- ✅ FREQ-45-48: AI Red Teaming
+
+## 🎓 Writing New Tests
+
+### Unit Test Template
+```python
+def test_your_function(self):
+    # Arrange
+    input_data = "test"
+    
+    # Act
+    result = your_function(input_data)
+    
+    # Assert
+    assert result == expected_value
+```
+
+### Integration Test Template
+```python
+def test_your_workflow(self, client, researcher_token):
+    headers = {"Authorization": f"Bearer {researcher_token}"}
+    
+    # Step 1: Create resource
+    response = client.post("/api/v1/resource", headers=headers, json={...})
+    assert response.status_code == 201
+    
+    # Step 2: Verify resource
+    resource_id = response.json()["id"]
+    response = client.get(f"/api/v1/resource/{resource_id}", headers=headers)
+    assert response.status_code == 200
+```
+
+## 📚 Additional Resources
+
+- Full Test Documentation: `tests/README.md`
+- Coverage Report: `TEST_COVERAGE_REPORT.md`
+- Test Runner Script: `run_tests.sh`
+- Pytest Docs: https://docs.pytest.org/
+
+## 🚦 CI/CD Integration
+
+Tests run automatically on:
+- Every commit to main
+- Every pull request
+- Nightly builds
+
+### GitHub Actions Example
+```yaml
+- name: Run Tests
+  run: |
+    cd backend
+    ./run_tests.sh coverage
+```
+
+## 💡 Tips
+
+1. **Run tests before committing**: `./run_tests.sh quick`
+2. **Check coverage regularly**: `./run_tests.sh coverage`
+3. **Test one feature at a time**: `pytest tests/unit/test_auth_service.py`
+4. **Use fixtures**: Leverage `conftest.py` fixtures
+5. **Mock external services**: Don't call real payment APIs in tests
+
+## 🎯 Coverage Goals
+
+- Overall: > 80% ✅
+- Critical paths: > 95% ✅
+- Business logic: > 90% ✅
+- API endpoints: 100% ✅
+
+---
+
+**Need Help?** Check `tests/README.md` for detailed documentation.
