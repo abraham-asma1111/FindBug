@@ -5,7 +5,7 @@ Free retesting of fixed vulnerabilities
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
-from backend.src.core.database import Base
+from src.core.database import Base
 
 
 class PTaaSRetestRequest(Base):
@@ -106,7 +106,7 @@ class PTaaSRetestHistory(Base):
     previous_status = Column(String(50))
     new_status = Column(String(50))
     notes = Column(Text)
-    metadata = Column(JSON)
+    activity_metadata = Column(JSON)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     

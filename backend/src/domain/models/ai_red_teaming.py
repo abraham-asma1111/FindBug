@@ -9,7 +9,7 @@ from datetime import datetime
 import uuid
 import enum
 
-from backend.src.core.database import Base
+from src.core.database import Base
 
 
 class AIModelType(str, enum.Enum):

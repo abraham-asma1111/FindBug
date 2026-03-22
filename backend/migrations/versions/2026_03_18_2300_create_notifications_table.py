@@ -17,35 +17,12 @@ depends_on = None
 
 
 def upgrade():
-    # Create notification_type enum
-    notification_type_enum = postgresql.ENUM(
-        'report_submitted', 'report_status_changed', 'report_triaged', 
-        'report_validated', 'report_invalid', 'report_duplicate', 
-        'report_resolved', 'report_acknowledged',
-        'bounty_approved', 'bounty_rejected', 'bounty_paid',
-        'reputation_updated', 'rank_changed',
-        'new_message', 'new_comment',
-        'program_published', 'program_updated', 'program_closed',
-        'account_verified', 'password_changed', 'mfa_enabled',
-        name='notificationtype',
-        create_type=True
-    )
-    notification_type_enum.create(op.get_bind(), checkfirst=True)
-    
-    # Create notification_priority enum
-    notification_priority_enum = postgresql.ENUM(
-        'low', 'medium', 'high', 'urgent',
-        name='notificationpriority',
-        create_type=True
-    )
-    notification_priority_enum.create(op.get_bind(), checkfirst=True)
-    
-    # Create notifications table
+    # Create notifications table (enums will be created automatically)
     op.create_table(
         'notifications',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column('notification_type', sa.Enum(
+        sa.Column('notification_type', postgresql.ENUM(
             'report_submitted', 'report_status_changed', 'report_triaged', 
             'report_validated', 'report_invalid', 'report_duplicate', 
             'report_resolved', 'report_acknowledged',
@@ -54,11 +31,13 @@ def upgrade():
             'new_message', 'new_comment',
             'program_published', 'program_updated', 'program_closed',
             'account_verified', 'password_changed', 'mfa_enabled',
-            name='notificationtype'
+            name='notificationtype',
+            create_type=True
         ), nullable=False),
-        sa.Column('priority', sa.Enum(
+        sa.Column('priority', postgresql.ENUM(
             'low', 'medium', 'high', 'urgent',
-            name='notificationpriority'
+            name='notificationpriority',
+            create_type=True
         ), nullable=False, server_default='medium'),
         sa.Column('title', sa.String(255), nullable=False),
         sa.Column('message', sa.Text, nullable=False),
