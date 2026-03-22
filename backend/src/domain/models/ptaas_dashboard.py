@@ -5,7 +5,7 @@ Real-time progress tracking for PTaaS engagements
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
-from backend.src.core.database import Base
+from src.core.database import Base
 
 
 class PTaaSTestingPhase(Base):

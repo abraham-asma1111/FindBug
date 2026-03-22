@@ -1,8 +1,8 @@
 """create simulation tables
 
-Revision ID: 2026_03_20_1500
-Revises: 2026_03_19_1600
-Create Date: 2026-03-20 15:00:00.000000
+Revision ID: 2026_03_20_1545
+Revises: 2026_03_20_1530
+Create Date: 2026-03-20 15:45:00.000000
 
 Implements FREQ-23 to FREQ-28: Bug Bounty Simulation Platform
 """
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '2026_03_20_1500'
-down_revision = '2026_03_19_1600'
+revision = '2026_03_20_1545'
+down_revision = '2026_03_20_1530'
 branch_labels = None
 depends_on = None
 

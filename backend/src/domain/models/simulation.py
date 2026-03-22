@@ -8,7 +8,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 
-from backend.src.core.database import Base
+from src.core.database import Base
 
 
 class SimulationChallenge(Base):

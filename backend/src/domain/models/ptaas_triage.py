@@ -5,7 +5,7 @@ Triage specialist validation, prioritization, and reporting
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, Numeric
 from sqlalchemy.orm import relationship
-from backend.src.core.database import Base
+from src.core.database import Base
 
 
 class PTaaSFindingTriage(Base):
