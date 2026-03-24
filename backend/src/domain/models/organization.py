@@ -53,3 +53,6 @@ class Organization(Base):
     
     # Relationships
     user = relationship("User", back_populates="organization")
+    programs = relationship("BountyProgram", back_populates="organization", cascade="all, delete-orphan")
+    webhook_endpoints = relationship("WebhookEndpoint", back_populates="organization",
+                                     cascade="all, delete-orphan")

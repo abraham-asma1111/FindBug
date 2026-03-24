@@ -10,7 +10,8 @@ from src.domain.models.notification import (
     NotificationType,
     NotificationPriority
 )
-from src.domain.models.user import User
+from src.domain.models.user import User, UserRole
+from src.core.role_access import role_from_str
 from src.domain.models.report import VulnerabilityReport
 from src.domain.models.program import BountyProgram
 from src.core.email_service import EmailService
@@ -286,8 +287,14 @@ class NotificationService:
         comment_preview: str
     ):
         """Notify about new comment on report."""
-        # Notify researcher if comment is from organization/triage
-        if commenter_role in ['organization', 'triage_specialist', 'admin']:
+        # Notify researcher if comment is from organization/triage/platform
+        if role_from_str(commenter_role) in (
+            UserRole.ORGANIZATION,
+            UserRole.TRIAGE_SPECIALIST,
+            UserRole.ADMIN,
+            UserRole.SUPER_ADMIN,
+            UserRole.STAFF,
+        ):
             return self.create_notification(
                 user_id=report.researcher.user_id,
                 notification_type=NotificationType.NEW_COMMENT,

@@ -68,7 +68,10 @@ class TriageService:
     def update_triage(
         self,
         report_id: UUID,
-        triage_specialist_id: UUID,
+        triage_staff_id: Optional[UUID],
+        actor_user_id: UUID,
+        actor_role: str,
+        actor_email: str,
         status: Optional[str] = None,
         assigned_severity: Optional[str] = None,
         cvss_score: Optional[Decimal] = None,
@@ -140,9 +143,10 @@ class TriageService:
                 report.duplicate_detected_at = datetime.utcnow()
                 report.status = 'duplicate'
         
-        # Set triage information
-        report.triaged_by = triage_specialist_id
-        report.triaged_at = datetime.utcnow()
+        # Set triage information (triaged_by -> staff.id; optional if admin has no staff row)
+        if triage_staff_id is not None:
+            report.triaged_by = triage_staff_id
+            report.triaged_at = datetime.utcnow()
         report.updated_at = datetime.utcnow()
         report.last_activity_at = datetime.utcnow()
         
@@ -157,7 +161,7 @@ class TriageService:
                     from_status=old_status,
                     to_status=status,
                     change_reason=triage_notes or f"Status changed by triage specialist",
-                    changed_by=triage_specialist_id
+                    changed_by=actor_user_id,
                 )
             )
             
@@ -173,9 +177,12 @@ class TriageService:
             # Log audit trail (FREQ-17)
             self.audit_service.log_report_status_changed(
                 report_id=report_id,
-                changed_by=triage_specialist_id,
                 old_status=old_status,
-                new_status=status
+                new_status=status,
+                changed_by_id=actor_user_id,
+                changed_by_role=actor_role,
+                changed_by_email=actor_email,
+                reason=triage_notes,
             )
         
         return report
@@ -184,7 +191,8 @@ class TriageService:
         self,
         report_id: UUID,
         original_report_id: UUID,
-        triage_specialist_id: UUID
+        triage_staff_id: Optional[UUID],
+        actor_user_id: UUID,
     ) -> VulnerabilityReport:
         """
         Mark report as duplicate - BR-07.
@@ -215,8 +223,9 @@ class TriageService:
         report.duplicate_of = original_report_id
         report.duplicate_detected_at = datetime.utcnow()
         report.status = 'duplicate'
-        report.triaged_by = triage_specialist_id
-        report.triaged_at = datetime.utcnow()
+        if triage_staff_id is not None:
+            report.triaged_by = triage_staff_id
+            report.triaged_at = datetime.utcnow()
         
         # Add note about duplicate bounty eligibility
         if within_24_hours:
@@ -233,7 +242,7 @@ class TriageService:
                 from_status=report.status,
                 to_status='duplicate',
                 change_reason=f"Marked as duplicate of {original.report_number}",
-                changed_by=triage_specialist_id
+                changed_by=actor_user_id,
             )
         )
         

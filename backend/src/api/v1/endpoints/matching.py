@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.authorization import get_current_user
+from src.core.role_access import is_ptaas_admin_or_staff
 from src.domain.models.user import User
 from src.services.matching_service import MatchingService
 
@@ -1120,7 +1121,7 @@ def get_matching_performance_metrics(
     - Trends over time
     """
     # Access control
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         # Non-admin users can only see their organization's metrics
         if not current_user.organization_id:
             raise HTTPException(
@@ -1155,7 +1156,7 @@ def get_organization_matching_stats(
     Shows organization-specific matching performance.
     """
     # Access control
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         if current_user.organization_id != organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1188,7 +1189,7 @@ def get_researcher_matching_stats(
     Shows how well researcher is being matched to opportunities.
     """
     # Access control
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         if current_user.id != researcher_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1222,7 +1223,7 @@ def get_matching_dashboard(
     
     # Determine scope based on user role
     organization_id = None
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         if not current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1257,7 +1258,7 @@ def get_matching_dashboard(
     return {
         'dashboard_generated_at': now.isoformat(),
         'organization_id': organization_id,
-        'is_platform_admin': current_user.role in ["ADMIN", "STAFF"],
+        'is_platform_admin': is_ptaas_admin_or_staff(current_user),
         'periods': {
             'last_7_days': last_week,
             'last_30_days': last_month,

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
-from src.domain.models.user import User
+from src.domain.models.user import User, UserRole
 from src.domain.models.researcher import Researcher
 from src.domain.models.organization import Organization
 from src.domain.models.staff import Staff
@@ -73,7 +73,7 @@ class AdminService:
         }
         
         # Add role-specific details
-        if user.role == "researcher" and user.researcher:
+        if user.role == UserRole.RESEARCHER and user.researcher:
             details["researcher"] = {
                 "reputation_score": user.researcher.reputation_score,
                 "total_reports": user.researcher.total_reports_submitted,
@@ -81,7 +81,7 @@ class AdminService:
                 "total_earnings": float(user.researcher.total_earnings),
                 "specializations": user.researcher.specializations
             }
-        elif user.role == "organization" and user.organization:
+        elif user.role == UserRole.ORGANIZATION and user.organization:
             details["organization"] = {
                 "company_name": user.organization.company_name,
                 "website": user.organization.website,
@@ -90,11 +90,14 @@ class AdminService:
                     BountyProgram.organization_id == user.organization.id
                 ).count()
             }
-        elif user.role == "triage_specialist" and user.staff:
+        elif user.role in (
+            UserRole.TRIAGE_SPECIALIST,
+            UserRole.STAFF,
+            UserRole.FINANCE_OFFICER,
+        ) and user.staff:
             details["staff"] = {
                 "department": user.staff.department,
-                "reports_triaged": user.staff.reports_triaged,
-                "avg_triage_time_hours": user.staff.avg_triage_time_hours
+                "position": user.staff.position,
             }
         
         return details
@@ -139,12 +142,12 @@ class AdminService:
         if not user:
             raise ValueError("User not found")
         
-        valid_roles = ["researcher", "organization", "triage_specialist", "admin"]
+        valid_roles = {r.value for r in UserRole}
         if new_role not in valid_roles:
             raise ValueError(f"Invalid role: {new_role}")
         
         old_role = user.role
-        user.role = new_role
+        user.role = UserRole(new_role)
         self.db.commit()
         self.db.refresh(user)
         
@@ -528,6 +531,14 @@ class AdminService:
         role: str = "triage_specialist"
     ) -> Staff:
         """Create new staff member - FREQ-01, FREQ-14."""
+        role_map = {
+            "triage_specialist": UserRole.TRIAGE_SPECIALIST,
+            "finance_officer": UserRole.FINANCE_OFFICER,
+            "staff": UserRole.STAFF,
+            "admin": UserRole.ADMIN,
+        }
+        user_role = role_map.get(role, UserRole.STAFF)
+
         # Check if user already exists
         existing_user = self.db.query(User).filter(User.email == email).first()
         if existing_user:
@@ -543,7 +554,7 @@ class AdminService:
             email=email,
             full_name=full_name,
             password_hash=get_password_hash(temp_password),
-            role=role,
+            role=user_role,
             is_active=True,
             email_verified=True
         )
@@ -554,9 +565,8 @@ class AdminService:
         # Create staff profile
         staff = Staff(
             user_id=user.id,
+            full_name=full_name,
             department=department,
-            reports_triaged=0,
-            avg_triage_time_hours=0.0
         )
         
         self.db.add(staff)

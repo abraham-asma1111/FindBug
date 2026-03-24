@@ -6,7 +6,7 @@ FastAPI Backend Server
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, simulation
+from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, simulation, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance
 
 # Version and metadata
 VERSION = "1.0.0"
@@ -54,6 +54,14 @@ app.include_router(messages.router, prefix="/api/v1")
 app.include_router(subscription.router, prefix="/api/v1")
 app.include_router(financial.router, prefix="/api/v1")
 app.include_router(simulation.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(vrt.router, prefix="/api/v1")
+app.include_router(kyc.router, prefix="/api/v1")
+app.include_router(security.router, prefix="/api/v1")
+app.include_router(webhooks.router, prefix="/api/v1")
+app.include_router(email_templates.router, prefix="/api/v1")
+app.include_router(data_exports.router, prefix="/api/v1")
+app.include_router(compliance.router, prefix="/api/v1")
 
 
 # Health Check Endpoint

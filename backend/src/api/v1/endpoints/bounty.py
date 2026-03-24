@@ -7,8 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
+from src.core.role_access import (
+    can_calculate_or_approve_bounty,
+    can_process_bounty_payout,
+    role_of,
+)
 from src.api.v1.middlewares.auth import get_current_user
-from src.domain.models.user import User
+from src.domain.models.user import User, UserRole
 from src.services.bounty_service import BountyService
 from src.api.v1.schemas.report import BountyApproval
 
@@ -30,7 +35,7 @@ def calculate_bounty(
     
     Only organizations and finance officers can calculate.
     """
-    if current_user.role not in ["organization", "finance_officer", "admin"]:
+    if not can_calculate_or_approve_bounty(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations or finance officers can calculate bounties"
@@ -71,7 +76,7 @@ def approve_bounty(
     
     Only organizations and finance officers can approve.
     """
-    if current_user.role not in ["organization", "finance_officer", "admin"]:
+    if not can_calculate_or_approve_bounty(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations or finance officers can approve bounties"
@@ -117,7 +122,7 @@ def reject_bounty(
     
     Only organizations and finance officers can reject.
     """
-    if current_user.role not in ["organization", "finance_officer", "admin"]:
+    if not can_calculate_or_approve_bounty(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations or finance officers can reject bounties"
@@ -160,7 +165,7 @@ def mark_bounty_paid(
     
     Only finance officers can mark as paid.
     """
-    if current_user.role not in ["finance_officer", "admin"]:
+    if not can_process_bounty_payout(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only finance officers can mark bounties as paid"
@@ -205,7 +210,7 @@ def get_pending_payouts(
     
     Only finance officers can access.
     """
-    if current_user.role not in ["finance_officer", "admin"]:
+    if not can_process_bounty_payout(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only finance officers can view pending payouts"
@@ -241,7 +246,7 @@ def get_overdue_payouts(
     
     Only finance officers and admins can access.
     """
-    if current_user.role not in ["finance_officer", "admin"]:
+    if not can_process_bounty_payout(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only finance officers can view overdue payouts"
@@ -274,14 +279,14 @@ def get_payout_statistics(
     
     Finance officers see all, organizations see their programs only.
     """
-    if current_user.role not in ["organization", "finance_officer", "admin"]:
+    if not can_calculate_or_approve_bounty(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations or finance officers can view statistics"
         )
     
     # Organizations can only see their own programs
-    if current_user.role == "organization" and not program_id:
+    if role_of(current_user) == UserRole.ORGANIZATION and not program_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Organizations must specify a program_id"

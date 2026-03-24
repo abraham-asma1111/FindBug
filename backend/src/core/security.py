@@ -51,6 +51,8 @@ class RBACPermission:
     RESEARCHER = "researcher"
     ORGANIZATION = "organization"
     STAFF = "staff"
+    TRIAGE_SPECIALIST = "triage_specialist"
+    FINANCE_OFFICER = "finance_officer"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
     
@@ -76,6 +78,16 @@ class RBACPermission:
             "approve_payments",
             "view_all_reports"
         ],
+        TRIAGE_SPECIALIST: [
+            "triage_reports",
+            "assign_severity",
+            "view_all_reports"
+        ],
+        FINANCE_OFFICER: [
+            "approve_payments",
+            "approve_bounties",
+            "view_program_reports"
+        ],
         ADMIN: [
             "manage_users",
             "manage_programs",
@@ -89,10 +101,11 @@ class RBACPermission:
     @staticmethod
     def has_permission(user_role: str, required_permission: str) -> bool:
         """Check if user role has required permission"""
-        if user_role == RBACPermission.SUPER_ADMIN:
+        ur = user_role.value if hasattr(user_role, "value") else str(user_role)
+        if ur == RBACPermission.SUPER_ADMIN:
             return True
         
-        user_permissions = RBACPermission.PERMISSIONS.get(user_role, [])
+        user_permissions = RBACPermission.PERMISSIONS.get(ur, [])
         return required_permission in user_permissions
 
 
@@ -329,8 +342,13 @@ class BusinessLogicSecurity:
         Validate user can access report
         Prevents IDOR (Insecure Direct Object Reference)
         """
-        # Admin and staff can access all reports
-        if current_user_role in [RBACPermission.ADMIN, RBACPermission.SUPER_ADMIN, RBACPermission.STAFF]:
+        # Platform roles that can access all reports
+        if current_user_role in [
+            RBACPermission.ADMIN,
+            RBACPermission.SUPER_ADMIN,
+            RBACPermission.STAFF,
+            RBACPermission.TRIAGE_SPECIALIST,
+        ]:
             return True
         
         # Researcher can only access own reports

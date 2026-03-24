@@ -50,7 +50,7 @@ def upgrade():
     
     # Validation and review
     op.add_column('ptaas_findings', sa.Column('validated', sa.Boolean(), nullable=True, server_default='false'))
-    op.add_column('ptaas_findings', sa.Column('validated_by', sa.Integer(), nullable=True))
+    op.add_column('ptaas_findings', sa.Column('validated_by', postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column('ptaas_findings', sa.Column('validated_at', sa.DateTime(), nullable=True))
     op.add_column('ptaas_findings', sa.Column('retest_required', sa.Boolean(), nullable=True, server_default='false'))
     op.add_column('ptaas_findings', sa.Column('retest_notes', sa.Text(), nullable=True))

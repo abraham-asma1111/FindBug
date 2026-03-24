@@ -26,6 +26,7 @@ class VulnerabilityReport(Base):
     # Relationships
     program_id = Column(PGUUID(as_uuid=True), ForeignKey("bounty_programs.id", ondelete="CASCADE"), nullable=False)
     researcher_id = Column(PGUUID(as_uuid=True), ForeignKey("researchers.id", ondelete="CASCADE"), nullable=False)
+    live_event_id = Column(PGUUID(as_uuid=True), ForeignKey("live_hacking_events.event_id", ondelete="SET NULL"), nullable=True)
     
     # Report content - FREQ-06
     title = Column(String(500), nullable=False)
@@ -90,6 +91,15 @@ class VulnerabilityReport(Base):
         remote_side=[id],
         backref="original_report"
     )
+    # Triage relationships (new models)
+    triage_queue_entry = relationship("TriageQueue", back_populates="report", uselist=False,
+                                      cascade="all, delete-orphan")
+    triage_assignments = relationship("TriageAssignment", back_populates="report",
+                                      cascade="all, delete-orphan")
+    validation_result = relationship("ValidationResult", back_populates="report", uselist=False,
+                                     cascade="all, delete-orphan")
+    duplicate_detections = relationship("DuplicateDetection", foreign_keys="DuplicateDetection.report_id",
+                                        back_populates="report", cascade="all, delete-orphan")
     
     # Indexes for performance
     __table_args__ = (

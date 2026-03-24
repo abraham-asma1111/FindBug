@@ -21,8 +21,8 @@ def upgrade():
     # PTaaS Retest Policy
     op.create_table(
         'ptaas_retest_policies',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('engagement_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('engagement_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('retest_period_months', sa.Integer(), nullable=False, server_default='12'),
         sa.Column('max_free_retests_per_finding', sa.Integer(), nullable=True, server_default='3'),
         sa.Column('eligible_severities', postgresql.JSON(astext_type=sa.Text()), nullable=True),
@@ -45,16 +45,16 @@ def upgrade():
     # PTaaS Retest Requests
     op.create_table(
         'ptaas_retest_requests',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('finding_id', sa.Integer(), nullable=False),
-        sa.Column('engagement_id', sa.Integer(), nullable=False),
-        sa.Column('requested_by', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('finding_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('engagement_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('requested_by', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('requested_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.Column('status', sa.String(length=50), nullable=True, server_default='PENDING'),
         sa.Column('fix_description', sa.Text(), nullable=False),
         sa.Column('fix_implemented_at', sa.DateTime(), nullable=True),
         sa.Column('fix_evidence', postgresql.JSON(astext_type=sa.Text()), nullable=True),
-        sa.Column('assigned_to', sa.Integer(), nullable=True),
+        sa.Column('assigned_to', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('assigned_at', sa.DateTime(), nullable=True),
         sa.Column('retest_started_at', sa.DateTime(), nullable=True),
         sa.Column('retest_completed_at', sa.DateTime(), nullable=True),
@@ -82,11 +82,11 @@ def upgrade():
     # PTaaS Retest History
     op.create_table(
         'ptaas_retest_history',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('retest_request_id', sa.Integer(), nullable=False),
-        sa.Column('finding_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('retest_request_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('finding_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('activity_type', sa.String(length=50), nullable=False),
-        sa.Column('activity_by', sa.Integer(), nullable=False),
+        sa.Column('activity_by', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('activity_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.Column('previous_status', sa.String(length=50), nullable=True),
         sa.Column('new_status', sa.String(length=50), nullable=True),

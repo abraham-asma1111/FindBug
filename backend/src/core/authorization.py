@@ -2,15 +2,114 @@
 Authorization and Resource Ownership Validation
 Prevents IDOR (Insecure Direct Object References) attacks
 """
-from typing import Optional
+from typing import Optional, Callable
 from uuid import UUID
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from jose import JWTError, jwt
 
+from src.core.database import get_db
+from src.core.config import settings
 from src.domain.models.user import User
 from src.domain.models.program import BountyProgram
 from src.domain.models.researcher import Researcher
 from src.domain.models.organization import Organization
+
+security = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Get current authenticated user from JWT token
+    
+    Args:
+        credentials: HTTP Bearer token
+        db: Database session
+    
+    Returns:
+        User: Current authenticated user
+    
+    Raises:
+        HTTPException: If token is invalid or user not found
+    """
+    token = credentials.credentials
+    
+    try:
+        # Decode JWT token
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Get user from database
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive"
+        )
+    
+    return user
+
+
+def require_role(*allowed_roles: str) -> Callable:
+    """
+    Dependency to require specific user roles
+    
+    Args:
+        *allowed_roles: Roles that are allowed to access the endpoint
+    
+    Returns:
+        Callable: Dependency function that checks user role
+    
+    Example:
+        @router.get("/admin")
+        def admin_endpoint(user: User = Depends(require_role("admin", "staff"))):
+            ...
+    """
+    def role_checker(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: Session = Depends(get_db)
+    ) -> User:
+        user = get_current_user(credentials, db)
+        
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
+            )
+        
+        return user
+    
+    return role_checker
 
 
 class ResourceAuthorization:
