@@ -21,9 +21,9 @@ def upgrade():
     # PTaaS Finding Triage
     op.create_table(
         'ptaas_finding_triage',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('finding_id', sa.Integer(), nullable=False),
-        sa.Column('triaged_by', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('finding_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('triaged_by', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('triaged_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.Column('triage_status', sa.String(length=50), nullable=True, server_default='PENDING'),
         sa.Column('triage_notes', sa.Text(), nullable=True),
@@ -59,11 +59,11 @@ def upgrade():
     # PTaaS Executive Reports
     op.create_table(
         'ptaas_executive_reports',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('engagement_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('engagement_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('report_title', sa.String(length=255), nullable=False),
         sa.Column('report_type', sa.String(length=50), nullable=True, server_default='EXECUTIVE'),
-        sa.Column('generated_by', sa.Integer(), nullable=False),
+        sa.Column('generated_by', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('generated_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.Column('report_period_start', sa.DateTime(), nullable=True),
         sa.Column('report_period_end', sa.DateTime(), nullable=True),
@@ -87,7 +87,7 @@ def upgrade():
         sa.Column('report_file_path', sa.String(length=500), nullable=True),
         sa.Column('report_file_url', sa.String(length=500), nullable=True),
         sa.Column('approved', sa.Boolean(), nullable=True, server_default='false'),
-        sa.Column('approved_by', sa.Integer(), nullable=True),
+        sa.Column('approved_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('approved_at', sa.DateTime(), nullable=True),
         sa.Column('distributed_to', postgresql.JSON(astext_type=sa.Text()), nullable=True),
         sa.Column('distributed_at', sa.DateTime(), nullable=True),
@@ -105,9 +105,9 @@ def upgrade():
     # PTaaS Finding Prioritization
     op.create_table(
         'ptaas_finding_prioritization',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('finding_id', sa.Integer(), nullable=False),
-        sa.Column('prioritized_by', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('finding_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('prioritized_by', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('prioritized_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.Column('old_priority', sa.String(length=50), nullable=True),
         sa.Column('new_priority', sa.String(length=50), nullable=False),

@@ -63,7 +63,7 @@ class ResearcherProfile(Base):
     
     # Relationships
     researcher = relationship("Researcher", backref="profile")
-    skills_detail = relationship("ResearcherSkill", back_populates="researcher_profile")
+    skills_detail = relationship("ResearcherSkill", primaryjoin="ResearcherProfile.researcher_id == foreign(ResearcherSkill.researcher_id)", back_populates="researcher_profile")
     
     __table_args__ = (
         Index('ix_researcher_profiles_researcher_id', 'researcher_id'),
@@ -86,7 +86,7 @@ class ResearcherSkill(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    researcher_profile = relationship("ResearcherProfile", back_populates="skills_detail")
+    researcher_profile = relationship("ResearcherProfile", primaryjoin="ResearcherSkill.researcher_id == foreign(ResearcherProfile.researcher_id)", back_populates="skills_detail")
     skill_tag = relationship("SkillTag", back_populates="researcher_skills")
     
     __table_args__ = (

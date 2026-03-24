@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
+from src.core.role_access import can_update_reputation_admin
 from src.api.v1.middlewares.auth import get_current_user
 from src.domain.models.user import User
 from src.services.reputation_service import ReputationService
@@ -175,7 +176,7 @@ def update_researcher_reputation(
     
     Only admins and triage specialists can manually trigger.
     """
-    if current_user.role not in ["admin", "triage_specialist"]:
+    if not can_update_reputation_admin(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins or triage specialists can update reputation"

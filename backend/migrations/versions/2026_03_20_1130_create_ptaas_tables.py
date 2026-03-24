@@ -21,8 +21,8 @@ def upgrade():
     # Create ptaas_engagements table
     op.create_table(
         'ptaas_engagements',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('organization_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('organization_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('status', sa.String(length=50), nullable=False),
@@ -47,7 +47,7 @@ def upgrade():
         sa.Column('team_size', sa.Integer(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.Column('created_by', sa.Integer(), nullable=True),
+        sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
         sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ),
         sa.PrimaryKeyConstraint('id')
@@ -59,8 +59,8 @@ def upgrade():
     # Create ptaas_findings table
     op.create_table(
         'ptaas_findings',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('engagement_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('engagement_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('title', sa.String(length=255), nullable=False),
         sa.Column('description', sa.Text(), nullable=False),
         sa.Column('severity', sa.String(length=50), nullable=False),
@@ -70,7 +70,7 @@ def upgrade():
         sa.Column('remediation', sa.Text(), nullable=True),
         sa.Column('references', postgresql.JSON(astext_type=sa.Text()), nullable=True),
         sa.Column('status', sa.String(length=50), nullable=True),
-        sa.Column('discovered_by', sa.Integer(), nullable=True),
+        sa.Column('discovered_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('discovered_at', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(['discovered_by'], ['users.id'], ),
         sa.ForeignKeyConstraint(['engagement_id'], ['ptaas_engagements.id'], ),
@@ -83,18 +83,18 @@ def upgrade():
     # Create ptaas_deliverables table
     op.create_table(
         'ptaas_deliverables',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('engagement_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('engagement_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('deliverable_type', sa.String(length=100), nullable=False),
         sa.Column('title', sa.String(length=255), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('file_path', sa.String(length=500), nullable=True),
         sa.Column('file_url', sa.String(length=500), nullable=True),
         sa.Column('version', sa.String(length=50), nullable=True),
-        sa.Column('submitted_by', sa.Integer(), nullable=True),
+        sa.Column('submitted_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('submitted_at', sa.DateTime(), nullable=True),
         sa.Column('approved', sa.Boolean(), nullable=True),
-        sa.Column('approved_by', sa.Integer(), nullable=True),
+        sa.Column('approved_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('approved_at', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(['approved_by'], ['users.id'], ),
         sa.ForeignKeyConstraint(['engagement_id'], ['ptaas_engagements.id'], ),
@@ -107,11 +107,11 @@ def upgrade():
     # Create ptaas_progress_updates table
     op.create_table(
         'ptaas_progress_updates',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('engagement_id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('engagement_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('update_text', sa.Text(), nullable=False),
         sa.Column('progress_percentage', sa.Integer(), nullable=True),
-        sa.Column('created_by', sa.Integer(), nullable=True),
+        sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
         sa.ForeignKeyConstraint(['engagement_id'], ['ptaas_engagements.id'], ),

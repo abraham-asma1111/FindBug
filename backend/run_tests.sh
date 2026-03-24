@@ -41,31 +41,31 @@ echo ""
 case "${1:-all}" in
     unit)
         echo -e "${GREEN}Running Unit Tests...${NC}"
-        pytest tests/unit/ -v --cov=src --cov-report=term --cov-report=html
+        pytest tests/unit/ -v
         ;;
     integration)
         echo -e "${GREEN}Running Integration Tests...${NC}"
-        pytest tests/integration/ -v --cov=src --cov-report=term --cov-report=html
+        pytest tests/integration/ -v
         ;;
     freq)
         echo -e "${GREEN}Running All FREQ Tests...${NC}"
-        pytest tests/integration/test_all_freqs.py -v --cov=src --cov-report=term --cov-report=html
+        pytest tests/integration/test_all_freqs.py -v
         ;;
-    coverage)
-        echo -e "${GREEN}Running All Tests with Coverage...${NC}"
-        pytest --cov=src --cov-report=term --cov-report=html --cov-report=xml
+    business)
+        echo -e "${GREEN}Running Business Logic Tests...${NC}"
+        pytest tests/unit/test_business_logic.py -v
         ;;
     quick)
-        echo -e "${GREEN}Running Quick Test (no coverage)...${NC}"
-        pytest -v
+        echo -e "${GREEN}Running Quick Test (business logic only)...${NC}"
+        pytest tests/unit/test_business_logic.py -v
         ;;
     all)
         echo -e "${GREEN}Running All Tests...${NC}"
-        pytest -v --cov=src --cov-report=term --cov-report=html
+        pytest -v --tb=short
         ;;
     *)
         echo -e "${RED}Unknown test type: $1${NC}"
-        echo "Usage: ./run_tests.sh [unit|integration|freq|coverage|quick|all]"
+        echo "Usage: ./run_tests.sh [unit|integration|freq|business|quick|all]"
         exit 1
         ;;
 esac
@@ -77,7 +77,6 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ All Tests Passed!${NC}"
     echo -e "${GREEN}=========================================${NC}"
     echo ""
-    echo "Coverage report generated in: htmlcov/index.html"
 else
     echo ""
     echo -e "${RED}=========================================${NC}"

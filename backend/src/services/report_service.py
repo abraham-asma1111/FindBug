@@ -12,6 +12,8 @@ from src.domain.models.report import (
     ReportStatusHistory
 )
 from src.domain.models.program import BountyProgram, ProgramParticipation
+from src.domain.models.user import UserRole
+from src.core.role_access import role_from_str
 from src.domain.repositories.report_repository import ReportRepository
 
 
@@ -169,17 +171,23 @@ class ReportService:
             return None
         
         # Access control
-        if user_role == "researcher":
+        r = role_from_str(user_role)
+        if r == UserRole.RESEARCHER:
             if str(report.researcher_id) != str(user_id):
                 raise PermissionError("You can only view your own reports")
-        elif user_role == "organization":
+        elif r == UserRole.ORGANIZATION:
             # Check if report belongs to organization's program
             program = self.db.query(BountyProgram).filter(
                 BountyProgram.id == report.program_id
             ).first()
             if not program or str(program.organization_id) != str(user_id):
                 raise PermissionError("You can only view reports for your programs")
-        elif user_role not in ["triage_specialist", "admin"]:
+        elif r not in (
+            UserRole.TRIAGE_SPECIALIST,
+            UserRole.STAFF,
+            UserRole.ADMIN,
+            UserRole.SUPER_ADMIN,
+        ):
             raise PermissionError("Unauthorized access")
         
         return report
@@ -200,7 +208,7 @@ class ReportService:
             raise ValueError("Report not found")
         
         # Researchers cannot create internal notes
-        if user_role == "researcher" and is_internal:
+        if role_from_str(user_role) == UserRole.RESEARCHER and is_internal:
             raise PermissionError("Researchers cannot create internal notes")
         
         comment = ReportComment(
@@ -228,7 +236,14 @@ class ReportService:
     ) -> List[ReportComment]:
         """Get comments for a report - FREQ-09."""
         # Researchers cannot see internal notes
-        include_internal = user_role in ["triage_specialist", "organization", "admin"]
+        r = role_from_str(user_role)
+        include_internal = r in (
+            UserRole.TRIAGE_SPECIALIST,
+            UserRole.ORGANIZATION,
+            UserRole.ADMIN,
+            UserRole.SUPER_ADMIN,
+            UserRole.STAFF,
+        )
         
         return self.report_repo.get_comments(
             report_id=report_id,
@@ -354,7 +369,7 @@ class ReportService:
         
         # Check permissions
         report = self.report_repo.get_by_id(attachment.report_id)
-        if user_role == "researcher" and str(report.researcher_id) != str(user_id):
+        if role_from_str(user_role) == UserRole.RESEARCHER and str(report.researcher_id) != str(user_id):
             raise PermissionError("You can only delete your own attachments")
         
         # Delete file from storage

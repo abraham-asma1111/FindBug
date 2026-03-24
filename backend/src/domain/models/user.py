@@ -12,10 +12,12 @@ from src.core.database import Base
 
 
 class UserRole(str, enum.Enum):
-    """User roles enum"""
+    """User roles enum (aligned with RAD Table 1 / FREQ-01)."""
     RESEARCHER = "researcher"
     ORGANIZATION = "organization"
-    STAFF = "staff"
+    STAFF = "staff"  # generic platform staff
+    TRIAGE_SPECIALIST = "triage_specialist"
+    FINANCE_OFFICER = "finance_officer"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
 
@@ -24,7 +26,7 @@ class User(Base):
     """
     User model - Core authentication entity
     
-    Supports multiple roles: researcher, organization, staff, admin
+    Supports multiple roles including triage specialist and finance officer (RAD)
     Includes security features: MFA, account lockout, failed login tracking
     """
     __tablename__ = "users"
@@ -77,3 +79,12 @@ class User(Base):
     researcher = relationship("Researcher", back_populates="user", uselist=False)
     organization = relationship("Organization", back_populates="user", uselist=False)
     staff = relationship("Staff", back_populates="user", uselist=False)
+    triage_specialist = relationship("TriageSpecialist", back_populates="user", uselist=False)
+    administrator = relationship("Administrator", back_populates="user", uselist=False)
+    financial_officer = relationship("FinancialOfficer", back_populates="user", uselist=False)
+    kyc_verifications = relationship("KYCVerification", foreign_keys="KYCVerification.user_id",
+                                     back_populates="user", cascade="all, delete-orphan")
+    security_events = relationship("SecurityEvent", back_populates="user", cascade="all, delete-orphan")
+    login_history = relationship("LoginHistory", back_populates="user", cascade="all, delete-orphan")
+    data_exports = relationship("DataExport", back_populates="user", cascade="all, delete-orphan")
+    transactions = relationship("Transaction", back_populates="user")

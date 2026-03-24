@@ -69,9 +69,9 @@ def upgrade() -> None:
         sa.Column('responded_at', sa.TIMESTAMP, nullable=True),
         sa.Column('expires_at', sa.TIMESTAMP, nullable=True)
     )
-    op.create_index('idx_invitations_event', 'event_invitations', ['event_id'])
-    op.create_index('idx_invitations_researcher', 'event_invitations', ['researcher_id'])
-    op.create_index('idx_invitations_status', 'event_invitations', ['status'])
+    op.create_index('idx_event_invitations_event', 'event_invitations', ['event_id'])
+    op.create_index('idx_event_invitations_researcher', 'event_invitations', ['researcher_id'])
+    op.create_index('idx_event_invitations_status', 'event_invitations', ['status'])
 
     # Create event_metrics table
     op.create_table(

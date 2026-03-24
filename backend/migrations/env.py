@@ -10,9 +10,10 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-# Import Base and models
+# Import Base and ALL models (required for Base.metadata to discover all tables)
 from core.database import Base
-from domain.models import User, Researcher, Organization, Staff
+# Import all models so SQLAlchemy can discover them
+import domain.models  # This imports everything from __init__.py
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

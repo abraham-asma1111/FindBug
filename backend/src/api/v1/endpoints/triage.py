@@ -7,6 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
+from src.core.role_access import (
+    can_access_triage_queue,
+    can_org_or_triage_staff,
+    role_of,
+    triage_staff_fk_id,
+)
 from src.api.v1.middlewares.auth import get_current_user
 from src.domain.models.user import User
 from src.services.triage_service import TriageService
@@ -40,7 +46,7 @@ def get_triage_queue(
     
     Only triage specialists and admins can access.
     """
-    if current_user.role not in ["triage_specialist", "admin"]:
+    if not can_access_triage_queue(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can access the triage queue"
@@ -85,7 +91,7 @@ def update_report_triage(
     
     Only triage specialists and admins can update.
     """
-    if current_user.role not in ["triage_specialist", "admin"]:
+    if not can_access_triage_queue(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can update triage information"
@@ -96,7 +102,10 @@ def update_report_triage(
     try:
         report = service.update_triage(
             report_id=report_id,
-            triage_specialist_id=current_user.staff.id if current_user.role == "triage_specialist" else current_user.id,
+            triage_staff_id=triage_staff_fk_id(current_user),
+            actor_user_id=current_user.id,
+            actor_role=role_of(current_user).value,
+            actor_email=current_user.email,
             status=triage_data.status,
             assigned_severity=triage_data.assigned_severity,
             cvss_score=triage_data.cvss_score,
@@ -141,7 +150,7 @@ def mark_as_duplicate(
     
     Only triage specialists can mark duplicates.
     """
-    if current_user.role not in ["triage_specialist", "admin"]:
+    if not can_access_triage_queue(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can mark duplicates"
@@ -153,7 +162,8 @@ def mark_as_duplicate(
         report = service.mark_as_duplicate(
             report_id=report_id,
             original_report_id=original_report_id,
-            triage_specialist_id=current_user.staff.id if current_user.role == "triage_specialist" else current_user.id
+            triage_staff_id=triage_staff_fk_id(current_user),
+            actor_user_id=current_user.id,
         )
         
         return {
@@ -185,7 +195,7 @@ def find_similar_reports(
     
     Only triage specialists can access.
     """
-    if current_user.role not in ["triage_specialist", "admin"]:
+    if not can_access_triage_queue(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can search for similar reports"
@@ -226,7 +236,7 @@ def acknowledge_report(
     
     Only triage specialists and organizations can acknowledge.
     """
-    if current_user.role not in ["triage_specialist", "organization", "admin"]:
+    if not can_org_or_triage_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists or organizations can acknowledge reports"
@@ -270,7 +280,7 @@ def resolve_report(
     
     Only triage specialists and organizations can resolve.
     """
-    if current_user.role not in ["triage_specialist", "organization", "admin"]:
+    if not can_org_or_triage_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists or organizations can resolve reports"
@@ -313,7 +323,7 @@ def get_triage_statistics(
     
     Only triage specialists and admins can access.
     """
-    if current_user.role not in ["triage_specialist", "admin"]:
+    if not can_access_triage_queue(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can view statistics"
@@ -339,7 +349,7 @@ def get_report_history(
     
     Only triage specialists, organizations, and admins can access.
     """
-    if current_user.role not in ["triage_specialist", "organization", "admin"]:
+    if not can_org_or_triage_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized access to report history"

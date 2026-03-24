@@ -74,6 +74,7 @@ class BountyPayment(Base):
     researcher = relationship("Researcher")
     organization = relationship("Organization")
     approver = relationship("User", foreign_keys=[approved_by])
+    history = relationship("PaymentHistory", back_populates="payment", cascade="all, delete-orphan")
     
     # Indexes
     __table_args__ = (

@@ -5,10 +5,11 @@ Implements FREQ-29, FREQ-30, FREQ-31
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from backend.src.core.database import get_db
-from backend.src.api.v1.middlewares.auth import get_current_user
-from backend.src.services.ptaas_service import PTaaSService
-from backend.src.api.v1.schemas.ptaas import (
+from src.core.database import get_db
+from src.core.role_access import is_ptaas_admin_or_staff
+from src.api.v1.middlewares.auth import get_current_user
+from src.services.ptaas_service import PTaaSService
+from src.api.v1.schemas.ptaas import (
     PTaaSEngagementCreate,
     PTaaSEngagementUpdate,
     PTaaSEngagementResponse,
@@ -21,7 +22,7 @@ from backend.src.api.v1.schemas.ptaas import (
     PTaaSProgressUpdateCreate,
     PTaaSProgressUpdateResponse
 )
-from backend.src.domain.models.user import User
+from src.domain.models.user import User
 
 router = APIRouter(prefix="/ptaas", tags=["PTaaS"])
 
@@ -69,7 +70,7 @@ def get_engagement(
     
     # Check access
     if engagement.organization_id != current_user.organization_id:
-        if not (current_user.role in ["ADMIN", "STAFF"]):
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -141,7 +142,7 @@ def assign_researchers(
     
     # Only org members or staff can assign
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -264,7 +265,7 @@ def validate_finding(
     service = PTaaSService(db)
     
     # Only staff or org members can validate
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         # Check if user is from the engagement's organization
         finding = service.get_finding(finding_id)
         if not finding:
@@ -429,9 +430,9 @@ def get_subscription_renewal(
 
 
 # Dashboard Endpoints - FREQ-34
-from backend.src.services.ptaas_dashboard_service import PTaaSDashboardService
-from backend.src.domain.models.ptaas_dashboard import PTaaSTestingPhase
-from backend.src.api.v1.schemas.ptaas_dashboard import (
+from src.services.ptaas_dashboard_service import PTaaSDashboardService
+from src.domain.models.ptaas_dashboard import PTaaSTestingPhase
+from src.api.v1.schemas.ptaas_dashboard import (
     PTaaSTestingPhaseCreate,
     PTaaSTestingPhaseUpdate,
     PTaaSTestingPhaseResponse,
@@ -468,7 +469,7 @@ def get_engagement_dashboard(
     
     # Check access
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -671,8 +672,8 @@ def complete_milestone(
 
 
 # Triage Endpoints - FREQ-36
-from backend.src.services.ptaas_triage_service import PTaaSTriageService
-from backend.src.api.v1.schemas.ptaas_triage import (
+from src.services.ptaas_triage_service import PTaaSTriageService
+from src.api.v1.schemas.ptaas_triage import (
     PTaaSFindingTriageCreate,
     PTaaSFindingTriageResponse,
     PTaaSFindingPrioritizationCreate,
@@ -694,7 +695,7 @@ def triage_finding(
     Triage and validate a finding - FREQ-36
     Only platform triage specialists (STAFF/ADMIN) can triage
     """
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can triage findings"
@@ -737,7 +738,7 @@ def get_pending_triage(
     Get findings pending triage - FREQ-36
     Only triage specialists can access
     """
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can view pending triage"
@@ -758,7 +759,7 @@ def prioritize_finding(
     Prioritize a finding - FREQ-36
     Triage specialists can adjust priority with justification
     """
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can prioritize findings"
@@ -785,7 +786,7 @@ def generate_executive_report(
     Generate compliance-ready executive report - FREQ-36
     Includes risk ratings, evidence summary, and recommendations
     """
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only triage specialists can generate executive reports"
@@ -820,7 +821,7 @@ def get_executive_report(
     engagement = ptaas_service.get_engagement(report.engagement_id)
     
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -847,7 +848,7 @@ def get_engagement_reports(
     
     # Check access
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -881,7 +882,7 @@ def approve_executive_report(
     engagement = ptaas_service.get_engagement(report.engagement_id)
     
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -891,8 +892,8 @@ def approve_executive_report(
 
 
 # Retest Endpoints - FREQ-37
-from backend.src.services.ptaas_retest_service import PTaaSRetestService
-from backend.src.api.v1.schemas.ptaas_retest import (
+from src.services.ptaas_retest_service import PTaaSRetestService
+from src.api.v1.schemas.ptaas_retest import (
     PTaaSRetestPolicyCreate,
     PTaaSRetestPolicyResponse,
     PTaaSRetestRequestCreate,
@@ -926,7 +927,7 @@ def create_retest_policy(
     
     # Only org members or staff can set policy
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -1044,7 +1045,7 @@ def get_engagement_retests(
     
     # Check access
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -1064,7 +1065,7 @@ def get_pending_retests(
     Get pending retest requests - FREQ-37
     Staff can view all pending retests
     """
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only staff can view pending retests"
@@ -1098,7 +1099,7 @@ def approve_retest(
     engagement = ptaas_service.get_engagement(retest.engagement_id)
     
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -1118,7 +1119,7 @@ def assign_retest(
     Assign retest to researcher - FREQ-37
     Staff or org members can assign
     """
-    if current_user.role not in ["ADMIN", "STAFF"]:
+    if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only staff can assign retests"
@@ -1154,7 +1155,7 @@ def complete_retest(
     
     # Check if user is assigned or staff
     if retest.assigned_to != current_user.id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only assigned researcher or staff can complete retest"
@@ -1185,7 +1186,7 @@ def get_retest_statistics(
     
     # Check access
     if engagement.organization_id != current_user.organization_id:
-        if current_user.role not in ["ADMIN", "STAFF"]:
+        if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"

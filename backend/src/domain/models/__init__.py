@@ -6,6 +6,12 @@ from .user import User, UserRole
 from .researcher import Researcher
 from .organization import Organization
 from .staff import Staff
+from .staff_profiles import TriageSpecialist, Administrator, FinancialOfficer
+from .kyc import KYCVerification
+from .security_log import SecurityEvent, LoginHistory
+from .triage import TriageQueue, TriageAssignment, ValidationResult, DuplicateDetection
+from .payment_extended import PayoutRequest, Transaction, PaymentGateway, PaymentHistory
+from .ops import WebhookEndpoint, WebhookLog, EmailTemplate, DataExport, ComplianceReport
 from .program import BountyProgram, ProgramScope, RewardTier, ProgramInvitation, ProgramParticipation
 from .report import VulnerabilityReport, ReportAttachment, ReportComment, ReportStatusHistory
 from .notification import Notification, NotificationType, NotificationPriority
@@ -70,91 +76,57 @@ from .simulation import (
 )
 
 __all__ = [
-    "User",
-    "UserRole",
+    # Core user models
+    "User", "UserRole",
     "Researcher",
     "Organization",
     "Staff",
-    "BountyProgram",
-    "ProgramScope",
-    "RewardTier",
-    "ProgramInvitation",
-    "ProgramParticipation",
-    "VulnerabilityReport",
-    "ReportAttachment",
-    "ReportComment",
-    "ReportStatusHistory",
-    "Notification",
-    "NotificationType",
-    "NotificationPriority",
-    "ResearcherMetrics",
-    "OrganizationMetrics",
-    "PlatformMetrics",
-    "AnalyticsReport",
-    "PTaaSEngagement",
-    "PTaaSFinding",
-    "PTaaSDeliverable",
-    "PTaaSProgressUpdate",
-    "PTaaSTestingPhase",
-    "PTaaSChecklistItem",
-    "PTaaSCollaborationUpdate",
-    "PTaaSMilestone",
-    "PTaaSFindingTriage",
-    "PTaaSExecutiveReport",
-    "PTaaSFindingPrioritization",
-    "PTaaSRetestRequest",
-    "PTaaSRetestPolicy",
-    "PTaaSRetestHistory",
-    "MatchingConfiguration",
-    "ResearcherAssignment",
-    "CodeReviewEngagement",
-    "CodeReviewFinding",
-    "ExternalIntegration",
-    "SyncLog",
-    "IntegrationFieldMapping",
-    "IntegrationWebhookEvent",
-    "IntegrationTemplate",
-    "IntegrationType",
-    "IntegrationStatus",
-    "SyncAction",
-    "SyncStatus",
-    "TransformationType",
-    "LiveHackingEvent",
-    "EventParticipation",
-    "EventInvitation",
-    "LiveHackingEvent",
-    "EventParticipation",
-    "EventInvitation",
-    "EventMetrics",
-    "EventStatus",
-    "ParticipationStatus",
-    "InvitationStatus",
-    "AIRedTeamingEngagement",
-    "AITestingEnvironment",
-    "AIVulnerabilityReport",
-    "AIFindingClassification",
-    "AISecurityReport",
-    "AIModelType",
-    "EngagementStatus",
-    "AIAttackType",
-    "AIClassification",
-    "ReportStatus",
-    "Message",
-    "Conversation",
-    "BountyPayment",
-    "Wallet",
-    "WalletTransaction",
-    "OrganizationSubscription",
-    "SubscriptionPayment",
-    "SubscriptionTierPricing",
-    "SubscriptionTier",
-    "SubscriptionStatus",
-    "SimulationChallenge",
-    "SimulationInstance",
-    "SimulationProgress",
-    "SimulationReport",
-    "SimulationSolution",
-    "SimulationSolutionComment",
-    "SimulationSolutionLike",
-    "SimulationLeaderboard",
+    # Staff role profiles (new)
+    "TriageSpecialist", "Administrator", "FinancialOfficer",
+    # KYC & security (new)
+    "KYCVerification",
+    "SecurityEvent", "LoginHistory",
+    # Triage workflow (new)
+    "TriageQueue", "TriageAssignment", "ValidationResult", "DuplicateDetection",
+    # Payment completeness (new)
+    "PayoutRequest", "Transaction", "PaymentGateway", "PaymentHistory",
+    # Ops tables (new)
+    "WebhookEndpoint", "WebhookLog", "EmailTemplate", "DataExport", "ComplianceReport",
+    # Bug bounty core
+    "BountyProgram", "ProgramScope", "RewardTier", "ProgramInvitation", "ProgramParticipation",
+    "VulnerabilityReport", "ReportAttachment", "ReportComment", "ReportStatusHistory",
+    # Notifications
+    "Notification", "NotificationType", "NotificationPriority",
+    # Analytics
+    "ResearcherMetrics", "OrganizationMetrics", "PlatformMetrics", "AnalyticsReport",
+    # PTaaS
+    "PTaaSEngagement", "PTaaSFinding", "PTaaSDeliverable", "PTaaSProgressUpdate",
+    "PTaaSTestingPhase", "PTaaSChecklistItem", "PTaaSCollaborationUpdate", "PTaaSMilestone",
+    "PTaaSFindingTriage", "PTaaSExecutiveReport", "PTaaSFindingPrioritization",
+    "PTaaSRetestRequest", "PTaaSRetestPolicy", "PTaaSRetestHistory",
+    # Matching
+    "MatchingConfiguration", "ResearcherAssignment",
+    # Code review
+    "CodeReviewEngagement", "CodeReviewFinding",
+    # Integrations
+    "ExternalIntegration", "SyncLog", "IntegrationFieldMapping", "IntegrationWebhookEvent",
+    "IntegrationTemplate", "IntegrationType", "IntegrationStatus",
+    "SyncAction", "SyncStatus", "TransformationType",
+    # Live events
+    "LiveHackingEvent", "EventParticipation", "EventInvitation",
+    "EventMetrics", "EventStatus", "ParticipationStatus", "InvitationStatus",
+    # AI red teaming
+    "AIRedTeamingEngagement", "AITestingEnvironment", "AIVulnerabilityReport",
+    "AIFindingClassification", "AISecurityReport", "AIModelType",
+    "EngagementStatus", "AIAttackType", "AIClassification", "ReportStatus",
+    # Messaging
+    "Message", "Conversation",
+    # Payments
+    "BountyPayment", "Wallet", "WalletTransaction",
+    # Subscriptions
+    "OrganizationSubscription", "SubscriptionPayment", "SubscriptionTierPricing",
+    "SubscriptionTier", "SubscriptionStatus",
+    # Simulation
+    "SimulationChallenge", "SimulationInstance", "SimulationProgress", "SimulationReport",
+    "SimulationSolution", "SimulationSolutionComment", "SimulationSolutionLike", "SimulationLeaderboard",
 ]

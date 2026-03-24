@@ -53,3 +53,6 @@ class Researcher(Base):
     
     # Relationships
     user = relationship("User", back_populates="researcher")
+    program_invitations = relationship("ProgramInvitation", back_populates="researcher", cascade="all, delete-orphan")
+    participations = relationship("ProgramParticipation", back_populates="researcher", cascade="all, delete-orphan")
+    payout_requests = relationship("PayoutRequest", back_populates="researcher", cascade="all, delete-orphan")

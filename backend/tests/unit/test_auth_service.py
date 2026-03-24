@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from src.services.auth_service import AuthService
 from src.domain.models.user import User, UserRole
-from src.core.security import hash_password
+from src.core.security import PasswordSecurity
 
 
 class TestAuthService:
@@ -29,7 +29,7 @@ class TestAuthService:
         user = User(
             id="123e4567-e89b-12d3-a456-426614174000",
             email="test@example.com",
-            password_hash=hash_password("Test123!@#"),
+            password_hash=PasswordSecurity.hash_password("Test123!@#"),
             role=UserRole.RESEARCHER,
             is_active=True,
             is_verified=True,
@@ -40,7 +40,7 @@ class TestAuthService:
     def test_hash_password(self, auth_service):
         """Test password hashing"""
         password = "Test123!@#"
-        hashed = hash_password(password)
+        hashed = PasswordSecurity.hash_password(password)
         
         assert hashed != password
         assert len(hashed) > 0
@@ -48,29 +48,25 @@ class TestAuthService:
     
     def test_verify_password_correct(self, auth_service):
         """Test password verification with correct password"""
-        from src.core.security import verify_password
-        
         password = "Test123!@#"
-        hashed = hash_password(password)
+        hashed = PasswordSecurity.hash_password(password)
         
-        assert verify_password(password, hashed) is True
+        assert PasswordSecurity.verify_password(password, hashed) is True
     
     def test_verify_password_incorrect(self, auth_service):
         """Test password verification with incorrect password"""
-        from src.core.security import verify_password
-        
         password = "Test123!@#"
         wrong_password = "Wrong123!@#"
-        hashed = hash_password(password)
+        hashed = PasswordSecurity.hash_password(password)
         
-        assert verify_password(wrong_password, hashed) is False
+        assert PasswordSecurity.verify_password(wrong_password, hashed) is False
     
     def test_create_access_token(self, auth_service):
         """Test JWT token creation"""
-        from src.core.security import create_access_token
+        from src.core.security import TokenSecurity
         
         data = {"sub": "test@example.com", "role": "researcher"}
-        token = create_access_token(data)
+        token = TokenSecurity.create_access_token(data)
         
         assert token is not None
         assert isinstance(token, str)
