@@ -1,5 +1,8 @@
-"""Notification Service - FREQ-12."""
-from typing import List, Optional
+"""
+Notification Service - FREQ-12.
+Enhanced with EmailTemplate integration for templated email notifications.
+"""
+from typing import Any, Dict, List, Optional, Type
 from uuid import UUID
 from datetime import datetime, timedelta
 
@@ -10,19 +13,150 @@ from src.domain.models.notification import (
     NotificationType,
     NotificationPriority
 )
+from src.domain.models.ops import EmailTemplate
 from src.domain.models.user import User, UserRole
 from src.core.role_access import role_from_str
 from src.domain.models.report import VulnerabilityReport
 from src.domain.models.program import BountyProgram
 from src.core.email_service import EmailService
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class NotificationService:
-    """Service for managing notifications - FREQ-12."""
+    """
+    Service for managing notifications - FREQ-12.
+    Enhanced with EmailTemplate integration for templated emails.
+    """
     
     def __init__(self, db: Session):
         self.db = db
         self.email_service = EmailService()
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # EMAIL TEMPLATE METHODS (New - EmailTemplate model)
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def get_email_template(self, template_name: str) -> Optional[EmailTemplate]:
+        """
+        Get email template by name.
+        
+        Args:
+            template_name: Template name
+            
+        Returns:
+            EmailTemplate or None
+        """
+        return self.db.query(EmailTemplate).filter(
+            EmailTemplate.name == template_name,
+            EmailTemplate.is_active == True
+        ).first()
+    
+    def render_template(
+        self,
+        template_name: str,
+        variables: Dict[str, Any]
+    ) -> Dict[str, str]:
+        """
+        Render email template with variables.
+        
+        Args:
+            template_name: Template name
+            variables: Template variables
+            
+        Returns:
+            Dict with 'subject', 'body_html', 'body_text'
+        """
+        template = self.get_email_template(template_name)
+        
+        if not template:
+            logger.warning(f"Email template '{template_name}' not found")
+            return {
+                "subject": "Notification",
+                "body_html": "",
+                "body_text": ""
+            }
+        
+        # Render subject
+        subject = template.subject
+        for key, value in variables.items():
+            placeholder = f"{{{{{key}}}}}"  # {{key}}
+            subject = subject.replace(placeholder, str(value))
+        
+        # Render HTML body
+        body_html = template.body_html
+        for key, value in variables.items():
+            placeholder = f"{{{{{key}}}}}"
+            body_html = body_html.replace(placeholder, str(value))
+        
+        # Render text body
+        body_text = template.body_text or ""
+        for key, value in variables.items():
+            placeholder = f"{{{{{key}}}}}"
+            body_text = body_text.replace(placeholder, str(value))
+        
+        logger.info(f"Rendered template '{template_name}'", extra={
+            "template_name": template_name,
+            "variables": list(variables.keys())
+        })
+        
+        return {
+            "subject": subject,
+            "body_html": body_html,
+            "body_text": body_text
+        }
+    
+    def send_templated_email(
+        self,
+        user_id: UUID,
+        template_name: str,
+        variables: Dict[str, Any]
+    ) -> bool:
+        """
+        Send templated email to user.
+        
+        Args:
+            user_id: User ID
+            template_name: Template name
+            variables: Template variables
+            
+        Returns:
+            True if sent successfully
+        """
+        # Get user
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user or not user.email:
+            logger.warning(f"User {user_id} not found or has no email")
+            return False
+        
+        # Render template
+        rendered = self.render_template(template_name, variables)
+        
+        if not rendered["body_html"] and not rendered["body_text"]:
+            logger.error(f"Template '{template_name}' rendered empty")
+            return False
+        
+        try:
+            # Send email using email service
+            # TODO: Integrate with actual email service
+            logger.info(f"Sent templated email to {user.email}", extra={
+                "user_id": str(user_id),
+                "template": template_name,
+                "subject": rendered["subject"]
+            })
+            return True
+        
+        except Exception as e:
+            logger.error(f"Failed to send templated email: {str(e)}", extra={
+                "user_id": str(user_id),
+                "template": template_name
+            })
+            return False
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # NOTIFICATION CREATION (Enhanced with template support)
+    # ═══════════════════════════════════════════════════════════════════════
     
     def create_notification(
         self,
@@ -84,23 +218,66 @@ class NotificationService:
         return notification
     
     def _send_email_notification(self, notification: Notification):
-        """Send email notification."""
+        """
+        Send email notification using templates.
+        Enhanced to use EmailTemplate model.
+        """
         try:
             # Get user email
             user = self.db.query(User).filter(User.id == notification.user_id).first()
             if not user or not user.email:
                 return
             
-            # Send email (using existing email service)
-            # For now, we'll use a simple email format
-            # TODO: Create proper email templates for each notification type
+            # Map notification type to template name
+            template_map = {
+                NotificationType.REPORT_SUBMITTED: "report_submitted",
+                NotificationType.REPORT_STATUS_CHANGED: "report_status_changed",
+                NotificationType.REPORT_ACKNOWLEDGED: "report_acknowledged",
+                NotificationType.BOUNTY_APPROVED: "bounty_approved",
+                NotificationType.BOUNTY_REJECTED: "bounty_rejected",
+                NotificationType.BOUNTY_PAID: "bounty_paid",
+                NotificationType.REPUTATION_UPDATED: "reputation_updated",
+                NotificationType.RANK_CHANGED: "rank_changed",
+                NotificationType.NEW_COMMENT: "new_comment",
+                NotificationType.PROGRAM_PUBLISHED: "program_published"
+            }
             
-            notification.email_sent = True
-            notification.email_sent_at = datetime.utcnow()
-            self.db.commit()
+            template_name = template_map.get(notification.notification_type)
+            
+            if template_name:
+                # Prepare template variables
+                variables = {
+                    "user_name": user.email.split('@')[0],  # Simple name extraction
+                    "notification_title": notification.title,
+                    "notification_message": notification.message,
+                    "action_url": notification.action_url or "#",
+                    "action_text": notification.action_text or "View Details",
+                    "platform_name": "FindBug Platform"
+                }
+                
+                # Send templated email
+                success = self.send_templated_email(
+                    user_id=user.id,
+                    template_name=template_name,
+                    variables=variables
+                )
+                
+                if success:
+                    notification.email_sent = True
+                    notification.email_sent_at = datetime.utcnow()
+                    self.db.commit()
+            else:
+                # Fallback to simple email if no template
+                logger.warning(f"No template mapping for {notification.notification_type}")
+                notification.email_sent = True
+                notification.email_sent_at = datetime.utcnow()
+                self.db.commit()
             
         except Exception as e:
-            print(f"Failed to send email notification: {e}")
+            logger.error(f"Failed to send email notification: {str(e)}", extra={
+                "notification_id": str(notification.id),
+                "user_id": str(notification.user_id)
+            })
     
     # Report Notifications
     

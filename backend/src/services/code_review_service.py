@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from backend.src.domain.models.code_review import (
+from src.domain.models.code_review import (
     CodeReviewEngagement,
     CodeReviewFinding,
     ReviewStatus,
@@ -17,7 +17,7 @@ from backend.src.domain.models.code_review import (
     FindingStatus,
     IssueType
 )
-from backend.src.services.matching_service import MatchingService
+from src.services.matching_service import MatchingService
 
 
 class CodeReviewService:

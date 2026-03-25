@@ -5,11 +5,11 @@ Free retesting of fixed vulnerabilities
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from backend.src.domain.models.ptaas_retest import (
+from src.domain.models.ptaas_retest import (
     PTaaSRetestRequest, PTaaSRetestPolicy, PTaaSRetestHistory
 )
-from backend.src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding
-from backend.src.services.audit_service import AuditService
+from src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding
+from src.services.audit_service import AuditService
 
 
 class PTaaSRetestService:

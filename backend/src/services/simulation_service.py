@@ -7,7 +7,7 @@ from sqlalchemy import and_, or_, func
 from typing import List, Optional, Dict
 from datetime import datetime
 
-from backend.src.domain.models.simulation import (
+from src.domain.models.simulation import (
     SimulationChallenge,
     SimulationProgress,
     SimulationReport,

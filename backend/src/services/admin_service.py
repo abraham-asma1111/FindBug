@@ -1,4 +1,7 @@
-"""Admin service - FREQ-14."""
+"""
+Admin service - FREQ-14.
+Enhanced with welcome emails and security event logging.
+"""
 from typing import List, Optional, Dict
 from uuid import UUID
 from datetime import datetime, timedelta
@@ -12,14 +15,88 @@ from src.domain.models.organization import Organization
 from src.domain.models.staff import Staff
 from src.domain.models.program import BountyProgram
 from src.domain.models.report import VulnerabilityReport, ReportStatusHistory
+from src.domain.models.security_log import SecurityEvent
+from src.services.notification_service import NotificationService
+from src.domain.models.notification import NotificationType, NotificationPriority
 from src.core.security import get_password_hash
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AdminService:
-    """Service for administrator operations - FREQ-14."""
+    """
+    Service for administrator operations - FREQ-14.
+    Enhanced with welcome emails and security event logging.
+    """
     
     def __init__(self, db: Session):
         self.db = db
+        self.notification_service = NotificationService(db)
+    
+    def send_welcome_email(self, staff_id: UUID):
+        """
+        Send welcome email to new staff member.
+        
+        Args:
+            staff_id: Staff ID
+        """
+        staff = self.db.query(Staff).filter(Staff.id == staff_id).first()
+        if not staff:
+            return
+        
+        user = self.db.query(User).filter(User.id == staff.user_id).first()
+        if not user:
+            return
+        
+        self.notification_service.create_notification(
+            user_id=user.id,
+            notification_type=NotificationType.SYSTEM,
+            title="Welcome to FindBug Platform!",
+            message=f"Welcome {staff.first_name}! Your staff account has been created. You now have access to admin features.",
+            priority=NotificationPriority.HIGH,
+            action_url="/admin/dashboard",
+            action_text="Go to Dashboard",
+            send_email=True
+        )
+        
+        logger.info(f"Sent welcome email to staff {staff_id}")
+    
+    def log_admin_action_security(
+        self,
+        admin_id: UUID,
+        action: str,
+        description: str,
+        severity: str = "low",
+        ip_address: Optional[str] = None
+    ):
+        """
+        Log admin action as security event.
+        
+        Args:
+            admin_id: Admin user ID
+            action: Action type
+            description: Action description
+            severity: Severity level (low, medium, high, critical)
+            ip_address: IP address (optional)
+        """
+        event = SecurityEvent(
+            user_id=admin_id,
+            event_type=f"admin_{action}",
+            severity=severity,
+            description=description,
+            ip_address=ip_address,
+            is_blocked=False
+        )
+        
+        self.db.add(event)
+        self.db.commit()
+        
+        logger.info(f"Logged admin action: {action}", extra={
+            "admin_id": str(admin_id),
+            "action": action,
+            "severity": severity
+        })
     
     # User Management
     

@@ -1,7 +1,7 @@
 """
 Compliance Service — Compliance report generation and tracking (FREQ-22)
 """
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional, Type
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from uuid import UUID

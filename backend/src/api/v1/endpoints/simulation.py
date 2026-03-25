@@ -6,12 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from backend.src.core.database import get_db
-from backend.src.api.v1.middlewares.auth import get_current_user
-from backend.src.domain.models.user import User
-from backend.src.services.simulation_service import SimulationService
-from backend.src.services.container_service import ContainerOrchestrationService
-from backend.src.api.v1.schemas.simulation import (
+from src.core.database import get_db
+from src.api.v1.middlewares.auth import get_current_user
+from src.domain.models.user import User
+from src.services.simulation_service import SimulationService
+from src.services.container_service import ContainerOrchestrationService
+from src.api.v1.schemas.simulation import (
     ChallengeListResponse,
     ChallengeDetailsResponse,
     StartChallengeRequest,
@@ -129,7 +129,7 @@ async def start_challenge(
             }
         
         # Get challenge details
-        from backend.src.domain.models.simulation import SimulationChallenge
+        from src.domain.models.simulation import SimulationChallenge
         challenge = db.query(SimulationChallenge).filter(
             SimulationChallenge.id == challenge_id
         ).first()
@@ -224,7 +224,7 @@ async def get_report_details(
     
     FREQ-28: Provides automated feedback and learning hints
     """
-    from backend.src.domain.models.simulation import SimulationReport
+    from src.domain.models.simulation import SimulationReport
     
     report = db.query(SimulationReport).filter(
         SimulationReport.id == report_id,
@@ -250,7 +250,7 @@ async def get_my_reports(
     FREQ-24: Mirrors real bug bounty workflow
     FREQ-27: Isolated simulation data
     """
-    from backend.src.domain.models.simulation import SimulationReport
+    from src.domain.models.simulation import SimulationReport
     
     reports = db.query(SimulationReport).filter(
         SimulationReport.user_id == current_user.id
@@ -275,7 +275,7 @@ async def request_hint(
     
     FREQ-28: Provides learning hints
     """
-    from backend.src.domain.models.simulation import SimulationChallenge, SimulationProgress
+    from src.domain.models.simulation import SimulationChallenge, SimulationProgress
     
     challenge = db.query(SimulationChallenge).filter(
         SimulationChallenge.id == challenge_id
@@ -335,7 +335,7 @@ async def get_community_solutions(
     
     FREQ-28: Provides learning resources
     """
-    from backend.src.domain.models.simulation import SimulationSolution
+    from src.domain.models.simulation import SimulationSolution
     
     solutions = db.query(SimulationSolution).filter(
         SimulationSolution.challenge_id == challenge_id,
@@ -381,7 +381,7 @@ async def get_my_progress(
     
     FREQ-24: Track simulation progress
     """
-    from backend.src.domain.models.simulation import SimulationProgress
+    from src.domain.models.simulation import SimulationProgress
     
     progress = db.query(SimulationProgress).filter(
         SimulationProgress.user_id == current_user.id
@@ -424,7 +424,7 @@ async def get_my_stats(
     
     FREQ-24: Track user performance
     """
-    from backend.src.domain.models.simulation import (
+    from src.domain.models.simulation import (
         SimulationProgress,
         SimulationReport,
         SimulationLeaderboard

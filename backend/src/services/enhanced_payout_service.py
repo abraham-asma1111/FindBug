@@ -8,7 +8,7 @@ Implements:
 - Saga pattern with compensation
 - Duplicate bounty handling (BR-07)
 """
-from typing import Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 from decimal import Decimal
 from datetime import datetime, timedelta

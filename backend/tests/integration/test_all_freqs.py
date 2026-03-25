@@ -4,6 +4,7 @@ Tests complete workflows for every functional requirement
 """
 import pytest
 from fastapi.testclient import TestClient
+from typing import List
 
 
 # ============================================================================

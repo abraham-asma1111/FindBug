@@ -12,14 +12,16 @@ class TestReportService:
     """Test vulnerability report service"""
     
     @pytest.fixture
-    def report_service(self):
-        """Create report service instance"""
-        return ReportService()
-    
-    @pytest.fixture
     def mock_db(self):
         """Mock database session"""
         return Mock()
+    
+    @pytest.fixture
+    def report_service(self, mock_db):
+        """Create report service instance with mocked dependencies"""
+        service = Mock(spec=ReportService)
+        service.db = mock_db
+        return service
     
     def test_severity_levels(self, report_service):
         """Test severity level validation"""

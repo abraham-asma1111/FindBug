@@ -4,7 +4,7 @@ Implements FREQ-29, FREQ-30, FREQ-31
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from src.core.database import get_db
 from src.core.role_access import is_ptaas_admin_or_staff
 from src.api.v1.middlewares.auth import get_current_user

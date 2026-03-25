@@ -1,5 +1,5 @@
 """Vulnerability Report API Endpoints - FREQ-06."""
-from typing import List, Optional
+from typing import List, Optional, Type
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form

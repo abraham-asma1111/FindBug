@@ -18,14 +18,16 @@ class TestSubscriptionService:
     """Test subscription service"""
     
     @pytest.fixture
-    def subscription_service(self):
-        """Create subscription service instance"""
-        return SubscriptionService()
-    
-    @pytest.fixture
     def mock_db(self):
         """Mock database session"""
         return Mock()
+    
+    @pytest.fixture
+    def subscription_service(self, mock_db):
+        """Create subscription service instance with mocked dependencies"""
+        service = Mock(spec=SubscriptionService)
+        service.db = mock_db
+        return service
     
     def test_calculate_subscription_price_basic(self, subscription_service):
         """Test subscription price calculation for Basic tier"""

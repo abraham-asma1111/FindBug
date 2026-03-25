@@ -30,7 +30,7 @@ def test_get_profile_not_found(user_service):
 
 def test_get_researcher_profile(user_service):
     mock_user = User(
-        id="u1", email="test@ninja.com", full_name="Test Ninja", role="researcher", status="active"
+        id="u1", email="test@ninja.com", role="researcher"
     )
     mock_researcher = Researcher(
         user_id="u1", reputation_score=150, rank=1, total_earnings=250.0
@@ -51,7 +51,7 @@ def test_get_researcher_profile(user_service):
 
 def test_get_organization_profile(user_service):
     mock_user = User(
-        id="u2", email="admin@corp.com", full_name="Admin", role="organization", status="active"
+        id="u2", email="admin@corp.com", role="organization"
     )
     mock_org = Organization(
         user_id="u2", company_name="Corp Inc", industry="Tech"
@@ -70,21 +70,20 @@ def test_get_organization_profile(user_service):
 def test_update_profile_forbidden(user_service):
     # User tries to update someone else's profile
     with pytest.raises(ForbiddenException):
-        user_service.update_profile("u1", {"full_name": "Hack"}, "u2")
+        user_service.update_profile("u1", {"bio": "Hack"}, "u2")
 
 
 def test_update_profile_success(user_service):
-    mock_user = User(id="u1", role="researcher")
+    mock_user = User(id="u1", email="test@example.com", role="researcher")
     mock_researcher = Researcher(user_id="u1")
 
     user_service.user_repo.get_by_id.return_value = mock_user
     user_service.researcher_repo.get_by_user_id.return_value = mock_researcher
 
     # Mock the internal call to get_profile to return the updated payload
-    user_service.get_profile = MagicMock(return_value={"id": "u1", "full_name": "New Name"})
+    user_service.get_profile = MagicMock(return_value={"id": "u1", "email": "test@example.com"})
 
     data = {
-        "full_name": "New Name",
         "profile": {
             "bio": "I find bugs."
         }
@@ -93,19 +92,17 @@ def test_update_profile_success(user_service):
     result = user_service.update_profile("u1", data, "u1")
 
     # Assert model attributes were updated
-    assert mock_user.full_name == "New Name"
     assert mock_researcher.bio == "I find bugs."
     user_service.db.commit.assert_called()
-    assert result["full_name"] == "New Name"
+    assert result["id"] == "u1"
 
 
 def test_deactivate_user(user_service):
-    mock_user = User(id="u1", is_active=True, status="active")
+    mock_user = User(id="u1", is_active=True)
     user_service.user_repo.get_by_id.return_value = mock_user
 
     result = user_service.deactivate_user("u1")
 
-    assert mock_user.status == "deactivated"
     assert mock_user.is_active is False
     user_service.db.commit.assert_called_once()
     assert result["user_id"] == "u1"

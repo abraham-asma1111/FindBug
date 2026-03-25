@@ -12,7 +12,7 @@ from celery import Celery
 from celery.exceptions import Retry
 from kombu import Queue, Exchange
 
-from backend.src.core.config import settings
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +115,8 @@ def sync_to_external_system(
     Returns:
         Sync result with external ID
     """
-    from backend.src.services.integration_service import IntegrationService
-    from backend.src.core.database import SessionLocal
+    from src.services.integration_service import IntegrationService
+    from src.core.database import SessionLocal
     
     retry_count = self.request.retries
     delay = ExponentialBackoff.calculate_delay(retry_count)
@@ -195,8 +195,8 @@ def process_webhook_event(
     Returns:
         Processing result
     """
-    from backend.src.services.integration_service import IntegrationService
-    from backend.src.core.database import SessionLocal
+    from src.services.integration_service import IntegrationService
+    from src.core.database import SessionLocal
     
     retry_count = self.request.retries
     

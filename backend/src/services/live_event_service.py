@@ -11,7 +11,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
-from backend.src.domain.models.live_event import (
+from src.domain.models.live_event import (
     LiveHackingEvent,
     EventParticipation,
     EventInvitation,
@@ -20,7 +20,7 @@ from backend.src.domain.models.live_event import (
     ParticipationStatus,
     InvitationStatus
 )
-from backend.src.domain.models.report import VulnerabilityReport
+from src.domain.models.report import VulnerabilityReport
 
 logger = logging.getLogger(__name__)
 

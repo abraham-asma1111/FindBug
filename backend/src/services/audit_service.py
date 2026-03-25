@@ -1,5 +1,5 @@
 """Audit service - FREQ-17."""
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional, Type
 from uuid import UUID
 from datetime import datetime, timedelta
 

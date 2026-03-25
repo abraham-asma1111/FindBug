@@ -1,17 +1,23 @@
 """
 AI Red Teaming Service
 Implements FREQ-45, FREQ-46, FREQ-47, FREQ-48: AI Security Testing
+Enhanced with token encryption and security improvements
 """
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional, Type
 from datetime import datetime
 from uuid import UUID
 from decimal import Decimal
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+import os
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
-from backend.src.domain.models.ai_red_teaming import (
+from src.domain.models.ai_red_teaming import (
     AIRedTeamingEngagement,
     AITestingEnvironment,
     AIVulnerabilityReport,
@@ -28,10 +34,92 @@ logger = logging.getLogger(__name__)
 
 
 class AIRedTeamingService:
-    """Service for managing AI Red Teaming engagements"""
+    """
+    Service for managing AI Red Teaming engagements.
+    Enhanced with token encryption and security improvements.
+    """
     
     def __init__(self, db: Session):
         self.db = db
+        self._init_encryption()
+    
+    def _init_encryption(self):
+        """Initialize encryption for access tokens"""
+        # In production, this should come from environment variable
+        password = os.getenv("ENCRYPTION_KEY", "default-encryption-key-change-in-production").encode()
+        salt = b'ai_red_teaming_salt'  # In production, use a secure random salt
+        
+        kdf = PBKDF2(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(password))
+        self.cipher = Fernet(key)
+    
+    def encrypt_access_token(self, token: str) -> str:
+        """
+        Encrypt access token for secure storage.
+        
+        Args:
+            token: Plain text token
+            
+        Returns:
+            Encrypted token (base64 encoded)
+        """
+        encrypted = self.cipher.encrypt(token.encode())
+        return base64.urlsafe_b64encode(encrypted).decode()
+    
+    def decrypt_access_token(self, encrypted_token: str) -> str:
+        """
+        Decrypt access token.
+        
+        Args:
+            encrypted_token: Encrypted token (base64 encoded)
+            
+        Returns:
+            Plain text token
+        """
+        encrypted_bytes = base64.urlsafe_b64decode(encrypted_token.encode())
+        decrypted = self.cipher.decrypt(encrypted_bytes)
+        return decrypted.decode()
+    
+    def validate_sandbox_environment(self, engagement_id: UUID) -> bool:
+        """
+        Validate sandbox environment security.
+        
+        Args:
+            engagement_id: Engagement ID
+            
+        Returns:
+            True if sandbox is secure
+        """
+        environment = self.db.query(AITestingEnvironment).filter(
+            AITestingEnvironment.engagement_id == engagement_id
+        ).first()
+        
+        if not environment:
+            logger.warning(f"No environment found for engagement {engagement_id}")
+            return False
+        
+        # Check sandbox isolation
+        if not environment.config.get("isolated", False):
+            logger.error(f"Sandbox not isolated for engagement {engagement_id}")
+            return False
+        
+        # Check network restrictions
+        if not environment.config.get("network_restricted", False):
+            logger.warning(f"Network not restricted for engagement {engagement_id}")
+            return False
+        
+        # Check resource limits
+        if not environment.config.get("resource_limits", {}):
+            logger.warning(f"No resource limits for engagement {engagement_id}")
+            return False
+        
+        logger.info(f"Sandbox environment validated for engagement {engagement_id}")
+        return True
     
     # ============================================
     # FREQ-45: Create and Manage AI Red Teaming Engagements
@@ -171,7 +259,7 @@ class AIRedTeamingService:
             model_type: Model type
             sandbox_url: Sandbox URL
             api_endpoint: API endpoint
-            access_token: Access token (should be encrypted)
+            access_token: Access token (will be encrypted)
             access_controls: Access control configuration
             rate_limits: Rate limit configuration
             is_isolated: Whether environment is isolated
@@ -187,22 +275,40 @@ class AIRedTeamingService:
         if existing:
             raise ValueError(f"Testing environment already exists for engagement {engagement_id}")
         
+        # Encrypt access token for secure storage
+        encrypted_token = self.encrypt_access_token(access_token)
+        
+        # Add security configuration to access controls
+        security_config = {
+            "isolated": is_isolated,
+            "network_restricted": True,
+            "resource_limits": {
+                "max_requests_per_minute": 60,
+                "max_concurrent_requests": 10,
+                "timeout_seconds": 30
+            }
+        }
+        
+        # Merge with provided access controls
+        enhanced_access_controls = {**access_controls, **security_config}
+        
         environment = AITestingEnvironment(
             engagement_id=engagement_id,
             model_type=model_type,
             sandbox_url=sandbox_url,
             api_endpoint=api_endpoint,
-            access_token=access_token,  # TODO: Encrypt this
-            access_controls=access_controls,
+            access_token=encrypted_token,  # Encrypted token
+            access_controls=enhanced_access_controls,
             rate_limits=rate_limits,
-            is_isolated=is_isolated
+            is_isolated=is_isolated,
+            config=security_config  # Store security config
         )
         
         self.db.add(environment)
         self.db.commit()
         self.db.refresh(environment)
         
-        logger.info(f"Setup testing environment for engagement {engagement_id}")
+        logger.info(f"Setup testing environment for engagement {engagement_id} with encrypted token")
         return environment
     
     def get_testing_environment(

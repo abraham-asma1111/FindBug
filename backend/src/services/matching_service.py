@@ -1,5 +1,8 @@
-"""BountyMatch service - FREQ-16 (Basic researcher matching)."""
-from typing import List, Optional, Dict
+"""
+BountyMatch service - FREQ-16 (Basic researcher matching).
+Enhanced with researcher notifications on match.
+"""
+from typing import List, Optional, Dict, Tuple, Any
 from uuid import UUID
 from datetime import datetime, timedelta
 
@@ -14,13 +17,60 @@ from src.domain.models.matching import (
 from src.domain.models.researcher import Researcher
 from src.domain.models.program import BountyProgram
 from src.domain.models.report import VulnerabilityReport
+from src.services.notification_service import NotificationService
+from src.domain.models.notification import NotificationType, NotificationPriority
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class MatchingService:
-    """Service for researcher matching - FREQ-16."""
+    """
+    Service for researcher matching - FREQ-16.
+    Enhanced with researcher notifications on match.
+    """
     
     def __init__(self, db: Session):
         self.db = db
+        self.notification_service = NotificationService(db)
+    
+    def notify_researcher_match(
+        self,
+        researcher_id: UUID,
+        program_name: str,
+        program_id: UUID,
+        match_score: float
+    ):
+        """
+        Notify researcher about a new match.
+        
+        Args:
+            researcher_id: Researcher ID
+            program_name: Program name
+            program_id: Program ID
+            match_score: Match score (0-100)
+        """
+        researcher = self.db.query(Researcher).filter(
+            Researcher.id == researcher_id
+        ).first()
+        
+        if not researcher:
+            return
+        
+        self.notification_service.create_notification(
+            user_id=researcher.user_id,
+            notification_type=NotificationType.PROGRAM_PUBLISHED,
+            title=f"New Program Match: {program_name}",
+            message=f"You've been matched with '{program_name}' (Match Score: {match_score:.0f}%). Check it out!",
+            priority=NotificationPriority.MEDIUM if match_score >= 70 else NotificationPriority.LOW,
+            related_entity_type="program",
+            related_entity_id=program_id,
+            action_url=f"/programs/{program_id}",
+            action_text="View Program",
+            send_email=match_score >= 80  # Only send email for high matches
+        )
+        
+        logger.info(f"Notified researcher {researcher_id} about match with program {program_id}")
     
     def create_matching_request(
         self,
@@ -1436,7 +1486,7 @@ class MatchingService:
             return []
         
         # Get available PTaaS engagements
-        from backend.src.domain.models.ptaas import PTaaSEngagement
+        from src.domain.models.ptaas import PTaaSEngagement
         
         engagements = self.db.query(PTaaSEngagement).filter(
             PTaaSEngagement.status.in_(['DRAFT', 'PENDING_APPROVAL', 'ACTIVE']),
@@ -1595,7 +1645,7 @@ class MatchingService:
             score += 10
         
         # PTaaS experience (20 points)
-        from backend.src.domain.models.ptaas import PTaaSFinding
+        from src.domain.models.ptaas import PTaaSFinding
         past_ptaas = self.db.query(PTaaSFinding).filter(
             PTaaSFinding.discovered_by == researcher.id
         ).count()
@@ -1658,7 +1708,7 @@ class MatchingService:
         - Time to assignment
         - Researcher satisfaction
         """
-        from backend.src.domain.models.matching import ResearcherAssignment
+        from src.domain.models.matching import ResearcherAssignment
         
         # Default to last 30 days if no date range specified
         if not end_date:
@@ -1754,7 +1804,7 @@ class MatchingService:
         end_date: datetime
     ) -> Dict[str, Any]:
         """Calculate trending metrics over time - FREQ-40"""
-        from backend.src.domain.models.matching import ResearcherAssignment
+        from src.domain.models.matching import ResearcherAssignment
         
         # Split period into weeks
         weeks = []
@@ -1818,7 +1868,7 @@ class MatchingService:
         
         Shows how well the researcher is being matched to opportunities.
         """
-        from backend.src.domain.models.matching import ResearcherAssignment
+        from src.domain.models.matching import ResearcherAssignment
         
         if not end_date:
             end_date = datetime.utcnow()
@@ -1880,7 +1930,7 @@ class MatchingService:
         )
         
         # Add organization-specific insights
-        from backend.src.domain.models.matching import MatchingConfiguration
+        from src.domain.models.matching import MatchingConfiguration
         
         config = self.db.query(MatchingConfiguration).filter(
             MatchingConfiguration.organization_id == organization_id
