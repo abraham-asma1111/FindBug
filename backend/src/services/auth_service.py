@@ -1,9 +1,12 @@
 """
 Authentication Service - Business logic for user authentication
+Enhanced with SecurityEvent and LoginHistory integration (FREQ-02, FREQ-17)
 """
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import uuid
+
+from sqlalchemy.orm import Session
 
 from src.core.security import (
     PasswordSecurity,
@@ -17,23 +20,159 @@ from src.core.ninja_service import NinjaEmailService, SkillsService
 from src.domain.models.user import User, UserRole
 from src.domain.models.researcher import Researcher
 from src.domain.models.organization import Organization
+from src.domain.models.security_log import SecurityEvent, LoginHistory
 from src.domain.repositories.user_repository import UserRepository
 from src.domain.repositories.researcher_repository import ResearcherRepository
 from src.domain.repositories.organization_repository import OrganizationRepository
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AuthService:
-    """Authentication service"""
+    """
+    Authentication service with comprehensive security logging.
+    
+    Features:
+    - User registration (researcher, organization)
+    - Login with MFA support
+    - Email verification
+    - Password reset
+    - SecurityEvent logging for suspicious activity
+    - LoginHistory tracking for all login attempts
+    """
     
     def __init__(
         self,
         user_repo: UserRepository,
         researcher_repo: ResearcherRepository,
-        organization_repo: OrganizationRepository
+        organization_repo: OrganizationRepository,
+        db: Session
     ):
         self.user_repo = user_repo
         self.researcher_repo = researcher_repo
         self.organization_repo = organization_repo
+        self.db = db
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # SECURITY LOGGING HELPERS
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def _log_security_event(
+        self,
+        event_type: str,
+        user_id: Optional[uuid.UUID],
+        description: str,
+        severity: str = "medium",
+        ip_address: Optional[str] = None,
+        is_blocked: bool = False
+    ) -> SecurityEvent:
+        """
+        Log security event.
+        
+        Args:
+            event_type: Event type (brute_force, account_lockout, etc.)
+            user_id: User ID (optional)
+            description: Event description
+            severity: Severity level (low, medium, high, critical)
+            ip_address: IP address (optional)
+            is_blocked: Whether action was blocked
+            
+        Returns:
+            SecurityEvent
+        """
+        event = SecurityEvent(
+            user_id=user_id,
+            event_type=event_type,
+            severity=severity,
+            description=description,
+            ip_address=ip_address,
+            is_blocked=is_blocked
+        )
+        
+        self.db.add(event)
+        self.db.commit()
+        
+        logger.info(f"Security event logged: {event_type}", extra={
+            "user_id": str(user_id) if user_id else None,
+            "severity": severity,
+            "event_type": event_type
+        })
+        
+        return event
+    
+    def _log_login_attempt(
+        self,
+        user_id: uuid.UUID,
+        is_successful: bool,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        failure_reason: Optional[str] = None,
+        mfa_used: bool = False
+    ) -> LoginHistory:
+        """
+        Log login attempt.
+        
+        Args:
+            user_id: User ID
+            is_successful: Whether login was successful
+            ip_address: IP address (optional)
+            user_agent: User agent string (optional)
+            failure_reason: Failure reason if unsuccessful
+            mfa_used: Whether MFA was used
+            
+        Returns:
+            LoginHistory
+        """
+        login_record = LoginHistory(
+            user_id=user_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            is_successful=is_successful,
+            failure_reason=failure_reason,
+            mfa_used=mfa_used
+        )
+        
+        self.db.add(login_record)
+        self.db.commit()
+        
+        logger.info(f"Login attempt logged: {'success' if is_successful else 'failure'}", extra={
+            "user_id": str(user_id),
+            "is_successful": is_successful,
+            "failure_reason": failure_reason
+        })
+        
+        return login_record
+    
+    def _extract_request_info(self, request: any) -> tuple[Optional[str], Optional[str]]:
+        """
+        Extract IP address and user agent from request.
+        
+        Args:
+            request: FastAPI request object
+            
+        Returns:
+            Tuple of (ip_address, user_agent)
+        """
+        if not request:
+            return None, None
+        
+        # Extract IP address
+        ip_address = None
+        if hasattr(request, 'client') and request.client:
+            ip_address = request.client.host
+        
+        # Extract user agent
+        user_agent = None
+        if hasattr(request, 'headers'):
+            user_agent = request.headers.get('user-agent')
+        
+        return ip_address, user_agent
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # REGISTRATION METHODS
+    # ═══════════════════════════════════════════════════════════════════════
+        self.db = db
     
     def register_researcher(
         self,
@@ -47,9 +186,16 @@ class AuthService:
         github: Optional[str] = None,
         twitter: Optional[str] = None,
         linkedin: Optional[str] = None,
-        skills: Optional[list[str]] = None
+        skills: Optional[list[str]] = None,
+        request: any = None
     ) -> Dict[str, any]:
-        """Register a new researcher - Bugcrowd 2026 Enhanced"""
+        """
+        Register a new researcher - Bugcrowd 2026 Enhanced.
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         # Validate email format
         if not InputSanitization.validate_email(email):
@@ -140,6 +286,21 @@ class AuthService:
         # Send verification email
         EmailService.send_verification_email(email, verification_token, "researcher")
         
+        # Log user registration security event
+        self._log_security_event(
+            event_type="user_registration",
+            user_id=user.id,
+            description=f"New researcher registered: {username}",
+            severity="low",
+            ip_address=ip_address
+        )
+        
+        logger.info("Researcher registered successfully", extra={
+            "user_id": str(user.id),
+            "username": username,
+            "email": email
+        })
+        
         return {
             "user_id": str(user.id),
             "researcher_id": str(researcher.id),
@@ -158,9 +319,16 @@ class AuthService:
         website: Optional[str] = None,
         subscription_type: Optional[str] = None,
         tax_id: Optional[str] = None,
-        business_license_url: Optional[str] = None
+        business_license_url: Optional[str] = None,
+        request: any = None
     ) -> Dict[str, any]:
-        """Register a new organization - Bugcrowd 2026 Enhanced"""
+        """
+        Register a new organization - Bugcrowd 2026 Enhanced.
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         # Validate email format
         if not InputSanitization.validate_email(email):
@@ -224,6 +392,21 @@ class AuthService:
         # Send verification email
         EmailService.send_verification_email(email, verification_token, "organization")
         
+        # Log organization registration security event
+        self._log_security_event(
+            event_type="user_registration",
+            user_id=user.id,
+            description=f"New organization registered: {company_name}",
+            severity="low",
+            ip_address=ip_address
+        )
+        
+        logger.info("Organization registered successfully", extra={
+            "user_id": str(user.id),
+            "company_name": company_name,
+            "email": email
+        })
+        
         return {
             "user_id": str(user.id),
             "organization_id": str(organization.id),
@@ -232,12 +415,28 @@ class AuthService:
         }
     
     def login(self, email: str, password: str, mfa_code: Optional[str] = None, request: any = None) -> Dict[str, any]:
-        """User login with optional MFA verification"""
+        """
+        User login with optional MFA verification.
+        Enhanced with SecurityEvent and LoginHistory logging.
+        """
+        
+        # Extract request info
+        ip_address, user_agent = self._extract_request_info(request)
         
         # Get user
         user = self.user_repo.get_by_email(email.lower())
         if not user:
-            # Log failed attempt
+            # Log security event for non-existent user
+            self._log_security_event(
+                event_type="login_attempt_unknown_user",
+                user_id=None,
+                description=f"Login attempt for non-existent email: {email}",
+                severity="low",
+                ip_address=ip_address,
+                is_blocked=False
+            )
+            
+            # Log failed attempt via SecurityAudit (for backward compatibility)
             if request:
                 SecurityAudit.log_security_event(
                     "LOGIN_FAILURE",
@@ -251,6 +450,16 @@ class AuthService:
         if user.is_locked:
             if user.locked_until and datetime.utcnow() < user.locked_until:
                 remaining = (user.locked_until - datetime.utcnow()).seconds // 60
+                
+                # Log login attempt for locked account
+                self._log_login_attempt(
+                    user_id=user.id,
+                    is_successful=False,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    failure_reason="account_locked"
+                )
+                
                 raise ValueError(f"Account locked. Try again in {remaining} minutes.")
             else:
                 # Unlock account
@@ -258,12 +467,29 @@ class AuthService:
         
         # Check if account is active
         if not user.is_active:
+            # Log login attempt for inactive account
+            self._log_login_attempt(
+                user_id=user.id,
+                is_successful=False,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                failure_reason="account_inactive"
+            )
             raise ValueError("Account is inactive")
         
         # Verify password
         if not PasswordSecurity.verify_password(password, user.password_hash):
             # Increment failed login attempts
             user = self.user_repo.increment_failed_login(user)
+            
+            # Log failed login attempt
+            self._log_login_attempt(
+                user_id=user.id,
+                is_successful=False,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                failure_reason="invalid_password"
+            )
             
             # Lock account if max attempts reached
             if user.failed_login_attempts >= AuthenticationSecurity.MAX_LOGIN_ATTEMPTS:
@@ -272,7 +498,17 @@ class AuthService:
                 )
                 user = self.user_repo.lock_account(user, locked_until)
                 
-                # Log account lockout
+                # Log account lockout security event
+                self._log_security_event(
+                    event_type="account_lockout",
+                    user_id=user.id,
+                    description=f"Account locked after {AuthenticationSecurity.MAX_LOGIN_ATTEMPTS} failed login attempts",
+                    severity="high",
+                    ip_address=ip_address,
+                    is_blocked=True
+                )
+                
+                # Log via SecurityAudit (for backward compatibility)
                 if request:
                     SecurityAudit.log_security_event(
                         "ACCOUNT_LOCKED",
@@ -287,7 +523,18 @@ class AuthService:
                     f"{AuthenticationSecurity.LOCKOUT_DURATION_MINUTES} minutes."
                 )
             
-            # Log failed attempt
+            # Log brute force attempt if multiple failures
+            if user.failed_login_attempts >= 3:
+                self._log_security_event(
+                    event_type="brute_force",
+                    user_id=user.id,
+                    description=f"Multiple failed login attempts detected ({user.failed_login_attempts} attempts)",
+                    severity="medium",
+                    ip_address=ip_address,
+                    is_blocked=False
+                )
+            
+            # Log via SecurityAudit (for backward compatibility)
             if request:
                 SecurityAudit.log_security_event(
                     "LOGIN_FAILURE",
@@ -319,6 +566,26 @@ class AuthService:
             # Verify MFA code
             if not self.verify_mfa_login(str(user.id), mfa_code):
                 # Log failed MFA attempt
+                self._log_login_attempt(
+                    user_id=user.id,
+                    is_successful=False,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    failure_reason="mfa_failed",
+                    mfa_used=True
+                )
+                
+                # Log MFA bypass attempt security event
+                self._log_security_event(
+                    event_type="mfa_bypass_attempt",
+                    user_id=user.id,
+                    description="Failed MFA verification attempt",
+                    severity="high",
+                    ip_address=ip_address,
+                    is_blocked=True
+                )
+                
+                # Log via SecurityAudit (for backward compatibility)
                 if request:
                     SecurityAudit.log_security_event(
                         "MFA_FAILURE",
@@ -354,6 +621,15 @@ class AuthService:
         self.user_repo.update(user)
         
         # Log successful login
+        self._log_login_attempt(
+            user_id=user.id,
+            is_successful=True,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            mfa_used=user.mfa_enabled
+        )
+        
+        # Log via SecurityAudit (for backward compatibility)
         if request:
             SecurityAudit.log_security_event(
                 "LOGIN_SUCCESS",
@@ -361,6 +637,12 @@ class AuthService:
                 {"email": user.email, "role": user.role.value, "mfa_used": user.mfa_enabled},
                 request
             )
+        
+        logger.info("User logged in successfully", extra={
+            "user_id": str(user.id),
+            "email": user.email,
+            "mfa_used": user.mfa_enabled
+        })
         
         return {
             "access_token": access_token,
@@ -373,8 +655,14 @@ class AuthService:
             "mfa_enabled": user.mfa_enabled
         }
 
-    def verify_email(self, token: str) -> Dict[str, any]:
-        """Verify user email with token"""
+    def verify_email(self, token: str, request: any = None) -> Dict[str, any]:
+        """
+        Verify user email with token.
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         # Hash the token to compare with stored hash
         token_hash = EmailService.hash_token(token)
@@ -401,6 +689,20 @@ class AuthService:
         user.email_verification_token = None
         user.email_verification_token_expires = None
         self.user_repo.update(user)
+        
+        # Log email verification security event
+        self._log_security_event(
+            event_type="email_verified",
+            user_id=user.id,
+            description="Email verified successfully",
+            severity="low",
+            ip_address=ip_address
+        )
+        
+        logger.info("Email verified successfully", extra={
+            "user_id": str(user.id),
+            "email": user.email
+        })
         
         return {
             "message": "Email verified successfully",
@@ -435,10 +737,16 @@ class AuthService:
             "message": "Verification email sent. Please check your inbox."
         }
     
-    def enable_mfa(self, user_id: str) -> Dict[str, any]:
-        """Enable MFA for user"""
+    def enable_mfa(self, user_id: str, request: any = None) -> Dict[str, any]:
+        """
+        Enable MFA for user.
+        Enhanced with security event logging.
+        """
         import pyotp
         import json
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         user = self.user_repo.get_by_id(user_id)
         if not user:
@@ -458,12 +766,23 @@ class AuthService:
         user.mfa_backup_codes = json.dumps(backup_codes)
         self.user_repo.update(user)
         
+        # Log security event
+        self._log_security_event(
+            event_type="mfa_setup_initiated",
+            user_id=user.id,
+            description="MFA setup initiated - awaiting verification",
+            severity="low",
+            ip_address=ip_address
+        )
+        
         # Generate QR code URI
         totp = pyotp.TOTP(secret)
         qr_uri = totp.provisioning_uri(
             name=user.email,
             issuer_name="FindBug Platform"
         )
+        
+        logger.info("MFA setup initiated", extra={"user_id": str(user.id)})
         
         return {
             "secret": secret,
@@ -472,9 +791,15 @@ class AuthService:
             "message": "Scan the QR code with your authenticator app and verify to enable MFA"
         }
     
-    def verify_mfa_setup(self, user_id: str, code: str) -> Dict[str, any]:
-        """Verify MFA setup with code"""
+    def verify_mfa_setup(self, user_id: str, code: str, request: any = None) -> Dict[str, any]:
+        """
+        Verify MFA setup with code.
+        Enhanced with security event logging.
+        """
         import pyotp
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         user = self.user_repo.get_by_id(user_id)
         if not user:
@@ -486,11 +811,30 @@ class AuthService:
         # Verify code
         totp = pyotp.TOTP(user.mfa_secret)
         if not totp.verify(code, valid_window=1):
+            # Log failed MFA setup
+            self._log_security_event(
+                event_type="mfa_setup_failed",
+                user_id=user.id,
+                description="Failed MFA setup verification - invalid code",
+                severity="low",
+                ip_address=ip_address
+            )
             raise ValueError("Invalid MFA code")
         
         # Enable MFA
         user.mfa_enabled = True
         self.user_repo.update(user)
+        
+        # Log successful MFA enablement
+        self._log_security_event(
+            event_type="mfa_enabled",
+            user_id=user.id,
+            description="MFA successfully enabled",
+            severity="low",
+            ip_address=ip_address
+        )
+        
+        logger.info("MFA enabled successfully", extra={"user_id": str(user.id)})
         
         return {
             "message": "MFA enabled successfully",
@@ -523,8 +867,14 @@ class AuthService:
         
         return False
     
-    def disable_mfa(self, user_id: str, password: str) -> Dict[str, any]:
-        """Disable MFA (requires password confirmation)"""
+    def disable_mfa(self, user_id: str, password: str, request: any = None) -> Dict[str, any]:
+        """
+        Disable MFA (requires password confirmation).
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         user = self.user_repo.get_by_id(user_id)
         if not user:
@@ -532,6 +882,14 @@ class AuthService:
         
         # Verify password
         if not PasswordSecurity.verify_password(password, user.password_hash):
+            # Log failed MFA disable attempt
+            self._log_security_event(
+                event_type="mfa_disable_failed",
+                user_id=user.id,
+                description="Failed MFA disable attempt - invalid password",
+                severity="medium",
+                ip_address=ip_address
+            )
             raise ValueError("Invalid password")
         
         # Disable MFA
@@ -539,6 +897,17 @@ class AuthService:
         user.mfa_secret = None
         user.mfa_backup_codes = None
         self.user_repo.update(user)
+        
+        # Log MFA disabled security event
+        self._log_security_event(
+            event_type="mfa_disabled",
+            user_id=user.id,
+            description="MFA disabled by user",
+            severity="medium",
+            ip_address=ip_address
+        )
+        
+        logger.info("MFA disabled", extra={"user_id": str(user.id)})
         
         return {
             "message": "MFA disabled successfully",
@@ -611,8 +980,14 @@ class AuthService:
             "message": "If the email exists, a password reset link has been sent."
         }
     
-    def reset_password(self, token: str, new_password: str) -> Dict[str, any]:
-        """Reset password using reset token"""
+    def reset_password(self, token: str, new_password: str, request: any = None) -> Dict[str, any]:
+        """
+        Reset password using reset token.
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         # Validate password strength
         is_valid, error = PasswordSecurity.validate_password_strength(new_password)
@@ -643,12 +1018,29 @@ class AuthService:
         
         self.user_repo.update(user)
         
+        # Log password reset security event
+        self._log_security_event(
+            event_type="password_reset",
+            user_id=user.id,
+            description="Password reset successfully via reset token",
+            severity="medium",
+            ip_address=ip_address
+        )
+        
+        logger.info("Password reset successfully", extra={"user_id": str(user.id)})
+        
         return {
             "message": "Password reset successfully. Please login with your new password."
         }
     
-    def change_password(self, user_id: str, current_password: str, new_password: str) -> Dict[str, any]:
-        """Change password (requires current password)"""
+    def change_password(self, user_id: str, current_password: str, new_password: str, request: any = None) -> Dict[str, any]:
+        """
+        Change password (requires current password).
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         user = self.user_repo.get_by_id(user_id)
         if not user:
@@ -656,6 +1048,14 @@ class AuthService:
         
         # Verify current password
         if not PasswordSecurity.verify_password(current_password, user.password_hash):
+            # Log failed password change attempt
+            self._log_security_event(
+                event_type="password_change_failed",
+                user_id=user.id,
+                description="Failed password change attempt - invalid current password",
+                severity="medium",
+                ip_address=ip_address
+            )
             raise ValueError("Current password is incorrect")
         
         # Validate new password strength
@@ -677,12 +1077,29 @@ class AuthService:
         
         self.user_repo.update(user)
         
+        # Log password change security event
+        self._log_security_event(
+            event_type="password_changed",
+            user_id=user.id,
+            description="Password changed successfully",
+            severity="medium",
+            ip_address=ip_address
+        )
+        
+        logger.info("Password changed successfully", extra={"user_id": str(user.id)})
+        
         return {
             "message": "Password changed successfully. Please login again."
         }
     
-    def logout(self, user_id: str) -> Dict[str, any]:
-        """Logout user (invalidate refresh token)"""
+    def logout(self, user_id: str, request: any = None) -> Dict[str, any]:
+        """
+        Logout user (invalidate refresh token).
+        Enhanced with security event logging.
+        """
+        
+        # Extract request info
+        ip_address, _ = self._extract_request_info(request)
         
         user = self.user_repo.get_by_id(user_id)
         if not user:
@@ -692,6 +1109,17 @@ class AuthService:
         user.refresh_token = None
         user.refresh_token_expires = None
         self.user_repo.update(user)
+        
+        # Log logout security event
+        self._log_security_event(
+            event_type="logout",
+            user_id=user.id,
+            description="User logged out successfully",
+            severity="low",
+            ip_address=ip_address
+        )
+        
+        logger.info("User logged out", extra={"user_id": str(user.id)})
         
         return {
             "message": "Logged out successfully"

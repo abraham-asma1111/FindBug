@@ -4,7 +4,7 @@ Implements security controls for authentication, authorization, and data protect
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import secrets
@@ -33,6 +33,10 @@ def verify_password_simple(password: str, hashed: str) -> bool:
         return hashlib.sha256((password + salt).encode()).hexdigest() == password_hash
     except:
         return False
+
+# Alias for backward compatibility
+get_password_hash = hash_password_simple
+verify_password = verify_password_simple
 
 # JWT Configuration (will be loaded from env)
 SECRET_KEY = "CHANGE_ME_IN_ENV"  # Load from environment

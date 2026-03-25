@@ -6,9 +6,9 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from decimal import Decimal
-from backend.src.domain.repositories.ptaas_repository import PTaaSRepository
-from backend.src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding, PTaaSDeliverable
-from backend.src.services.audit_service import AuditService
+from src.domain.repositories.ptaas_repository import PTaaSRepository
+from src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding, PTaaSDeliverable
+from src.services.audit_service import AuditService
 
 
 class PTaaSService:

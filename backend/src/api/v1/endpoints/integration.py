@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 
-from backend.src.core.database import get_db
-from backend.src.api.v1.middlewares.auth import get_current_user
-from backend.src.domain.models.user import User
-from backend.src.services.integration_service import IntegrationService
-from backend.src.domain.models.integration import IntegrationType, IntegrationStatus
-from backend.src.api.v1.schemas.integration import (
+from src.core.database import get_db
+from src.api.v1.middlewares.auth import get_current_user
+from src.domain.models.user import User
+from src.services.integration_service import IntegrationService
+from src.domain.models.integration import IntegrationType, IntegrationStatus
+from src.api.v1.schemas.integration import (
     IntegrationCreate,
     IntegrationUpdate,
     IntegrationResponse,
@@ -27,7 +27,7 @@ from backend.src.api.v1.schemas.integration import (
     SyncLogResponse,
     TaskStatusResponse
 )
-from backend.src.core.message_broker import MessageBrokerService
+from src.core.message_broker import MessageBrokerService
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -338,7 +338,7 @@ def get_sync_logs(
             detail="Access denied"
         )
     
-    from backend.src.domain.models.integration import SyncLog
+    from src.domain.models.integration import SyncLog
     
     logs = db.query(SyncLog).filter(
         SyncLog.integration_id == integration_id
@@ -386,7 +386,7 @@ def create_field_mapping(
             detail="Access denied"
         )
     
-    from backend.src.domain.models.integration import IntegrationFieldMapping, TransformationType
+    from src.domain.models.integration import IntegrationFieldMapping, TransformationType
     
     mapping = IntegrationFieldMapping(
         integration_id=integration_id,
@@ -428,7 +428,7 @@ def list_field_mappings(
             detail="Access denied"
         )
     
-    from backend.src.domain.models.integration import IntegrationFieldMapping
+    from src.domain.models.integration import IntegrationFieldMapping
     
     mappings = db.query(IntegrationFieldMapping).filter(
         IntegrationFieldMapping.integration_id == integration_id

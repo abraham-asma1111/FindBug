@@ -4,14 +4,14 @@ Implements FREQ-41: Expert Code Review System
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Type
 from uuid import UUID
 
-from backend.src.core.database import get_db
-from backend.src.api.v1.middlewares.auth import get_current_user
-from backend.src.domain.models.user import User
-from backend.src.services.code_review_service import CodeReviewService
-from backend.src.api.v1.schemas.code_review import (
+from src.core.database import get_db
+from src.api.v1.middlewares.auth import get_current_user
+from src.domain.models.user import User
+from src.services.code_review_service import CodeReviewService
+from src.api.v1.schemas.code_review import (
     CreateEngagementRequest,
     AssignReviewerRequest,
     AddFindingRequest,
@@ -25,7 +25,7 @@ from backend.src.api.v1.schemas.code_review import (
     FindingSeverityEnum,
     FindingStatusEnum
 )
-from backend.src.domain.models.code_review import ReviewStatus, FindingSeverity, FindingStatus
+from src.domain.models.code_review import ReviewStatus, FindingSeverity, FindingStatus
 
 router = APIRouter(prefix="/code-review", tags=["code-review"])
 

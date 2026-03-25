@@ -5,8 +5,8 @@ Real-time progress tracking and collaboration
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
-from backend.src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding, PTaaSProgressUpdate
-from backend.src.domain.models.ptaas_dashboard import (
+from src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding, PTaaSProgressUpdate
+from src.domain.models.ptaas_dashboard import (
     PTaaSTestingPhase, PTaaSChecklistItem, PTaaSCollaborationUpdate, PTaaSMilestone
 )
 

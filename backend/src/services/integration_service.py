@@ -1,17 +1,21 @@
 """
 SSDLC Integration Service
 Implements FREQ-42: Bi-directional sync with Jira/GitHub
+Enhanced with WebhookEndpoint and WebhookLog integration (FREQ-12, FREQ-15, FREQ-22)
 """
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from uuid import UUID
 import asyncio
+import hmac
+import hashlib
+import uuid
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from backend.src.domain.models.integration import (
+from src.domain.models.integration import (
     ExternalIntegration,
     SyncLog,
     IntegrationFieldMapping,
@@ -22,10 +26,11 @@ from backend.src.domain.models.integration import (
     SyncAction,
     SyncStatus
 )
-from backend.src.domain.models.report import VulnerabilityReport
-from backend.src.services.integration_clients.github_client import GitHubClient
-from backend.src.services.integration_clients.jira_client import JiraClient
-from backend.src.core.message_broker import MessageBrokerService
+from src.domain.models.ops import WebhookEndpoint, WebhookLog
+from src.domain.models.report import VulnerabilityReport
+from src.services.integration_clients.github_client import GitHubClient
+from src.services.integration_clients.jira_client import JiraClient
+from src.core.message_broker import MessageBrokerService
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +93,379 @@ class ConflictResolutionStrategy:
 
 
 class IntegrationService:
-    """Service for managing SSDLC integrations"""
+    """
+    Service for managing SSDLC integrations.
+    Enhanced with WebhookEndpoint and WebhookLog management.
+    """
     
     def __init__(self, db: Session):
         self.db = db
         self.message_broker = MessageBrokerService()
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # WEBHOOK ENDPOINT MANAGEMENT (New - WebhookEndpoint model)
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def register_webhook_endpoint(
+        self,
+        organization_id: UUID,
+        url: str,
+        events: List[str],
+        secret: Optional[str] = None
+    ) -> WebhookEndpoint:
+        """
+        Register webhook endpoint for organization.
+        
+        Args:
+            organization_id: Organization UUID
+            url: Webhook URL
+            events: List of event types to subscribe to
+            secret: HMAC signing secret (optional)
+            
+        Returns:
+            Created WebhookEndpoint
+        """
+        # Check if endpoint already exists
+        existing = self.db.query(WebhookEndpoint).filter(
+            WebhookEndpoint.organization_id == organization_id,
+            WebhookEndpoint.url == url
+        ).first()
+        
+        if existing:
+            # Update existing endpoint
+            existing.events = events
+            existing.secret = secret
+            existing.is_active = True
+            existing.updated_at = datetime.utcnow()
+            self.db.commit()
+            self.db.refresh(existing)
+            
+            logger.info(f"Updated webhook endpoint {existing.id} for org {organization_id}")
+            return existing
+        
+        # Create new endpoint
+        endpoint = WebhookEndpoint(
+            organization_id=organization_id,
+            url=url,
+            secret=secret,
+            events=events,
+            is_active=True
+        )
+        
+        self.db.add(endpoint)
+        self.db.commit()
+        self.db.refresh(endpoint)
+        
+        logger.info(f"Registered webhook endpoint {endpoint.id} for org {organization_id}")
+        return endpoint
+    
+    def get_webhook_endpoint(self, endpoint_id: UUID) -> Optional[WebhookEndpoint]:
+        """Get webhook endpoint by ID"""
+        return self.db.query(WebhookEndpoint).filter(
+            WebhookEndpoint.id == endpoint_id
+        ).first()
+    
+    def list_webhook_endpoints(
+        self,
+        organization_id: UUID,
+        is_active: Optional[bool] = None
+    ) -> List[WebhookEndpoint]:
+        """
+        List webhook endpoints for organization.
+        
+        Args:
+            organization_id: Organization UUID
+            is_active: Filter by active status (optional)
+            
+        Returns:
+            List of WebhookEndpoint
+        """
+        query = self.db.query(WebhookEndpoint).filter(
+            WebhookEndpoint.organization_id == organization_id
+        )
+        
+        if is_active is not None:
+            query = query.filter(WebhookEndpoint.is_active == is_active)
+        
+        return query.all()
+    
+    def update_webhook_endpoint(
+        self,
+        endpoint_id: UUID,
+        url: Optional[str] = None,
+        events: Optional[List[str]] = None,
+        secret: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> WebhookEndpoint:
+        """
+        Update webhook endpoint.
+        
+        Args:
+            endpoint_id: Endpoint UUID
+            url: New URL (optional)
+            events: New event list (optional)
+            secret: New secret (optional)
+            is_active: New active status (optional)
+            
+        Returns:
+            Updated WebhookEndpoint
+        """
+        endpoint = self.get_webhook_endpoint(endpoint_id)
+        if not endpoint:
+            raise ValueError(f"Webhook endpoint {endpoint_id} not found")
+        
+        if url is not None:
+            endpoint.url = url
+        if events is not None:
+            endpoint.events = events
+        if secret is not None:
+            endpoint.secret = secret
+        if is_active is not None:
+            endpoint.is_active = is_active
+        
+        endpoint.updated_at = datetime.utcnow()
+        self.db.commit()
+        self.db.refresh(endpoint)
+        
+        logger.info(f"Updated webhook endpoint {endpoint_id}")
+        return endpoint
+    
+    def delete_webhook_endpoint(self, endpoint_id: UUID) -> bool:
+        """
+        Delete webhook endpoint.
+        
+        Args:
+            endpoint_id: Endpoint UUID
+            
+        Returns:
+            True if deleted
+        """
+        endpoint = self.get_webhook_endpoint(endpoint_id)
+        if not endpoint:
+            return False
+        
+        self.db.delete(endpoint)
+        self.db.commit()
+        
+        logger.info(f"Deleted webhook endpoint {endpoint_id}")
+        return True
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # WEBHOOK DELIVERY (New - WebhookLog model)
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def trigger_webhook(
+        self,
+        organization_id: UUID,
+        event: str,
+        payload: Dict[str, Any]
+    ) -> List[WebhookLog]:
+        """
+        Trigger webhook for event.
+        
+        Args:
+            organization_id: Organization UUID
+            event: Event type (e.g., "report.submitted")
+            payload: Event payload
+            
+        Returns:
+            List of WebhookLog for delivery attempts
+        """
+        # Get active endpoints subscribed to this event
+        endpoints = self.db.query(WebhookEndpoint).filter(
+            WebhookEndpoint.organization_id == organization_id,
+            WebhookEndpoint.is_active == True
+        ).all()
+        
+        # Filter endpoints subscribed to this event
+        subscribed_endpoints = [
+            ep for ep in endpoints
+            if event in ep.events or "*" in ep.events
+        ]
+        
+        if not subscribed_endpoints:
+            logger.info(f"No endpoints subscribed to event {event} for org {organization_id}")
+            return []
+        
+        # Deliver to each endpoint
+        logs = []
+        for endpoint in subscribed_endpoints:
+            log = self._deliver_webhook(endpoint, event, payload)
+            logs.append(log)
+        
+        logger.info(f"Triggered webhook {event} for {len(logs)} endpoints")
+        return logs
+    
+    def _deliver_webhook(
+        self,
+        endpoint: WebhookEndpoint,
+        event: str,
+        payload: Dict[str, Any],
+        retry_count: int = 0
+    ) -> WebhookLog:
+        """
+        Deliver webhook to endpoint.
+        
+        Args:
+            endpoint: WebhookEndpoint
+            event: Event type
+            payload: Event payload
+            retry_count: Retry attempt number
+            
+        Returns:
+            WebhookLog
+        """
+        import requests
+        import json
+        
+        # Generate HMAC signature if secret is configured
+        signature = None
+        if endpoint.secret:
+            signature = self._generate_webhook_signature(
+                payload=json.dumps(payload).encode(),
+                secret=endpoint.secret
+            )
+        
+        # Prepare headers
+        headers = {
+            "Content-Type": "application/json",
+            "X-Webhook-Event": event,
+            "X-Webhook-Delivery": str(UUID(bytes=uuid.uuid4().bytes))
+        }
+        
+        if signature:
+            headers["X-Webhook-Signature"] = signature
+        
+        # Attempt delivery
+        log = WebhookLog(
+            endpoint_id=endpoint.id,
+            event=event,
+            payload=payload,
+            retry_count=retry_count
+        )
+        
+        try:
+            response = requests.post(
+                endpoint.url,
+                json=payload,
+                headers=headers,
+                timeout=10
+            )
+            
+            log.response_status = response.status_code
+            log.response_body = response.text[:1000]  # Limit to 1000 chars
+            
+            if response.status_code >= 200 and response.status_code < 300:
+                logger.info(f"Webhook delivered successfully to {endpoint.url}")
+            else:
+                log.error_message = f"HTTP {response.status_code}"
+                logger.warning(f"Webhook delivery failed: HTTP {response.status_code}")
+        
+        except Exception as e:
+            log.error_message = str(e)[:500]  # Limit to 500 chars
+            logger.error(f"Webhook delivery error: {str(e)}")
+        
+        self.db.add(log)
+        self.db.commit()
+        self.db.refresh(log)
+        
+        return log
+    
+    def _generate_webhook_signature(self, payload: bytes, secret: str) -> str:
+        """
+        Generate HMAC-SHA256 signature for webhook.
+        
+        Args:
+            payload: Payload bytes
+            secret: Secret key
+            
+        Returns:
+            Hex signature
+        """
+        signature = hmac.new(
+            secret.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        return f"sha256={signature}"
+    
+    def verify_webhook_signature(
+        self,
+        payload: bytes,
+        signature: str,
+        secret: str
+    ) -> bool:
+        """
+        Verify webhook signature.
+        
+        Args:
+            payload: Payload bytes
+            signature: Received signature
+            secret: Secret key
+            
+        Returns:
+            True if signature is valid
+        """
+        expected_signature = self._generate_webhook_signature(payload, secret)
+        return hmac.compare_digest(signature, expected_signature)
+    
+    def get_webhook_logs(
+        self,
+        endpoint_id: UUID,
+        limit: int = 100
+    ) -> List[WebhookLog]:
+        """
+        Get webhook delivery logs for endpoint.
+        
+        Args:
+            endpoint_id: Endpoint UUID
+            limit: Maximum number of logs
+            
+        Returns:
+            List of WebhookLog
+        """
+        return self.db.query(WebhookLog).filter(
+            WebhookLog.endpoint_id == endpoint_id
+        ).order_by(
+            WebhookLog.created_at.desc()
+        ).limit(limit).all()
+    
+    def retry_failed_webhook(self, log_id: UUID) -> WebhookLog:
+        """
+        Retry failed webhook delivery.
+        
+        Args:
+            log_id: WebhookLog UUID
+            
+        Returns:
+            New WebhookLog for retry attempt
+        """
+        log = self.db.query(WebhookLog).filter(
+            WebhookLog.id == log_id
+        ).first()
+        
+        if not log:
+            raise ValueError(f"Webhook log {log_id} not found")
+        
+        endpoint = self.get_webhook_endpoint(log.endpoint_id)
+        if not endpoint:
+            raise ValueError(f"Webhook endpoint {log.endpoint_id} not found")
+        
+        # Retry delivery
+        new_log = self._deliver_webhook(
+            endpoint=endpoint,
+            event=log.event,
+            payload=log.payload,
+            retry_count=log.retry_count + 1
+        )
+        
+        logger.info(f"Retried webhook delivery (attempt {new_log.retry_count})")
+        return new_log
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # INTEGRATION MANAGEMENT (Existing methods)
+    # ═══════════════════════════════════════════════════════════════════════
     
     def create_integration(
         self,

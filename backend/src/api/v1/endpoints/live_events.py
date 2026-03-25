@@ -8,12 +8,12 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
-from backend.src.core.database import get_db
-from backend.src.api.v1.middlewares.auth import get_current_user
-from backend.src.domain.models.user import User
-from backend.src.services.live_event_service import LiveEventService
-from backend.src.domain.models.live_event import EventStatus, ParticipationStatus
-from backend.src.api.v1.schemas.live_event import (
+from src.core.database import get_db
+from src.api.v1.middlewares.auth import get_current_user
+from src.domain.models.user import User
+from src.services.live_event_service import LiveEventService
+from src.domain.models.live_event import EventStatus, ParticipationStatus
+from src.api.v1.schemas.live_event import (
     EventCreate,
     EventUpdate,
     EventResponse,
@@ -535,7 +535,7 @@ def get_my_participation(
             detail="User is not a researcher"
         )
     
-    from backend.src.domain.models.live_event import EventParticipation
+    from src.domain.models.live_event import EventParticipation
     
     participation = db.query(EventParticipation).filter(
         EventParticipation.event_id == event_id,

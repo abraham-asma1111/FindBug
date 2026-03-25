@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 from sqlalchemy.orm import Session
 
-from backend.src.domain.models.simulation import SimulationInstance, SimulationChallenge
+from src.domain.models.simulation import SimulationInstance, SimulationChallenge
 
 
 class ContainerOrchestrationService:

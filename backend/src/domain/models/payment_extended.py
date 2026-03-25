@@ -118,7 +118,7 @@ class PaymentHistory(Base):
     __tablename__ = "payment_history"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    payment_id = Column(UUID(as_uuid=True), ForeignKey("bounty_payments.id", ondelete="CASCADE"),
+    payment_id = Column(UUID(as_uuid=True), ForeignKey("bounty_payments.payment_id", ondelete="CASCADE"),
                         nullable=False, index=True)
 
     previous_status = Column(String(20), nullable=False)

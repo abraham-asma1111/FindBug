@@ -7,18 +7,18 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 
-from backend.src.core.database import get_db
-from backend.src.api.v1.middlewares.auth import get_current_user
-from backend.src.domain.models.user import User
-from backend.src.services.ai_red_teaming_service import AIRedTeamingService
-from backend.src.domain.models.ai_red_teaming import (
+from src.core.database import get_db
+from src.api.v1.middlewares.auth import get_current_user
+from src.domain.models.user import User
+from src.services.ai_red_teaming_service import AIRedTeamingService
+from src.domain.models.ai_red_teaming import (
     AIModelType,
     EngagementStatus,
     AIAttackType,
     AIClassification,
     ReportStatus
 )
-from backend.src.api.v1.schemas.ai_red_teaming import (
+from src.api.v1.schemas.ai_red_teaming import (
     EngagementCreate,
     EngagementResponse,
     TestingEnvironmentCreate,

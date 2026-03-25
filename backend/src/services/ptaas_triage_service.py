@@ -5,11 +5,11 @@ Triage specialist validation, prioritization, and reporting
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
-from backend.src.domain.models.ptaas_triage import (
+from src.domain.models.ptaas_triage import (
     PTaaSFindingTriage, PTaaSExecutiveReport, PTaaSFindingPrioritization
 )
-from backend.src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding
-from backend.src.services.audit_service import AuditService
+from src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding
+from src.services.audit_service import AuditService
 
 
 class PTaaSTriageService:
