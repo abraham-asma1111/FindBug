@@ -3,7 +3,7 @@ FastAPI dependency injection functions for FindBug Platform
 """
 from typing import Optional
 from fastapi import Depends, Header
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import SessionLocal
 from src.core.security import verify_access_token
@@ -43,12 +43,36 @@ def get_current_user(
     if not payload:
         raise UnauthorizedException("Invalid or expired token.")
 
-    user_id = payload.get("sub")
+    # Try user_id first (new format), fall back to sub (email) for compatibility
+    user_id = payload.get("user_id") or payload.get("sub")
     if not user_id:
-        raise UnauthorizedException("Token missing subject claim.")
+        raise UnauthorizedException("Token missing user identifier.")
 
     repo = UserRepository(db)
-    user = repo.get_by_id(user_id)
+    # If user_id looks like UUID, use get_by_id, otherwise use get_by_email
+    try:
+        from uuid import UUID
+        from src.domain.models.user import User
+        from src.domain.models.organization import Organization
+        from src.domain.models.researcher import Researcher
+        
+        UUID(user_id)  # Validate UUID format
+        # Eager load relationships to avoid lazy loading issues
+        user = db.query(User).options(
+            joinedload(User.organization),
+            joinedload(User.researcher)
+        ).filter(User.id == user_id).first()
+    except (ValueError, AttributeError):
+        # Not a UUID, treat as email
+        from src.domain.models.user import User
+        from src.domain.models.organization import Organization
+        from src.domain.models.researcher import Researcher
+        
+        user = db.query(User).options(
+            joinedload(User.organization),
+            joinedload(User.researcher)
+        ).filter(User.email == user_id).first()
+    
     if not user:
         raise UnauthorizedException("User account not found.")
     if not user.is_active:
@@ -68,11 +92,54 @@ def get_current_user_optional(
         payload = verify_access_token(token)
         if not payload:
             return None
-        user_id = payload.get("sub")
+        # Try user_id first, fall back to sub (email)
+        user_id = payload.get("user_id") or payload.get("sub")
         repo = UserRepository(db)
-        return repo.get_by_id(user_id)
+        # If user_id looks like UUID, use get_by_id, otherwise use get_by_email
+        try:
+            from uuid import UUID
+            UUID(user_id)
+            return repo.get_by_id(user_id)
+        except (ValueError, AttributeError):
+            return repo.get_by_email(user_id)
     except Exception:
         return None
+
+
+def get_current_verified_user(
+    current_user=Depends(get_current_user),
+):
+    """
+    Return current user only if email is verified.
+    Raises 403 if email not verified.
+    """
+    if not current_user.email_verified:
+        raise ForbiddenException("Email verification required.")
+    return current_user
+
+
+def get_current_researcher(
+    current_user=Depends(get_current_user),
+):
+    """
+    Return current user only if role is researcher.
+    Raises 403 if not a researcher.
+    """
+    if current_user.role != UserRole.RESEARCHER:
+        raise ForbiddenException("Researcher role required.")
+    return current_user
+
+
+def get_current_organization(
+    current_user=Depends(get_current_user),
+):
+    """
+    Return current user only if role is organization.
+    Raises 403 if not an organization.
+    """
+    if current_user.role != UserRole.ORGANIZATION:
+        raise ForbiddenException("Organization role required.")
+    return current_user
 
 
 # ─── Role guards ──────────────────────────────────────────────────────────────

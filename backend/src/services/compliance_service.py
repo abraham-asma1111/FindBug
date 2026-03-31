@@ -280,7 +280,7 @@ class ComplianceService:
             "access_control_status": "enabled"
         }
     
-    def _generate_iso_27001_summary(self, period_start: datetime, period_end: datetime) -> Dict:
+    def _generate_iso27001_summary(self, period_start: datetime, period_end: datetime) -> Dict:
         """Generate ISO 27001 compliance summary"""
         # TODO: Implement actual ISO 27001 compliance checks
         return {

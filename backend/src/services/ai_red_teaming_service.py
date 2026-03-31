@@ -11,7 +11,7 @@ from decimal import Decimal
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import os
 
 from sqlalchemy.orm import Session
@@ -49,7 +49,7 @@ class AIRedTeamingService:
         password = os.getenv("ENCRYPTION_KEY", "default-encryption-key-change-in-production").encode()
         salt = b'ai_red_teaming_salt'  # In production, use a secure random salt
         
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,

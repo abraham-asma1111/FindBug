@@ -42,6 +42,20 @@ class NotificationType(str, enum.Enum):
     ACCOUNT_VERIFIED = "account_verified"
     PASSWORD_CHANGED = "password_changed"
     MFA_ENABLED = "mfa_enabled"
+    
+    # KYC events
+    KYC_SUBMITTED = "kyc_submitted"
+    KYC_APPROVED = "kyc_approved"
+    KYC_REJECTED = "kyc_rejected"
+    KYC_EXPIRED = "kyc_expired"
+    
+    # Matching events
+    MATCH_FOUND = "match_found"
+    ASSIGNMENT_APPROVED = "assignment_approved"
+    ASSIGNMENT_REJECTED = "assignment_rejected"
+    
+    # Security events
+    SECURITY_INCIDENT = "security_incident"
 
 
 class NotificationPriority(str, enum.Enum):

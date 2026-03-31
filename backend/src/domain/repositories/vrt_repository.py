@@ -29,6 +29,17 @@ class VRTRepository(BaseRepository[VRTCategory]):
             .all()
         )
 
+    def get_all_entries(self, limit: int = 100, offset: int = 0) -> List[VRTEntry]:
+        """Get all VRT entries with pagination."""
+        return (
+            self.db.query(VRTEntry)
+            .filter(VRTEntry.is_active == True)
+            .order_by(VRTEntry.name)
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
     def get_entry_by_id(self, entry_id: str) -> Optional[VRTEntry]:
         return self.db.query(VRTEntry).filter(VRTEntry.id == entry_id).first()
 

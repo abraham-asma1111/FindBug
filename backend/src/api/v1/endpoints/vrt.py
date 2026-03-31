@@ -27,6 +27,17 @@ def get_category(category_id: str, db: Session = Depends(get_db)):
     return service.get_category(category_id)
 
 
+@router.get("/entries", response_model=List[VRTEntryResponse], summary="List All VRT Entries")
+def get_all_entries(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Retrieve all VRT vulnerability entries."""
+    service = VRTService(db)
+    return service.get_all_entries(limit=limit, offset=offset)
+
+
 @router.get("/entries/{entry_id}", response_model=VRTEntryResponse, summary="Get VRT Entry Details")
 def get_entry(entry_id: str, db: Session = Depends(get_db)):
     """Retrieve specific vulnerability entry details."""

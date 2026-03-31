@@ -10,7 +10,7 @@ from src.core.security import SecurityAudit
 from src.services.kyc_service import KYCService
 from src.core.file_storage import FileStorageService
 from src.domain.models.user import User
-from src.api.v1.middlewares import get_current_user, get_current_verified_user, require_admin
+from src.core.dependencies import get_current_user, get_current_verified_user, require_admin
 from src.api.v1.schemas.kyc import (
     KYCSubmissionRequest,
     KYCSubmissionResponse,

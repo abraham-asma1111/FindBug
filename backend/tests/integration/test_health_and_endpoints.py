@@ -44,7 +44,7 @@ def test_all_endpoints_registered(client):
         "/api/v1/reports",
         "/api/v1/triage",
         "/api/v1/bounty",
-        "/api/v1/reputation",
+        "/api/v1/leaderboard",
         "/api/v1/notifications",
         "/api/v1/dashboard",
         "/api/v1/analytics",

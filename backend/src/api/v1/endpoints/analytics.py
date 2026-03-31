@@ -231,3 +231,117 @@ def get_my_performance(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.get("/analytics/organization", status_code=status.HTTP_200_OK)
+def get_organization_analytics(
+    time_period: str = Query('6months', description="Time period: 7days, 30days, 3months, 6months, 1year"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get organization analytics - FREQ-12.
+    
+    Comprehensive analytics for organizations including:
+    - Vulnerability trends
+    - Program effectiveness
+    - Report statistics
+    - Financial metrics
+    
+    Only organizations can access their own analytics.
+    """
+    if current_user.role != "organization":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations can access organization analytics"
+        )
+    
+    if not current_user.organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization profile not found"
+        )
+    
+    service = AnalyticsService(db)
+    organization_id = current_user.organization.id
+    
+    try:
+        # Get comprehensive analytics
+        vulnerability_trends = service.get_vulnerability_trends(
+            organization_id=organization_id,
+            time_period=time_period
+        )
+        
+        program_effectiveness = service.get_program_effectiveness(
+            organization_id=organization_id,
+            time_period=time_period
+        )
+        
+        # Return flattened structure with key fields at top level
+        return {
+            "organization_id": str(organization_id),
+            "period": time_period,
+            "total_reports": vulnerability_trends.get("total_vulnerabilities", 0),
+            "reports": vulnerability_trends.get("total_vulnerabilities", 0),
+            "statistics": {
+                "total_vulnerabilities": vulnerability_trends.get("total_vulnerabilities", 0),
+                "severity_distribution": vulnerability_trends.get("severity_distribution", {}),
+                "status_distribution": vulnerability_trends.get("status_distribution", {}),
+                "total_programs": program_effectiveness.get("summary", {}).get("total_programs", 0),
+                "active_programs": len([p for p in program_effectiveness.get("programs", []) if p]),
+                "quality_rate": program_effectiveness.get("summary", {}).get("quality_rate", 0)
+            },
+            "vulnerability_trends": vulnerability_trends,
+            "program_effectiveness": program_effectiveness
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/analytics/researcher", status_code=status.HTTP_200_OK)
+def get_researcher_analytics(
+    time_period: str = Query('6months', description="Time period: 7days, 30days, 3months, 6months, 1year"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get researcher analytics - FREQ-12.
+    
+    Comprehensive analytics for researchers including:
+    - Performance metrics
+    - Earnings trends
+    - Submission statistics
+    - Specialization analysis
+    
+    Only researchers can access their own analytics.
+    """
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can access researcher analytics"
+        )
+    
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Researcher profile not found"
+        )
+    
+    service = AnalyticsService(db)
+    
+    try:
+        analytics = service.get_researcher_performance(
+            researcher_id=current_user.researcher.id,
+            time_period=time_period
+        )
+        return analytics
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

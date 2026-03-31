@@ -2,7 +2,7 @@
 from typing import List, Optional, Type
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
@@ -20,6 +20,123 @@ from src.api.v1.schemas.report import (
 
 
 router = APIRouter()
+
+
+@router.get("/reports", status_code=status.HTTP_200_OK)
+def search_reports(
+    search: Optional[str] = Query(None, description="Search by title or description"),
+    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    program_id: Optional[UUID] = Query(None, description="Filter by program"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Search and filter reports - FREQ-18, FREQ-19.
+    
+    Researchers see their own reports.
+    Organizations see reports for their programs.
+    Triage specialists see all reports.
+    """
+    service = ReportService(db)
+    
+    if current_user.role == "researcher":
+        # Researchers see their own reports
+        reports = service.get_researcher_reports(
+            researcher_id=current_user.researcher.id,
+            status=status_filter,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Apply search filter if provided
+        if search:
+            reports = [r for r in reports if search.lower() in r.title.lower() or search.lower() in r.description.lower()]
+        
+        # Apply severity filter if provided
+        if severity:
+            reports = [r for r in reports if r.assigned_severity == severity]
+        
+        return {
+            "reports": reports,
+            "total": len(reports),
+            "limit": limit,
+            "offset": offset
+        }
+    
+    elif current_user.role == "organization":
+        # Organizations see reports for their programs
+        if not program_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="program_id required for organization users"
+            )
+        
+        reports = service.get_program_reports(
+            program_id=program_id,
+            organization_id=current_user.organization.id,
+            status=status_filter,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Apply search filter if provided
+        if search:
+            reports = [r for r in reports if search.lower() in r.title.lower() or search.lower() in r.description.lower()]
+        
+        # Apply severity filter if provided
+        if severity:
+            reports = [r for r in reports if r.assigned_severity == severity]
+        
+        return {
+            "reports": reports,
+            "total": len(reports),
+            "limit": limit,
+            "offset": offset
+        }
+    
+    else:
+        # Triage specialists and admins see all reports
+        from src.domain.models.report import VulnerabilityReport
+        
+        query = db.query(VulnerabilityReport)
+        
+        if search:
+            query = query.filter(
+                (VulnerabilityReport.title.ilike(f"%{search}%")) |
+                (VulnerabilityReport.description.ilike(f"%{search}%"))
+            )
+        
+        if status_filter:
+            query = query.filter(VulnerabilityReport.status == status_filter)
+        
+        if severity:
+            query = query.filter(VulnerabilityReport.assigned_severity == severity)
+        
+        if program_id:
+            query = query.filter(VulnerabilityReport.program_id == program_id)
+        
+        reports = query.order_by(VulnerabilityReport.submitted_at.desc()).limit(limit).offset(offset).all()
+        
+        return {
+            "reports": [
+                {
+                    "id": str(r.id),
+                    "report_number": r.report_number,
+                    "title": r.title,
+                    "status": r.status,
+                    "assigned_severity": r.assigned_severity,
+                    "submitted_at": r.submitted_at,
+                    "program_id": str(r.program_id)
+                }
+                for r in reports
+            ],
+            "total": len(reports),
+            "limit": limit,
+            "offset": offset
+        }
 
 
 @router.post("/reports", status_code=status.HTTP_201_CREATED)
@@ -84,6 +201,7 @@ def submit_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to submit report: {str(e)}"
         )
+
 
 
 @router.post("/reports/{report_id}/attachments", status_code=status.HTTP_201_CREATED)

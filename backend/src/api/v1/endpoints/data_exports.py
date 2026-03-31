@@ -11,7 +11,7 @@ from src.core.database import get_db
 from src.core.security import SecurityAudit
 from src.services.data_export_service import DataExportService
 from src.domain.models.user import User
-from src.api.v1.middlewares import get_current_user
+from src.core.dependencies import get_current_user
 from src.api.v1.schemas.data_exports import (
     DataExportRequest,
     DataExportResponse,

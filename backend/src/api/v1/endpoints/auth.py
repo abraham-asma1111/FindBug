@@ -9,7 +9,7 @@ from src.core.security import SecurityAudit, InputSanitization
 from src.services.auth_service import AuthService
 from src.domain.models.user import User
 from src.domain.repositories import UserRepository, ResearcherRepository, OrganizationRepository
-from src.api.v1.middlewares import get_current_user, get_current_verified_user
+from src.core.dependencies import get_current_user, get_current_verified_user
 from src.api.v1.schemas.auth import (
     RegisterResearcherRequest,
     RegisterOrganizationRequest,
@@ -38,7 +38,7 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     user_repo = UserRepository(db)
     researcher_repo = ResearcherRepository(db)
     organization_repo = OrganizationRepository(db)
-    return AuthService(user_repo, researcher_repo, organization_repo)
+    return AuthService(user_repo, researcher_repo, organization_repo, db)
 
 
 @router.post(
@@ -47,13 +47,6 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     status_code=status.HTTP_201_CREATED,
     summary="Register as Researcher",
     description="Register a new security researcher account - Extended ERD"
-)
-@router.get(
-    "/register/researcher",
-    response_model=RegisterResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Register as Researcher (GET)",
-    description="Register a new security researcher account - Extended ERD (GET method)"
 )
 async def register_researcher(
     data: RegisterResearcherRequest = None,
@@ -76,18 +69,16 @@ async def register_researcher(
         )
     
     try:
+        # Validate password confirmation
+        if data.password != data.password_confirm:
+            raise ValueError("Passwords do not match")
+        
         result = auth_service.register_researcher(
             email=data.email,
             password=data.password,
             first_name=data.first_name,
             last_name=data.last_name,
-            username=data.username,
-            bio=data.bio,
-            website=data.website,
-            github=data.github,
-            twitter=data.twitter,
-            linkedin=data.linkedin,
-            skills=data.skills
+            request=request
         )
         
         # Log registration
@@ -126,12 +117,12 @@ async def register_researcher(
     summary="Register as Organization",
     description="Register a new organization account - Extended ERD"
 )
-@router.get(
+@router.post(
     "/register/organization",
     response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Register as Organization (GET)",
-    description="Register a new organization account - Extended ERD (GET method)"
+    summary="Register as Organization",
+    description="Register a new organization account - Extended ERD"
 )
 async def register_organization(
     data: RegisterOrganizationRequest = None,
@@ -155,15 +146,18 @@ async def register_organization(
         )
     
     try:
+        # Validate password confirmation
+        if data.password != data.password_confirm:
+            raise ValueError("Passwords do not match")
+        
         result = auth_service.register_organization(
             email=data.email,
             password=data.password,
+            first_name=data.first_name,
+            last_name=data.last_name,
             company_name=data.company_name,
-            industry=data.industry,
-            website=data.website,
-            subscription_type=data.subscription_type,
-            tax_id=data.tax_id,
-            business_license_url=data.business_license_url
+            phone_number=data.phone_number,
+            request=request
         )
         
         # Log registration
@@ -200,12 +194,6 @@ async def register_organization(
     response_model=TokenResponse,
     summary="User Login",
     description="Authenticate user and receive JWT token"
-)
-@router.get(
-    "/login",
-    response_model=TokenResponse,
-    summary="User Login (GET)",
-    description="Authenticate user and receive JWT token (GET method)"
 )
 async def login(
     data: LoginRequest = None,

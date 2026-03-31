@@ -125,6 +125,22 @@ class KYCService:
             
             logger.info("KYC submitted", extra={"user_id": user_id, "kyc_id": str(kyc.id)})
             
+            # Send notification to user about KYC submission
+            from src.services.notification_service import NotificationService
+            
+            notification_service = NotificationService(self.db)
+            notification_data = {
+                "title": "KYC Documents Submitted",
+                "message": "Your KYC documents have been submitted successfully. Pending admin review.",
+                "type": "kyc_update"
+            }
+            
+            notification_service.create_notification(
+                user_id=user_id,
+                notification_type="KYC_SUBMITTED",
+                data=notification_data
+            )
+            
             return {
                 "kyc_id": str(kyc.id),
                 "status": kyc.status,
@@ -275,7 +291,28 @@ class KYCService:
             "approved": approved
         })
         
-        # TODO: Send notification to user about KYC status
+        # Send notification to user about KYC status
+        from src.services.notification_service import NotificationService
+        
+        notification_service = NotificationService(self.db)
+        notification_data = {
+            "title": "KYC Verification Update",
+            "message": f"Your KYC verification has been {kyc.status}.",
+            "type": "kyc_update"
+        }
+        
+        if approved:
+            notification_service.create_notification(
+                user_id=str(kyc.user_id),
+                notification_type="KYC_APPROVED",
+                data=notification_data
+            )
+        else:
+            notification_service.create_notification(
+                user_id=str(kyc.user_id),
+                notification_type="KYC_REJECTED",
+                data=notification_data
+            )
         
         return {
             "kyc_id": str(kyc.id),

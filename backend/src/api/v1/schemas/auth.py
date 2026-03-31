@@ -2,49 +2,44 @@
 Authentication Schemas - Pydantic models for request/response validation
 Aligned with Extended ERD
 """
-from pydantic import BaseModel, EmailStr, Field, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator
 from typing import Optional
 
 
 class RegisterResearcherRequest(BaseModel):
-    """Request schema for researcher registration - Bugcrowd 2026 Enhanced"""
-    # Basic Authentication
-    email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
-    
-    # Bugcrowd 2026 Identity (Required)
+    """Request schema for researcher registration - matches frontend form"""
+    # Required fields from frontend form
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_-]+$')
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    password_confirm: str = Field(..., min_length=8, max_length=128)
     
-    # Extended ERD Profile (Optional)
-    bio: Optional[str] = Field(None, max_length=5000)
-    website: Optional[str] = Field(None, max_length=500)
-    github: Optional[str] = Field(None, max_length=255)
-    twitter: Optional[str] = Field(None, max_length=255)
-    
-    # Bugcrowd 2026 Professional (Optional)
-    linkedin: Optional[str] = Field(None, max_length=255)
-    skills: Optional[list[str]] = Field(None, description="List of security skills")
+    @field_validator('password_confirm')
+    @classmethod
+    def passwords_match(cls, v, info):
+        if 'password' in info.data and v != info.data['password']:
+            raise ValueError('Passwords do not match')
+        return v
 
 
 class RegisterOrganizationRequest(BaseModel):
-    """Request schema for organization registration - Bugcrowd 2026 Enhanced"""
-    # Basic Authentication
+    """Request schema for organization registration - matches frontend form"""
+    # Required fields from frontend form
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
-    
-    # Extended ERD Company Info (Required)
     company_name: str = Field(..., min_length=2, max_length=200)
+    phone_number: Optional[str] = Field(None, max_length=20)
+    password: str = Field(..., min_length=8, max_length=128)
+    password_confirm: str = Field(..., min_length=8, max_length=128)
     
-    # Extended ERD Company Info (Optional)
-    industry: Optional[str] = Field(None, max_length=100)
-    website: Optional[str] = Field(None, max_length=500)
-    subscription_type: Optional[str] = Field(None, max_length=20)
-    
-    # Bugcrowd 2026 Business Verification (Optional)
-    tax_id: Optional[str] = Field(None, max_length=100)
-    business_license_url: Optional[str] = Field(None, max_length=500)
+    @field_validator('password_confirm')
+    @classmethod
+    def passwords_match(cls, v, info):
+        if 'password' in info.data and v != info.data['password']:
+            raise ValueError('Passwords do not match')
+        return v
 
 
 class LoginRequest(BaseModel):

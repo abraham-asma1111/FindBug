@@ -662,7 +662,8 @@ class AdminService:
             }
         )
         
-        # TODO: Send welcome email with temp password
+        # Send welcome email to new staff member
+        self.send_welcome_email(staff.id)
         
         return staff
     

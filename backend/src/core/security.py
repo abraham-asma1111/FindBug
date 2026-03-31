@@ -44,6 +44,15 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
+def verify_access_token(token: str) -> Optional[Dict[str, Any]]:
+    """
+    Verify and decode JWT access token.
+    Returns payload dict if valid, None otherwise.
+    """
+    token_security = TokenSecurity()
+    return token_security.verify_token(token)
+
+
 # ============================================================================
 # OWASP A01:2021 - Broken Access Control
 # ============================================================================

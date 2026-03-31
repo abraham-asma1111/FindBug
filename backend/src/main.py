@@ -6,7 +6,8 @@ FastAPI Backend Server
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, simulation, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments
+from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration
+from src.api.v1.endpoints import simulation_gateway
 
 # Version and metadata
 VERSION = "1.0.0"
@@ -24,7 +25,12 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:3001", 
+        "http://localhost:3002", 
+        "http://localhost"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +38,7 @@ app.add_middleware(
 
 # Register API Routers
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(registration.router, prefix="/api/v1")  # New OTP-based registration
 app.include_router(profile.router, prefix="/api/v1")
 app.include_router(domain.router, prefix="/api/v1")
 app.include_router(sso.router, prefix="/api/v1")
@@ -53,7 +60,7 @@ app.include_router(ai_red_teaming.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(subscription.router, prefix="/api/v1")
 app.include_router(financial.router, prefix="/api/v1")
-app.include_router(simulation.router, prefix="/api/v1")
+app.include_router(simulation_gateway.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(vrt.router, prefix="/api/v1")
 app.include_router(kyc.router, prefix="/api/v1")
@@ -63,6 +70,12 @@ app.include_router(email_templates.router, prefix="/api/v1")
 app.include_router(data_exports.router, prefix="/api/v1")
 app.include_router(compliance.router, prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")
+app.include_router(files.router, prefix="/api/v1")
+app.include_router(wallet.router, prefix="/api/v1")
+app.include_router(recommendations.router, prefix="/api/v1")
+app.include_router(email_preferences.router, prefix="/api/v1")
+app.include_router(payment_methods.router, prefix="/api/v1")
+app.include_router(duplicate_detection.router, prefix="/api/v1")
 
 
 # Health Check Endpoint

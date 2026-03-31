@@ -185,3 +185,17 @@ class StatusHistoryResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class DuplicateCheckResponse(BaseModel):
+    """Schema for duplicate check response"""
+    is_duplicate: bool
+    similarity_score: Optional[float] = None
+    duplicate_of: Optional[UUID] = None
+    duplicate_report_title: Optional[str] = None
+    message: str
+    
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Create from dictionary"""
+        return cls(**data)

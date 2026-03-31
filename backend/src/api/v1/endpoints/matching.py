@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
-from src.core.authorization import get_current_user
+from src.core.dependencies import get_current_user
 from src.core.role_access import is_ptaas_admin_or_staff
 from src.domain.models.user import User
 from src.services.matching_service import MatchingService

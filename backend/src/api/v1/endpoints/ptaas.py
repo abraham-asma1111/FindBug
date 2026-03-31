@@ -38,7 +38,7 @@ def create_engagement(
     Create new PTaaS engagement - FREQ-29
     Only organization members can create engagements
     """
-    if not current_user.organization_id:
+    if not current_user.organization:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organization members can create PTaaS engagements"
@@ -46,7 +46,7 @@ def create_engagement(
     
     service = PTaaSService(db)
     return service.create_engagement(
-        organization_id=current_user.organization_id,
+        organization_id=current_user.organization.id,
         engagement_data=engagement.dict(),
         created_by=current_user.id
     )
@@ -69,7 +69,8 @@ def get_engagement(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -85,14 +86,14 @@ def list_engagements(
     current_user: User = Depends(get_current_user)
 ):
     """List engagements for current organization"""
-    if not current_user.organization_id:
+    if not current_user.organization:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organization members can view engagements"
         )
     
     service = PTaaSService(db)
-    return service.get_organization_engagements(current_user.organization_id)
+    return service.get_organization_engagements(current_user.organization.id)
 
 
 @router.patch("/engagements/{engagement_id}", response_model=PTaaSEngagementResponse)
@@ -113,7 +114,8 @@ def update_engagement(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -141,7 +143,8 @@ def assign_researchers(
         )
     
     # Only org members or staff can assign
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -275,7 +278,8 @@ def validate_finding(
             )
         
         engagement = service.get_engagement(finding.engagement_id)
-        if engagement.organization_id != current_user.organization_id:
+        org_id = current_user.organization.id if current_user.organization else None
+        if engagement.organization_id != org_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -468,7 +472,8 @@ def get_engagement_dashboard(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -499,7 +504,8 @@ def initialize_engagement_phases(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -748,6 +754,70 @@ def get_pending_triage(
     return triage_service.get_pending_triage(limit)
 
 
+@router.get("/triage/queue", response_model=List[PTaaSPendingTriageResponse])
+def get_triage_queue(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get triage queue (alias for /triage/pending) - FREQ-35
+    Only triage specialists can access
+    """
+    if not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can view triage queue"
+        )
+    
+    triage_service = PTaaSTriageService(db)
+    return triage_service.get_pending_triage(limit)
+
+
+@router.get("/dashboard")
+def get_ptaas_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get PTaaS dashboard overview - FREQ-30
+    
+    Shows:
+    - Active engagements
+    - Pending findings
+    - Recent activity
+    - Statistics
+    """
+    service = PTaaSService(db)
+    
+    # Get user's engagements based on role
+    if current_user.role == "organization":
+        if not current_user.organization:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organization profile not found"
+            )
+        engagements = service.get_organization_engagements(current_user.organization.id)
+    elif is_ptaas_admin_or_staff(current_user):
+        # Staff can see all engagements
+        engagements = db.query(service.db.query(PTaaSService).all())
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Calculate statistics
+    total_engagements = len(engagements) if engagements else 0
+    active_engagements = len([e for e in engagements if e.status == 'active']) if engagements else 0
+    
+    return {
+        "total_engagements": total_engagements,
+        "active_engagements": active_engagements,
+        "engagements": engagements[:5] if engagements else []  # Return first 5
+    }
+
+
 @router.post("/findings/{finding_id}/prioritize", response_model=PTaaSFindingPrioritizationResponse, status_code=status.HTTP_201_CREATED)
 def prioritize_finding(
     finding_id: int,
@@ -820,7 +890,8 @@ def get_executive_report(
     ptaas_service = PTaaSService(db)
     engagement = ptaas_service.get_engagement(report.engagement_id)
     
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -847,7 +918,8 @@ def get_engagement_reports(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -881,7 +953,8 @@ def approve_executive_report(
     ptaas_service = PTaaSService(db)
     engagement = ptaas_service.get_engagement(report.engagement_id)
     
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -926,7 +999,8 @@ def create_retest_policy(
         )
     
     # Only org members or staff can set policy
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1044,7 +1118,8 @@ def get_engagement_retests(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1098,7 +1173,8 @@ def approve_retest(
     ptaas_service = PTaaSService(db)
     engagement = ptaas_service.get_engagement(retest.engagement_id)
     
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1185,7 +1261,8 @@ def get_retest_statistics(
         )
     
     # Check access
-    if engagement.organization_id != current_user.organization_id:
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

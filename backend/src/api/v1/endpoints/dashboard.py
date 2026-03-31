@@ -11,6 +11,57 @@ from src.services.dashboard_service import DashboardService
 router = APIRouter()
 
 
+@router.get("/dashboard", status_code=status.HTTP_200_OK)
+def get_dashboard(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get dashboard for current user - FREQ-15.
+    
+    Routes to appropriate dashboard based on user role:
+    - researcher → researcher dashboard
+    - organization → organization dashboard
+    - staff/admin → staff dashboard
+    """
+    service = DashboardService(db)
+    
+    try:
+        if current_user.role == "researcher":
+            if not current_user.researcher:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Researcher profile not found"
+                )
+            return service.get_researcher_dashboard(researcher_id=current_user.researcher.id)
+        
+        elif current_user.role == "organization":
+            if not current_user.organization:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Organization profile not found"
+                )
+            return service.get_organization_dashboard(organization_id=current_user.organization.id)
+        
+        elif current_user.role in ["staff", "admin"]:
+            if current_user.role == "admin":
+                return service.get_admin_dashboard()
+            else:
+                return service.get_staff_dashboard()
+        
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unknown user role"
+            )
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
 @router.get("/dashboard/researcher", status_code=status.HTTP_200_OK)
 def get_researcher_dashboard(
     current_user: User = Depends(get_current_user),

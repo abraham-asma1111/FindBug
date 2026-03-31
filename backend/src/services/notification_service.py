@@ -139,13 +139,23 @@ class NotificationService:
         
         try:
             # Send email using email service
-            # TODO: Integrate with actual email service
-            logger.info(f"Sent templated email to {user.email}", extra={
-                "user_id": str(user_id),
-                "template": template_name,
-                "subject": rendered["subject"]
-            })
-            return True
+            success = self.email_service.send_html_email(
+                to_email=user.email,
+                subject=rendered["subject"],
+                html_body=rendered["body_html"],
+                text_body=rendered["body_text"]
+            )
+            
+            if success:
+                logger.info(f"Sent templated email to {user.email}", extra={
+                    "user_id": str(user_id),
+                    "template": template_name,
+                    "subject": rendered["subject"]
+                })
+                return True
+            else:
+                logger.error(f"Email service failed to send to {user.email}")
+                return False
         
         except Exception as e:
             logger.error(f"Failed to send templated email: {str(e)}", extra={

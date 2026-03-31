@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from src.domain.models.security_log import SecurityEvent, LoginHistory
-from src.domain.models.user import User
+from src.domain.models.user import User, UserRole
 from src.core.exceptions import NotFoundException
 from src.core.logging import get_logger
+from src.services.notification_service import NotificationService
 
 logger = get_logger(__name__)
 
@@ -19,6 +20,7 @@ class SecurityService:
     
     def __init__(self, db: Session):
         self.db = db
+        self.notification_service = NotificationService(db)
         
         # Event severity levels
         self.severity_levels = ["low", "medium", "high", "critical"]
@@ -405,7 +407,8 @@ class SecurityService:
             "severity": severity
         })
         
-        # TODO: Send notification to security team
+        # Send notification to security team
+        self._notify_security_team(event, incident_type, severity, details)
         
         return {
             "incident_id": event["event_id"],
@@ -488,3 +491,71 @@ class SecurityService:
                 "success_rate": round((successful_logins / total_logins * 100) if total_logins > 0 else 0, 2)
             }
         }
+    
+    def _notify_security_team(
+        self,
+        event: Dict,
+        incident_type: str,
+        severity: str,
+        details: Dict
+    ):
+        """
+        Send notification to security team about critical incidents.
+        
+        Args:
+            event: Security event data
+            incident_type: Type of incident
+            severity: Severity level
+            details: Additional details
+        """
+        try:
+            # Get all admin and staff users with security roles
+            security_users = self.db.query(User).filter(
+                User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.STAFF]),
+                User.is_active == True
+            ).all()
+            
+            # Create notification message based on severity
+            severity_emojis = {
+                "low": "🟡",
+                "medium": "🟠", 
+                "high": "🔴",
+                "critical": "🚨"
+            }
+            
+            emoji = severity_emojis.get(severity, "⚠️")
+            
+            title = f"{emoji} Security Incident: {incident_type.title()}"
+            message = f"""
+Type: {incident_type}
+Severity: {severity.upper()}
+User ID: {event.get('user_id', 'Unknown')}
+IP Address: {event.get('ip_address', 'Unknown')}
+User Agent: {event.get('user_agent', 'Unknown')}
+Time: {event.get('created_at', 'Unknown')}
+
+Details: {details.get('description', 'No additional details')}
+            """.strip()
+            
+            # Only send notifications for high and critical incidents
+            if severity in ["high", "critical"]:
+                for user in security_users:
+                    # Create in-app notification
+                    self.notification_service.create_notification(
+                        user_id=user.id,
+                        notification_type="security_incident",
+                        title=title,
+                        message=message,
+                        priority="high" if severity == "critical" else "medium",
+                        action_url="/admin/security/incidents",
+                        action_text="View Incidents",
+                        send_email=True  # Send email for critical incidents
+                    )
+                
+                logger.info(f"Security team notified about {severity} incident: {incident_type}")
+            else:
+                logger.info(f"Low/medium incident logged without notification: {incident_type}")
+                
+        except Exception as e:
+            logger.error(f"Failed to notify security team: {str(e)}")
+            # Don't raise - notification failure shouldn't break incident reporting

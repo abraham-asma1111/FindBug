@@ -15,7 +15,7 @@ class TestSubscriptionFlow:
         
         # Subscribe to Basic tier
         response = client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={
                 "tier": "basic",
@@ -34,7 +34,7 @@ class TestSubscriptionFlow:
         headers = {"Authorization": f"Bearer {organization_token}"}
         
         response = client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={
                 "tier": "professional",
@@ -53,7 +53,7 @@ class TestSubscriptionFlow:
         
         # First subscribe
         client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={"tier": "basic", "payment_method": "bank_transfer"}
         )
@@ -73,7 +73,7 @@ class TestSubscriptionFlow:
         
         # Subscribe to Basic
         client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={"tier": "basic", "payment_method": "bank_transfer"}
         )
@@ -95,7 +95,7 @@ class TestSubscriptionFlow:
         
         # Subscribe first
         client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={"tier": "basic", "payment_method": "bank_transfer"}
         )
@@ -113,7 +113,7 @@ class TestSubscriptionFlow:
         
         # Subscribe
         client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={"tier": "professional", "payment_method": "telebirr"}
         )
@@ -133,7 +133,7 @@ class TestSubscriptionFlow:
         headers = {"Authorization": f"Bearer {researcher_token}"}
         
         response = client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             headers=headers,
             json={"tier": "basic", "payment_method": "bank_transfer"}
         )
@@ -143,7 +143,7 @@ class TestSubscriptionFlow:
     def test_subscription_without_auth(self, client):
         """Test subscription endpoint without authentication"""
         response = client.post(
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             json={"tier": "basic", "payment_method": "bank_transfer"}
         )
         

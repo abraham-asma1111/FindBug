@@ -85,6 +85,38 @@ def create_subscription(
         )
 
 
+@router.get("/current", response_model=SubscriptionResponse)
+def get_current_subscription(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current user's subscription.
+    
+    For organizations: returns their own subscription
+    For other roles: returns error
+    """
+    # Only organizations have subscriptions
+    if current_user.role != UserRole.ORGANIZATION:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations have subscriptions"
+        )
+    
+    subscription = db.query(OrganizationSubscription).filter(
+        OrganizationSubscription.organization_id == current_user.organization.id,
+        OrganizationSubscription.status.in_(["active", "pending", "suspended"])
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active subscription found"
+        )
+    
+    return subscription
+
+
 @router.get("/organization/{organization_id}", response_model=SubscriptionResponse)
 def get_organization_subscription(
     organization_id: UUID,
@@ -98,7 +130,7 @@ def get_organization_subscription(
     """
     # Authorization check
     if current_user.role == UserRole.ORGANIZATION:
-        if current_user.id != organization_id:
+        if current_user.organization.id != organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Organizations can only view their own subscription"

@@ -11,7 +11,7 @@ from src.core.security import SecurityAudit, TokenSecurity
 from src.core.sso_service import SAMLService
 from src.domain.models.user import User
 from src.domain.repositories import OrganizationRepository, UserRepository
-from src.api.v1.middlewares import get_current_organization
+from src.core.dependencies import get_current_organization
 
 router = APIRouter(prefix="/sso", tags=["SSO"])
 

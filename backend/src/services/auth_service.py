@@ -180,18 +180,12 @@ class AuthService:
         password: str,
         first_name: str,
         last_name: str,
-        username: str,
-        bio: Optional[str] = None,
-        website: Optional[str] = None,
-        github: Optional[str] = None,
-        twitter: Optional[str] = None,
-        linkedin: Optional[str] = None,
-        skills: Optional[list[str]] = None,
         request: any = None
     ) -> Dict[str, any]:
         """
-        Register a new researcher - Bugcrowd 2026 Enhanced.
+        Register a new researcher - matches frontend form.
         Enhanced with security event logging.
+        Username auto-generated from email.
         """
         
         # Extract request info
@@ -211,32 +205,26 @@ class AuthService:
         if existing_user:
             raise ValueError("Email already registered")
         
-        # Validate username
-        if not username or len(username) < 3 or len(username) > 50:
-            raise ValueError("Username must be 3-50 characters")
+        # Auto-generate username from email
+        username = email.split('@')[0]
+        # Clean username
+        username = ''.join(c for c in username if c.isalnum() or c in '_-')
+        # Ensure minimum length
+        if len(username) < 3:
+            username = username + str(uuid.uuid4())[:4]
+        # Ensure maximum length
+        if len(username) > 50:
+            username = username[:50]
         
-        # Check if username already exists
+        # Check if username already exists, if so append random suffix
         existing_researcher = self.researcher_repo.get_by_username(username)
         if existing_researcher:
-            raise ValueError("Username already taken")
-        
-        # Validate skills if provided
-        if skills:
-            skill_validation = SkillsService.validate_skills(skills)
-            if not skill_validation["valid"]:
-                raise ValueError(skill_validation["message"])
+            username = username[:45] + str(uuid.uuid4())[:5]
         
         # Sanitize inputs
         first_name = InputSanitization.sanitize_html(first_name.strip())
         last_name = InputSanitization.sanitize_html(last_name.strip())
         username = InputSanitization.sanitize_html(username.strip())
-        
-        if bio:
-            bio = InputSanitization.sanitize_html(bio)
-        if website and not InputSanitization.validate_url(website):
-            raise ValueError("Invalid website URL")
-        if linkedin and not InputSanitization.validate_url(linkedin):
-            raise ValueError("Invalid LinkedIn URL")
         
         # Generate email verification token
         verification_token = EmailService.generate_verification_token()
@@ -259,13 +247,7 @@ class AuthService:
         # Generate ninja email alias
         ninja_email = NinjaEmailService.generate_ninja_email(username, str(user.id))
         
-        # Convert skills list to JSON string
-        skills_json = None
-        if skills:
-            import json
-            skills_json = json.dumps(skills)
-        
-        # Create researcher profile (Bugcrowd 2026 Enhanced)
+        # Create researcher profile
         researcher = Researcher(
             id=uuid.uuid4(),
             user_id=user.id,
@@ -273,12 +255,6 @@ class AuthService:
             last_name=last_name,
             username=username,
             ninja_email=ninja_email,
-            bio=bio,
-            website=website,
-            github=github,
-            twitter=twitter,
-            linkedin=linkedin,
-            skills=skills_json,
             kyc_status="pending"
         )
         researcher = self.researcher_repo.create(researcher)
@@ -314,16 +290,14 @@ class AuthService:
         self,
         email: str,
         password: str,
+        first_name: str,
+        last_name: str,
         company_name: str,
-        industry: Optional[str] = None,
-        website: Optional[str] = None,
-        subscription_type: Optional[str] = None,
-        tax_id: Optional[str] = None,
-        business_license_url: Optional[str] = None,
+        phone_number: Optional[str] = None,
         request: any = None
     ) -> Dict[str, any]:
         """
-        Register a new organization - Bugcrowd 2026 Enhanced.
+        Register a new organization - matches frontend form.
         Enhanced with security event logging.
         """
         
@@ -350,11 +324,11 @@ class AuthService:
             raise ValueError("Email already registered")
         
         # Sanitize inputs
+        first_name = InputSanitization.sanitize_html(first_name.strip())
+        last_name = InputSanitization.sanitize_html(last_name.strip())
         company_name = InputSanitization.sanitize_html(company_name)
-        if website and not InputSanitization.validate_url(website):
-            raise ValueError("Invalid website URL")
-        if business_license_url and not InputSanitization.validate_url(business_license_url):
-            raise ValueError("Invalid business license URL")
+        if phone_number:
+            phone_number = InputSanitization.sanitize_html(phone_number.strip())
         
         # Generate email verification token
         verification_token = EmailService.generate_verification_token()
@@ -374,16 +348,11 @@ class AuthService:
         )
         user = self.user_repo.create(user)
         
-        # Create organization profile (Bugcrowd 2026 Enhanced)
+        # Create organization profile
         organization = Organization(
             id=uuid.uuid4(),
             user_id=user.id,
             company_name=company_name,
-            industry=industry,
-            website=website,
-            subscription_type=subscription_type,
-            tax_id=tax_id,
-            business_license_url=business_license_url,
             verification_status="pending",
             domain_verified=False
         )
@@ -393,10 +362,11 @@ class AuthService:
         EmailService.send_verification_email(email, verification_token, "organization")
         
         # Log organization registration security event
+        phone_info = f", Phone: {phone_number}" if phone_number else ""
         self._log_security_event(
             event_type="user_registration",
             user_id=user.id,
-            description=f"New organization registered: {company_name}",
+            description=f"New organization registered: {company_name} (Contact: {first_name} {last_name}{phone_info})",
             severity="low",
             ip_address=ip_address
         )
@@ -404,7 +374,9 @@ class AuthService:
         logger.info("Organization registered successfully", extra={
             "user_id": str(user.id),
             "company_name": company_name,
-            "email": email
+            "email": email,
+            "contact_name": f"{first_name} {last_name}",
+            "phone_number": phone_number or "not provided"
         })
         
         return {

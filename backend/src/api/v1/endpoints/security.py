@@ -10,7 +10,7 @@ from src.core.database import get_db
 from src.core.security import SecurityAudit
 from src.services.security_service import SecurityService
 from src.domain.models.user import User
-from src.api.v1.middlewares import get_current_user, require_admin
+from src.core.dependencies import get_current_user, require_admin
 from src.api.v1.schemas.security import (
     SecurityEventsListResponse,
     LoginHistoryListResponse,

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.domain.models.message import Message, Conversation
 from src.domain.models.user import User
-from src.core.security import SecurityService
+from src.services.security_service import SecurityService
 
 
 class MessageService:
