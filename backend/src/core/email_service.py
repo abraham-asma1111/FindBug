@@ -26,7 +26,243 @@ class EmailService:
         return hashlib.sha256(token.encode()).hexdigest()
     
     @staticmethod
-    def send_verification_email(email: str, token: str, user_type: str) -> bool:
+    def generate_otp() -> str:
+        """Generate 6-digit OTP"""
+        import random
+        return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    @staticmethod
+    def send_email_verification_link(email: str, token: str, user_type: str) -> bool:
+        """
+        Send email verification link (no OTP, just click to verify)
+        
+        Args:
+            email: User email address
+            token: Verification token for the link
+            user_type: 'researcher' or 'organization'
+        """
+        try:
+            # Email configuration from environment
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@findbugplatform.com')
+            
+            if not smtp_user or not smtp_password:
+                print("⚠️  SMTP credentials not configured. Email not sent.")
+                return False
+            
+            # Create verification link
+            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3002')
+            verification_link = f"{base_url}/verify-email?token={token}&type={user_type}"
+            
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = 'Verify Your FindBug Account - Complete Registration'
+            msg['From'] = smtp_from
+            msg['To'] = email
+            
+            # Email body
+            text_body = f"""
+            Welcome to FindBug Platform!
+            
+            Complete your {user_type} registration by clicking the verification link below:
+            
+            {verification_link}
+            
+            This link will expire in 24 hours.
+            
+            If you didn't create this account, please ignore this email.
+            
+            Best regards,
+            FindBug Platform Team
+            Bahir Dar University
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: #7C3AED; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">🔒 Verify Your Email</h1>
+                  </div>
+                  
+                  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none;">
+                    <h2 style="color: #7C3AED; margin-top: 0;">Welcome to FindBug!</h2>
+                    <p>Thank you for registering as a <strong>{user_type}</strong>.</p>
+                    <p>Click the button below to verify your email and complete your registration:</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="{verification_link}" 
+                         style="background-color: #7C3AED; color: white; padding: 15px 30px; 
+                                text-decoration: none; border-radius: 8px; display: inline-block; 
+                                font-weight: bold; font-size: 16px;">
+                        ✅ Verify Email Address
+                      </a>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px; text-align: center;">
+                      This link expires in 24 hours
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                    
+                    <div style="background: #f1f3f4; padding: 15px; border-radius: 5px;">
+                      <p style="margin: 0; color: #666; font-size: 14px;">
+                        <strong>Can't click the button?</strong> Copy and paste this link in your browser:<br>
+                        <a href="{verification_link}" style="color: #7C3AED; word-break: break-all;">{verification_link}</a>
+                      </p>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                      If you didn't create this account, please ignore this email.
+                    </p>
+                  </div>
+                  
+                  <div style="background: #f1f3f4; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;">
+                    <p style="margin: 0;">FindBug Platform - Bug Bounty & Security Research</p>
+                    <p style="margin: 5px 0 0;">Bahir Dar University - Cyber Security Program</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            # Attach both plain text and HTML versions
+            part1 = MIMEText(text_body, 'plain')
+            part2 = MIMEText(html_body, 'html')
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            # Send email
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            print(f"✅ Email verification link sent to {email}")
+            print(f"   Link: {verification_link}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send verification email: {e}")
+            return False
+        """
+        Send registration verification email with OTP and backup link
+        
+        Args:
+            email: User email address
+            otp: 6-digit OTP code
+            token: Backup verification token
+            user_type: 'researcher' or 'organization'
+        """
+        try:
+            # Email configuration from environment
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@findbugplatform.com')
+            
+            if not smtp_user or not smtp_password:
+                print("⚠️  SMTP credentials not configured. Email not sent.")
+                return False
+            
+            # Create verification link (backup method)
+            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3002')
+            verification_link = f"{base_url}/verify-email?token={token}&type={user_type}"
+            
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = 'Verify Your FindBug Account - Complete Registration'
+            msg['From'] = smtp_from
+            msg['To'] = email
+            
+            # Email body
+            text_body = f"""
+            Welcome to FindBug Platform!
+            
+            Complete your {user_type} registration by entering this verification code:
+            
+            VERIFICATION CODE: {otp}
+            
+            This code will expire in 10 minutes.
+            
+            Alternatively, you can click this link to verify:
+            {verification_link}
+            
+            If you didn't create this account, please ignore this email.
+            
+            Best regards,
+            FindBug Platform Team
+            Bahir Dar University
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: #7C3AED; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">🔒 Complete Your Registration</h1>
+                  </div>
+                  
+                  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none;">
+                    <h2 style="color: #7C3AED; margin-top: 0;">Welcome to FindBug!</h2>
+                    <p>Thank you for registering as a <strong>{user_type}</strong>.</p>
+                    <p>Complete your registration by entering this verification code:</p>
+                    
+                    <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #7C3AED;">
+                      <h1 style="color: #7C3AED; font-size: 36px; margin: 0; letter-spacing: 8px; font-family: monospace;">{otp}</h1>
+                      <p style="color: #666; margin: 10px 0 0; font-size: 14px;">Enter this code to verify your email</p>
+                    </div>
+                    
+                    <p style="color: #e74c3c; font-size: 14px; text-align: center;">
+                      ⏰ This code expires in 10 minutes
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                    
+                    <div style="background: #f1f3f4; padding: 15px; border-radius: 5px;">
+                      <p style="margin: 0; color: #666; font-size: 14px;">
+                        <strong>Alternative method:</strong> If you can't enter the code, 
+                        <a href="{verification_link}" style="color: #7C3AED;">click here to verify</a>
+                      </p>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                      If you didn't create this account, please ignore this email.
+                    </p>
+                  </div>
+                  
+                  <div style="background: #f1f3f4; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;">
+                    <p style="margin: 0;">FindBug Platform - Bug Bounty & Security Research</p>
+                    <p style="margin: 5px 0 0;">Bahir Dar University - Cyber Security Program</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            # Attach both plain text and HTML versions
+            part1 = MIMEText(text_body, 'plain')
+            part2 = MIMEText(html_body, 'html')
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            # Send email
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            print(f"✅ Registration verification email sent to {email}")
+            print(f"   OTP: {otp} (expires in 10 minutes)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send registration email: {e}")
+            return False
         """
         Send email verification link
         
@@ -207,6 +443,65 @@ class EmailService:
         print(f"{'='*60}\n")
 
         # TODO: Replace with actual email service (SendGrid, AWS SES, etc.)
+
+    @staticmethod
+    def send_html_email(
+        to_email: str,
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None
+    ) -> bool:
+        """
+        Send HTML email using SMTP
+        
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            html_body: HTML email body
+            text_body: Plain text fallback (optional)
+            
+        Returns:
+            True if sent successfully
+        """
+        try:
+            # Email configuration from environment
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@bugbounty.com')
+            
+            if not smtp_user or not smtp_password:
+                print("⚠️  SMTP credentials not configured. Email not sent.")
+                return False
+            
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = smtp_from
+            msg['To'] = to_email
+            
+            # Add plain text part if provided
+            if text_body:
+                part1 = MIMEText(text_body, 'plain')
+                msg.attach(part1)
+            
+            # Add HTML part
+            part2 = MIMEText(html_body, 'html')
+            msg.attach(part2)
+            
+            # Send email
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            print(f"✅ HTML email sent to {to_email}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send HTML email: {e}")
+            return False
 
 
 class BusinessEmailValidator:

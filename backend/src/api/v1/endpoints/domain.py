@@ -10,7 +10,7 @@ from src.core.security import SecurityAudit
 from src.core.domain_verification import DomainVerificationService
 from src.domain.models.user import User
 from src.domain.repositories import OrganizationRepository
-from src.api.v1.middlewares import get_current_organization
+from src.core.dependencies import get_current_organization
 
 router = APIRouter(prefix="/domain", tags=["Domain Verification"])
 

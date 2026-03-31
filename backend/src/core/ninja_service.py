@@ -143,23 +143,24 @@ class SkillsService:
     
     @classmethod
     def validate_skills(cls, skills: list[str]) -> Dict[str, any]:
-        """Validate researcher skills"""
+        """
+        Validate researcher skills.
+        Now accepts custom skills - only validates count and format.
+        """
         if not skills:
             return {"valid": True, "message": "No skills provided"}
         
         if len(skills) > 50:
             return {"valid": False, "message": "Maximum 50 skills allowed"}
         
-        all_skills = cls.get_all_skills()
-        invalid_skills = [skill for skill in skills if skill not in all_skills]
+        # Validate each skill format (not empty, reasonable length)
+        for skill in skills:
+            if not skill or not skill.strip():
+                return {"valid": False, "message": "Skills cannot be empty"}
+            if len(skill) > 100:
+                return {"valid": False, "message": f"Skill '{skill[:50]}...' is too long (max 100 characters)"}
         
-        if invalid_skills:
-            return {
-                "valid": False,
-                "message": f"Invalid skills: {', '.join(invalid_skills[:5])}"
-            }
-        
-        return {"valid": True, "message": f"Validated {len(skills)} skills"}
+        return {"valid": True, "message": f"Validated {len(skills)} skills (including custom skills)"}
     
     @classmethod
     def get_skills_by_category(cls, category: str) -> list[str]:

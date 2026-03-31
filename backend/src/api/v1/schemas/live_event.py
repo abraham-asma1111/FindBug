@@ -2,7 +2,7 @@
 Live Hacking Events API Schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from uuid import UUID
 from decimal import Decimal

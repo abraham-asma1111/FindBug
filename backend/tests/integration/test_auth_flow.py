@@ -14,13 +14,14 @@ class TestAuthenticationFlow:
         register_data = {
             "email": "newresearcher@test.com",
             "password": "SecurePass123!",
-            "full_name": "New Researcher",
-            "role": "researcher"
+            "password_confirm": "SecurePass123!",
+            "first_name": "New",
+            "last_name": "Researcher"
         }
-        response = client.post("/api/v1/auth/register", json=register_data)
+        response = client.post("/api/v1/auth/register/researcher", json=register_data)
         assert response.status_code == 201
         data = response.json()
-        assert "id" in data
+        assert "user_id" in data
         assert data["email"] == register_data["email"]
         
         # Login
@@ -41,10 +42,12 @@ class TestAuthenticationFlow:
         register_data = {
             "email": "neworg@test.com",
             "password": "SecurePass123!",
-            "company_name": "New Organization",
-            "role": "organization"
+            "password_confirm": "SecurePass123!",
+            "first_name": "New",
+            "last_name": "Organization",
+            "company_name": "New Organization"
         }
-        response = client.post("/api/v1/auth/register", json=register_data)
+        response = client.post("/api/v1/auth/register/organization", json=register_data)
         assert response.status_code == 201
         
         # Login
@@ -71,27 +74,28 @@ class TestAuthenticationFlow:
         register_data = {
             "email": "duplicate@test.com",
             "password": "SecurePass123!",
-            "full_name": "First User",
-            "role": "researcher"
+            "password_confirm": "SecurePass123!",
+            "first_name": "First",
+            "last_name": "User"
         }
         
         # First registration
-        response = client.post("/api/v1/auth/register", json=register_data)
+        response = client.post("/api/v1/auth/register/researcher", json=register_data)
         assert response.status_code == 201
         
         # Duplicate registration
-        response = client.post("/api/v1/auth/register", json=register_data)
+        response = client.post("/api/v1/auth/register/researcher", json=register_data)
         assert response.status_code in [400, 409]
     
     def test_protected_endpoint_without_token(self, client):
         """Test accessing protected endpoint without token fails"""
-        response = client.get("/api/v1/profile/me")
+        response = client.get("/api/v1/profile")
         assert response.status_code == 401
     
     def test_protected_endpoint_with_token(self, client, researcher_token):
         """Test accessing protected endpoint with valid token"""
         headers = {"Authorization": f"Bearer {researcher_token}"}
-        response = client.get("/api/v1/profile/me", headers=headers)
+        response = client.get("/api/v1/profile", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert "email" in data

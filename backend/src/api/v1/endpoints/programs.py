@@ -32,22 +32,25 @@ def create_program(
     
     Only organizations can create programs.
     """
-    service = ProgramService(db)
-    
-    program = service.create_program(
-        organization_id=current_user.organization.id,
-        name=program_data.name,
-        description=program_data.description,
-        program_type=program_data.type,
-        visibility=program_data.visibility,
-        budget=program_data.budget,
-        policy=program_data.policy,
-        rules_of_engagement=program_data.rules_of_engagement,
-        safe_harbor=program_data.safe_harbor,
-        response_sla_hours=program_data.response_sla_hours
-    )
-    
-    return program
+    try:
+        service = ProgramService(db)
+        
+        program = service.create_program(
+            organization_id=str(current_user.organization.id),
+            name=program_data.name,
+            description=program_data.description,
+            program_type=program_data.program_type,
+            scope=program_data.scope,
+            reward_tiers=program_data.reward_tiers,
+            rules=program_data.rules
+        )
+        
+        return ProgramResponse.from_orm(program)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @router.get("", response_model=List[ProgramListResponse])

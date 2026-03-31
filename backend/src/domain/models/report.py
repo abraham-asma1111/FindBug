@@ -26,7 +26,7 @@ class VulnerabilityReport(Base):
     # Relationships
     program_id = Column(PGUUID(as_uuid=True), ForeignKey("bounty_programs.id", ondelete="CASCADE"), nullable=False)
     researcher_id = Column(PGUUID(as_uuid=True), ForeignKey("researchers.id", ondelete="CASCADE"), nullable=False)
-    live_event_id = Column(PGUUID(as_uuid=True), ForeignKey("live_hacking_events.event_id", ondelete="SET NULL"), nullable=True)
+    event_id = Column(PGUUID(as_uuid=True), ForeignKey("live_hacking_events.event_id", ondelete="SET NULL"), nullable=True)
     
     # Report content - FREQ-06
     title = Column(String(500), nullable=False)

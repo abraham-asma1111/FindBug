@@ -10,7 +10,7 @@ from src.core.database import get_db
 from src.core.security import SecurityAudit
 from src.services.payment_service import PaymentService
 from src.domain.models.user import User
-from src.api.v1.middlewares import get_current_user, get_current_verified_user, require_admin
+from src.core.dependencies import get_current_user, get_current_verified_user, require_admin
 from src.api.v1.schemas.payments import (
     BountyPaymentCreateRequest,
     BountyPaymentResponse,
@@ -520,6 +520,116 @@ async def reject_payout_request(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Payout rejection failed: {str(e)}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PAYMENT METHODS ENDPOINT
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/methods",
+    summary="Get Payment Methods",
+    description="Get available payment methods"
+)
+async def get_payment_methods(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get available payment methods.
+    
+    Returns list of supported payment methods:
+    - telebirr
+    - cbe_birr
+    - bank_transfer
+    """
+    return {
+        "payment_methods": [
+            {
+                "id": "telebirr",
+                "name": "TeleBirr",
+                "type": "mobile_money",
+                "description": "Mobile money payment via TeleBirr",
+                "is_active": True
+            },
+            {
+                "id": "cbe_birr",
+                "name": "CBE Birr",
+                "type": "mobile_money",
+                "description": "Mobile money payment via CBE Birr",
+                "is_active": True
+            },
+            {
+                "id": "bank_transfer",
+                "name": "Bank Transfer",
+                "type": "bank",
+                "description": "Direct bank transfer",
+                "is_active": True
+            }
+        ]
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PAYOUTS LIST ENDPOINT
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/payouts",
+    response_model=PayoutListResponse,
+    summary="Get Payouts",
+    description="Get payout requests (alias for /payout/my-requests)"
+)
+async def get_payouts(
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """
+    Get payout requests for current user.
+    
+    This is an alias for /payout/my-requests for convenience.
+    """
+    try:
+        # Get researcher ID from user
+        from src.domain.models.researcher import Researcher
+        researcher = payment_service.db.query(Researcher).filter(
+            Researcher.user_id == current_user.id
+        ).first()
+        
+        if not researcher:
+            return PayoutListResponse(payouts=[], total=0)
+        
+        payouts = payment_service.list_payout_requests(
+            researcher_id=researcher.id,
+            status=status,
+            skip=skip,
+            limit=limit
+        )
+        
+        return PayoutListResponse(
+            payouts=[
+                PayoutRequestResponse(
+                    payout_id=str(p.id),
+                    researcher_id=str(p.researcher_id),
+                    amount=float(p.amount),
+                    payment_method=p.payment_method,
+                    payment_details=p.payment_details,
+                    status=p.status,
+                    created_at=p.created_at.isoformat(),
+                    processed_at=p.processed_at.isoformat() if p.processed_at else None
+                )
+                for p in payouts
+            ],
+            total=len(payouts)
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get payouts: {str(e)}"
         )
 
 

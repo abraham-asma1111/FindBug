@@ -10,7 +10,7 @@ from src.core.security import SecurityAudit
 from src.services.webhook_service import WebhookService
 from src.domain.models.user import User
 from src.domain.models.organization import Organization
-from src.api.v1.middlewares import get_current_user
+from src.core.dependencies import get_current_user
 from src.api.v1.schemas.webhooks import (
     WebhookCreateRequest,
     WebhookUpdateRequest,

@@ -304,7 +304,19 @@ class MatchingService:
         
         self.db.commit()
         
-        # TODO: Send notification to researchers
+        # Send notification to researchers about invitations
+        for invitation in invitations:
+            program = self.db.query(BountyProgram).filter(
+                BountyProgram.id == invitation.program_id
+            ).first()
+            
+            if program:
+                self.notify_researcher_match(
+                    researcher_id=invitation.researcher_id,
+                    program_name=program.name,
+                    program_id=program.id,
+                    match_score=invitation.match_score
+                )
         
         return invitations
     
@@ -1248,8 +1260,23 @@ class MatchingService:
         self.db.commit()
         self.db.refresh(assignment)
         
-        # TODO: Trigger actual assignment to engagement
-        # TODO: Send notification to researcher
+        # Send notification to researcher about assignment approval
+        researcher = self.db.query(Researcher).filter(
+            Researcher.id == assignment.researcher_id
+        ).first()
+        
+        if researcher:
+            self.notification_service.create_notification(
+                user_id=researcher.user_id,
+                notification_type=NotificationType.ASSIGNMENT_APPROVED,
+                title="Assignment Approved! 🎉",
+                message=f"Your assignment has been approved. Check your dashboard for next steps.",
+                priority=NotificationPriority.HIGH,
+                related_entity_type="assignment",
+                related_entity_id=assignment.id,
+                action_url="/assignments/" + str(assignment.id),
+                action_text="View Assignment"
+            )
         
         return assignment
     

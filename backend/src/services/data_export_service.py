@@ -97,8 +97,21 @@ class DataExportService:
             "user_id": user_id,
             "export_type": export_type
         })
+        # Trigger background job for export processing
+        from src.tasks.data_export_tasks import process_export_task
         
-        # TODO: Trigger background job to process export (Celery task)
+        # Queue export for background processing
+        process_export_task.delay(export_id=str(export.id))
+        
+        return {
+            "export_id": str(export.id),
+            "export_type": export.export_type,
+            "format": export.format,
+            "status": export.status,
+                "expires_at": export.expires_at.isoformat(),
+                "created_at": export.created_at.isoformat(),
+                "message": "Export request created. Processing will begin shortly."
+            }
         
         return {
             "export_id": str(export.id),
@@ -336,9 +349,21 @@ class DataExportService:
             export.status = "processing"
             self.db.commit()
             
-            # TODO: Fetch data based on export_type and filters
-            # This is a placeholder - actual implementation would query relevant tables
-            data = []
+            # Fetch data based on export type and filters
+            # Fetch data based on export type and filters
+            # Apply filters if provided
+            if export.filters:
+                # Simple filtering implementation
+                filtered_data = []
+                for item in data:
+                    match = True
+                    for key, value in export.filters.items():
+                        if key in item and str(item[key]) != str(value):
+                            match = False
+                            break
+                    if match:
+                        filtered_data.append(item)
+                data = filtered_data
             
             # Generate export file
             if export.format == "csv":

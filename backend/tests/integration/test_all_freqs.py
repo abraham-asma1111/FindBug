@@ -15,22 +15,25 @@ class TestFREQ01_Authentication:
     
     def test_researcher_registration(self, client):
         """Test researcher registration"""
-        response = client.post("/api/v1/auth/register", json={
+        response = client.post("/api/v1/auth/register/researcher", json={
             "email": "researcher@test.com",
             "password": "Test123!@#",
-            "full_name": "Test Researcher",
-            "role": "researcher"
+            "password_confirm": "Test123!@#",
+            "first_name": "Test",
+            "last_name": "Researcher"
         })
         assert response.status_code == 201
         assert "user_id" in response.json()
     
     def test_organization_registration(self, client):
         """Test organization registration"""
-        response = client.post("/api/v1/auth/register", json={
+        response = client.post("/api/v1/auth/register/organization", json={
             "email": "org@test.com",
             "password": "Test123!@#",
-            "company_name": "Test Org",
-            "role": "organization"
+            "password_confirm": "Test123!@#",
+            "first_name": "Test",
+            "last_name": "Organization",
+            "company_name": "Test Org"
         })
         assert response.status_code == 201
     
@@ -88,9 +91,10 @@ class TestFREQ03_08_ProgramManagement:
         })
         assert response.status_code == 201
     
-    def test_list_programs(self, client):
+    def test_list_programs(self, client, researcher_token):
         """FREQ-04: List available programs"""
-        response = client.get("/api/v1/programs")
+        headers = {"Authorization": f"Bearer {researcher_token}"}
+        response = client.get("/api/v1/programs", headers=headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)
     
@@ -154,12 +158,12 @@ class TestFREQ11_Reputation:
     def test_get_researcher_reputation(self, client, researcher_token):
         """Test retrieving researcher reputation"""
         headers = {"Authorization": f"Bearer {researcher_token}"}
-        response = client.get("/api/v1/reputation/me", headers=headers)
+        response = client.get("/api/v1/my-reputation", headers=headers)
         assert response.status_code == 200
     
     def test_leaderboard(self, client):
         """Test global leaderboard"""
-        response = client.get("/api/v1/reputation/leaderboard")
+        response = client.get("/api/v1/leaderboard")
         assert response.status_code == 200
 
 
@@ -207,9 +211,10 @@ class TestFREQ13_Notifications:
 class TestFREQ14_Search:
     """FREQ-14: Search and filtering"""
     
-    def test_search_programs(self, client):
+    def test_search_programs(self, client, researcher_token):
         """Test searching programs"""
-        response = client.get("/api/v1/programs?search=security")
+        headers = {"Authorization": f"Bearer {researcher_token}"}
+        response = client.get("/api/v1/programs?search=security", headers=headers)
         assert response.status_code == 200
     
     def test_filter_reports(self, client, organization_token):
@@ -307,7 +312,7 @@ class TestFREQ20_Subscription:
     def test_subscribe_basic_tier(self, client, organization_token):
         """Test subscribing to Basic tier (15K ETB quarterly)"""
         headers = {"Authorization": f"Bearer {organization_token}"}
-        response = client.post("/api/v1/subscriptions/subscribe", headers=headers, json={
+        response = client.post("/api/v1/subscriptions", headers=headers, json={
             "tier": "basic",
             "payment_method": "bank_transfer"
         })
@@ -615,10 +620,11 @@ class TestAllFREQsSummary:
         
         # Test that main endpoints exist
         endpoints = [
-            "/api/v1/auth/register",
+            "/api/v1/auth/register/researcher",
+            "/api/v1/auth/register/organization",
             "/api/v1/programs",
             "/api/v1/reports",
-            "/api/v1/subscriptions/subscribe",
+            "/api/v1/subscriptions",
             "/api/v1/simulation/challenges",
             "/api/v1/ptaas/engagements",
             "/api/v1/live-events",
