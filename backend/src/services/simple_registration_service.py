@@ -2,7 +2,7 @@
 Simple Registration Service - HackerOne Style
 Create account immediately, send verification email for full access
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict
 import uuid
 
@@ -69,68 +69,55 @@ class SimpleRegistrationService:
         if existing_user:
             raise ValueError("Email already registered")
         
-        # Create user account (inactive until email verified)
-        user = User(
+        # Store registration data temporarily - DO NOT create user yet
+        # User will only be created after email verification
+        
+        # Check if email already exists in main users table
+        existing_user = self.user_repo.get_by_email(email)
+        if existing_user:
+            raise ValueError("Email already registered")
+        
+        # Store in pending registrations table
+        from src.domain.models.pending_registration import PendingRegistration
+        
+        # Remove any existing pending registration for this email
+        existing_pending = self.db.query(PendingRegistration).filter(
+            PendingRegistration.email == email.lower()
+        ).first()
+        if existing_pending:
+            self.db.delete(existing_pending)
+            self.db.commit()
+        
+        # Create pending registration
+        pending_registration = PendingRegistration(
             id=uuid.uuid4(),
             email=email.lower(),
             password_hash=PasswordSecurity.hash_password(password),
-            role=UserRole.RESEARCHER,
-            is_verified=False,  # Email not verified yet
-            is_active=False     # Account inactive until email verified
-        )
-        user = self.user_repo.create(user)
-        
-        # Create researcher profile
-        username = email.split('@')[0]
-        username = ''.join(c for c in username if c.isalnum() or c in '_-')
-        if len(username) < 3:
-            username = username + str(uuid.uuid4())[:4]
-        if len(username) > 50:
-            username = username[:50]
-        
-        # Ensure unique username
-        existing_researcher = self.researcher_repo.get_by_username(username)
-        if existing_researcher:
-            username = username[:45] + str(uuid.uuid4())[:5]
-        
-        researcher = Researcher(
-            id=uuid.uuid4(),
-            user_id=user.id,
-            username=username,
             first_name=InputSanitization.sanitize_html(first_name.strip()),
             last_name=InputSanitization.sanitize_html(last_name.strip()),
-            reputation_score=0,
-            total_bounties_earned=0.0,
-            kyc_status="not_started"
+            role="researcher",
+            verification_token=f"verify-{uuid.uuid4()}",
+            expires_at=datetime.utcnow() + timedelta(hours=24)
         )
-        self.researcher_repo.create(researcher)
         
-        # Generate verification token with user ID and send email
-        verification_token = f"verify-{user.id}"
+        self.db.add(pending_registration)
+        self.db.commit()
         
         # Send verification email
         email_sent = EmailService.send_email_verification_link(
             email=email,
-            token=verification_token,
+            token=pending_registration.verification_token,
             user_type="researcher"
         )
         
         if not email_sent:
             logger.warning(f"Failed to send verification email to {email}")
         
-        # Log security event
-        SecurityAudit.log_security_event(
-            "REGISTRATION_COMPLETED",
-            user.id,
-            {"email": user.email, "role": "researcher", "email_verified": False},
-            request
-        )
-        
         return {
             "success": True,
-            "message": "Account created successfully! Please check your email and click the verification link to activate your account.",
-            "user_id": str(user.id),
-            "email": user.email,
+            "message": "Registration initiated! Please check your email and click the verification link to complete your account creation.",
+            "user_id": str(pending_registration.id),  # Use pending registration ID
+            "email": email,
             "can_login": False,
             "email_verified": False
         }
@@ -170,99 +157,221 @@ class SimpleRegistrationService:
         if existing_user:
             raise ValueError("Email already registered")
         
-        # Create user account (inactive until email verified)
-        user = User(
+        # Store registration data temporarily - DO NOT create user yet
+        # User will only be created after email verification
+        
+        # Check if email already exists in main users table
+        existing_user = self.user_repo.get_by_email(email)
+        if existing_user:
+            raise ValueError("Email already registered")
+        
+        # Store in pending registrations table
+        from src.domain.models.pending_registration import PendingRegistration
+        
+        # Remove any existing pending registration for this email
+        existing_pending = self.db.query(PendingRegistration).filter(
+            PendingRegistration.email == email.lower()
+        ).first()
+        if existing_pending:
+            self.db.delete(existing_pending)
+            self.db.commit()
+        
+        # Create pending registration
+        pending_registration = PendingRegistration(
             id=uuid.uuid4(),
             email=email.lower(),
             password_hash=PasswordSecurity.hash_password(password),
-            role=UserRole.ORGANIZATION,
-            is_verified=False,  # Email not verified yet
-            is_active=False     # Account inactive until email verified
-        )
-        user = self.user_repo.create(user)
-        
-        # Create organization profile
-        organization = Organization(
-            id=uuid.uuid4(),
-            user_id=user.id,
-            company_name=InputSanitization.sanitize_html(company_name.strip()),
             first_name=InputSanitization.sanitize_html(first_name.strip()),
             last_name=InputSanitization.sanitize_html(last_name.strip()),
+            role="organization",
+            company_name=InputSanitization.sanitize_html(company_name.strip()),
             phone_number=phone_number.strip(),
             country=country.strip() if country else None,
-            subscription_type="basic",
-            is_verified=False  # Organizations need additional verification
+            verification_token=f"verify-{uuid.uuid4()}",
+            expires_at=datetime.utcnow() + timedelta(hours=24)
         )
-        self.organization_repo.create(organization)
         
-        # Generate verification token and send email
-        verification_token = EmailService.generate_verification_token()
+        self.db.add(pending_registration)
+        self.db.commit()
         
         # Send verification email
         email_sent = EmailService.send_email_verification_link(
             email=email,
-            token=verification_token,
+            token=pending_registration.verification_token,
             user_type="organization"
         )
         
         if not email_sent:
             logger.warning(f"Failed to send verification email to {email}")
         
-        # Log security event
-        SecurityAudit.log_security_event(
-            "REGISTRATION_COMPLETED",
-            user.id,
-            {"email": user.email, "role": "organization", "email_verified": False},
-            request
-        )
-        
         return {
             "success": True,
-            "message": "Account created successfully! Please check your email and click the verification link to activate your account.",
-            "user_id": str(user.id),
-            "email": user.email,
+            "message": "Registration initiated! Please check your email and click the verification link to complete your account creation.",
+            "user_id": str(pending_registration.id),  # Use pending registration ID
+            "email": email,
             "can_login": False,
             "email_verified": False
         }
     
     def verify_email(self, token: str, request: any = None) -> Dict[str, any]:
         """
-        Verify email using token and activate account
+        Verify email using token and CREATE user account from pending registration
         """
-        # In a real implementation, you'd store tokens in database
-        # For now, we'll implement a simple verification that activates any account
-        # You should implement proper token storage and validation
-        
-        # This is a simplified version - in production you'd:
-        # 1. Store verification tokens in database with user_id
-        # 2. Validate token hasn't expired
-        # 3. Find user by token
-        # 4. Activate account
-        
-        # For demo purposes, let's assume token format: "verify-{user_id}"
-        if token.startswith("verify-"):
-            try:
-                user_id = token.replace("verify-", "")
-                user = self.user_repo.get_by_id(user_id)
-                
-                if user and not user.is_verified:
-                    # Activate account
-                    user.is_verified = True
-                    user.is_active = True
-                    self.db.commit()
-                    
-                    return {
-                        "success": True,
-                        "message": "Email verified successfully! You can now login to your account.",
-                        "email_verified": True,
-                        "can_login": True
-                    }
-            except:
-                pass
-        
+        from src.domain.models.pending_registration import PendingRegistration
+
+        # Find pending registration by token
+        pending = self.db.query(PendingRegistration).filter(
+            PendingRegistration.verification_token == token
+        ).first()
+
+        if not pending:
+            raise ValueError("Invalid or expired verification link.")
+
+        # Check if token has expired
+        if pending.expires_at and datetime.utcnow() > pending.expires_at:
+            # Clean up expired token
+            self.db.delete(pending)
+            self.db.commit()
+            raise ValueError("Verification link has expired. Please register again.")
+
+        # Check if user already exists (shouldn't happen, but safety check)
+        existing_user = self.user_repo.get_by_email(pending.email)
+        if existing_user:
+            # Clean up pending registration
+            self.db.delete(pending)
+            self.db.commit()
+            return {
+                "success": True,
+                "message": "Email already verified. You can login to your account.",
+                "email_verified": True,
+                "can_login": True
+            }
+
+        try:
+            # NOW create the actual user account
+            user = User(
+                id=uuid.uuid4(),
+                email=pending.email,
+                password_hash=pending.password_hash,
+                role=UserRole.RESEARCHER if pending.role == "researcher" else UserRole.ORGANIZATION,
+                is_verified=True,   # Email is verified
+                is_active=True      # Account is active
+            )
+            user = self.user_repo.create(user)
+
+            # Create role-specific profile
+            if pending.role == "researcher":
+                # Create researcher profile
+                username = pending.email.split('@')[0]
+                username = ''.join(c for c in username if c.isalnum() or c in '_-')
+                if len(username) < 3:
+                    username = username + str(uuid.uuid4())[:4]
+                if len(username) > 50:
+                    username = username[:50]
+
+                # Ensure unique username
+                existing_researcher = self.researcher_repo.get_by_username(username)
+                if existing_researcher:
+                    username = username[:45] + str(uuid.uuid4())[:5]
+
+                researcher = Researcher(
+                    id=uuid.uuid4(),
+                    user_id=user.id,
+                    username=username,
+                    first_name=pending.first_name,
+                    last_name=pending.last_name,
+                    kyc_status="not_started"
+                )
+                self.researcher_repo.create(researcher)
+
+            elif pending.role == "organization":
+                # Create organization profile
+                organization = Organization(
+                    id=uuid.uuid4(),
+                    user_id=user.id,
+                    company_name=pending.company_name,
+                    first_name=pending.first_name,
+                    last_name=pending.last_name,
+                    phone_number=pending.phone_number,
+                    country=pending.country,
+                    subscription_type="basic",
+                    is_verified=False  # Organizations need additional verification
+                )
+                self.organization_repo.create(organization)
+
+            # Clean up pending registration
+            self.db.delete(pending)
+            self.db.commit()
+
+            # Log security event
+            SecurityAudit.log_security_event(
+                "EMAIL_VERIFIED_USER_CREATED",
+                user.id,
+                {"email": user.email, "role": pending.role},
+                request
+            )
+
+            return {
+                "success": True,
+                "message": "Email verified successfully! Your account has been created. You can now login.",
+                "email_verified": True,
+                "can_login": True
+            }
+
+        except Exception as e:
+            # If user creation fails, keep the pending registration
+            logger.error(f"Failed to create user from pending registration: {e}")
+            raise ValueError("Account creation failed. Please try again or contact support.")
+
         return {
             "success": False,
             "message": "Invalid or expired verification link.",
             "email_verified": False,
             "can_login": False
+        }
+        
+    def resend_verification_email(self, email: str, request: any = None) -> Dict[str, any]:
+        """
+        Resend verification email for unverified user
+        """
+        # Find user by email
+        user = self.user_repo.get_by_email(email)
+        if not user:
+            raise ValueError("Email not found")
+        
+        # Check if already verified
+        if user.is_verified:
+            return {
+                "success": True,
+                "message": "Email is already verified. You can login to your account."
+            }
+        
+        # Generate new verification token
+        verification_token = f"verify-{user.id}"
+        
+        # Determine user type
+        user_type = "researcher" if user.role.value == "researcher" else "organization"
+        
+        # Send verification email
+        email_sent = EmailService.send_email_verification_link(
+            email=email,
+            token=verification_token,
+            user_type=user_type
+        )
+        
+        if not email_sent:
+            logger.warning(f"Failed to resend verification email to {email}")
+            raise ValueError("Failed to send verification email. Please try again.")
+        
+        # Log security event
+        SecurityAudit.log_security_event(
+            "VERIFICATION_EMAIL_RESENT",
+            user.id,
+            {"email": user.email, "role": user_type},
+            request
+        )
+        
+        return {
+            "success": True,
+            "message": "Verification email sent! Please check your inbox and click the verification link."
         }

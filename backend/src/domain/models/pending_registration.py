@@ -35,7 +35,7 @@ class PendingRegistration(Base):
     # Basic info
     email = Column(String(255), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
-    registration_type = Column(Enum(RegistrationType), nullable=False)
+    role = Column(String(50), nullable=False)  # "researcher" or "organization"
     
     # Personal info
     first_name = Column(String(100), nullable=False)
@@ -79,4 +79,4 @@ class PendingRegistration(Base):
         return datetime.utcnow() > self.otp_expires_at
     
     def __repr__(self):
-        return f"<PendingRegistration(email='{self.email}', type='{self.registration_type}')>"
+        return f"<PendingRegistration(email='{self.email}', role='{self.role}')>"

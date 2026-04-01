@@ -22,9 +22,10 @@ class InitiateRegistrationResponse(BaseModel):
     """Response from initiate registration"""
     success: bool = Field(..., description="Whether registration was initiated successfully")
     message: str = Field(..., description="Success message")
-    email: str = Field(..., description="Email address where OTP was sent")
-    verification_method: str = Field(..., description="Verification method (otp)")
-    expires_in_minutes: int = Field(..., description="OTP expiration time in minutes")
+    user_id: str = Field(..., description="Created user ID")
+    email: str = Field(..., description="User email address")
+    can_login: bool = Field(..., description="Whether user can login (false until email verified)")
+    email_verified: bool = Field(..., description="Whether email is verified")
 
 
 class VerifyOTPRequest(BaseModel):

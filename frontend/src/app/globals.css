@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f5f1ec;
+    --foreground: #2d2a26;
+    --surface: #fbf8f4;
+    --card: #ffffff;
+    --border: #ddd4cb;
+    --muted: #6d6760;
+    --primary: #ef2330;
+    --primary-soft: #fde9e7;
+    --chip-blue: #2d78a8;
+    --chip-blue-soft: #edf5fb;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+  
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Custom component styles can be added here */
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

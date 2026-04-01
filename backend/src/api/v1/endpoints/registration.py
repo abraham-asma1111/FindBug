@@ -19,17 +19,18 @@ from src.api.v1.schemas.registration import (
     VerifyTokenRequest,
     VerifyTokenResponse
 )
+from src.api.v1.schemas.auth import VerifyEmailRequest
 
 router = APIRouter(prefix="/registration", tags=["Registration"])
 
 
-def get_registration_service(db: Session = Depends(get_db)) -> RegistrationService:
-    """Dependency to get RegistrationService instance"""
+def get_registration_service(db: Session = Depends(get_db)) -> SimpleRegistrationService:
+    """Dependency to get SimpleRegistrationService instance"""
     pending_repo = PendingRegistrationRepository(db)
     user_repo = UserRepository(db)
     researcher_repo = ResearcherRepository(db)
     organization_repo = OrganizationRepository(db)
-    return RegistrationService(pending_repo, user_repo, researcher_repo, organization_repo, db)
+    return SimpleRegistrationService(user_repo, researcher_repo, organization_repo, db)
 
 
 @router.post(
@@ -42,7 +43,7 @@ def get_registration_service(db: Session = Depends(get_db)) -> RegistrationServi
 async def initiate_researcher_registration(
     data: InitiateRegistrationRequest,
     request: Request,
-    registration_service: RegistrationService = Depends(get_registration_service)
+    registration_service: SimpleRegistrationService = Depends(get_registration_service)
 ):
     """
     Initiate researcher registration.
@@ -54,7 +55,7 @@ async def initiate_researcher_registration(
     4. Return success message
     """
     try:
-        result = registration_service.initiate_researcher_registration(
+        result = registration_service.register_researcher(
             email=data.email,
             password=data.password,
             first_name=data.first_name,
@@ -93,7 +94,7 @@ async def initiate_researcher_registration(
 async def initiate_organization_registration(
     data: InitiateRegistrationRequest,
     request: Request,
-    registration_service: RegistrationService = Depends(get_registration_service)
+    registration_service: SimpleRegistrationService = Depends(get_registration_service)
 ):
     """
     Initiate organization registration.
@@ -105,7 +106,7 @@ async def initiate_organization_registration(
     4. Return success message
     """
     try:
-        result = registration_service.initiate_organization_registration(
+        result = registration_service.register_organization(
             email=data.email,
             password=data.password,
             first_name=data.first_name,
@@ -147,7 +148,7 @@ async def initiate_organization_registration(
 async def verify_registration_otp(
     data: VerifyOTPRequest,
     request: Request,
-    registration_service: RegistrationService = Depends(get_registration_service)
+    registration_service: SimpleRegistrationService = Depends(get_registration_service)
 ):
     """
     Verify OTP and complete registration.
@@ -196,7 +197,7 @@ async def verify_registration_otp(
 async def verify_registration_token(
     data: VerifyTokenRequest,
     request: Request,
-    registration_service: RegistrationService = Depends(get_registration_service)
+    registration_service: SimpleRegistrationService = Depends(get_registration_service)
 ):
     """
     Verify token (backup method) and complete registration.
@@ -240,7 +241,7 @@ async def verify_registration_token(
 async def resend_registration_otp(
     data: ResendOTPRequest,
     request: Request,
-    registration_service: RegistrationService = Depends(get_registration_service)
+    registration_service: SimpleRegistrationService = Depends(get_registration_service)
 ):
     """
     Resend OTP for pending registration.
@@ -248,12 +249,82 @@ async def resend_registration_otp(
     Use this when user didn't receive the OTP or it expired.
     """
     try:
-        result = registration_service.resend_verification_otp(
+        result = registration_service.resend_verification_email(
             email=data.email,
             request=request
         )
         
         return ResendOTPResponse(**result)
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Log error
+        SecurityAudit.log_security_event(
+            "RESEND_OTP_ERROR",
+            None,
+            {"error": str(e), "email": data.email},
+            request
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resend OTP. Please try again."
+        )
+
+
+@router.get(
+    "/verify-email",
+    summary="Verify Email Address",
+    description="Verify email address using token from email link and redirect to login"
+)
+async def verify_email_registration(
+    token: str,
+    request: Request,
+    registration_service: SimpleRegistrationService = Depends(get_registration_service)
+):
+    """
+    Verify email address using token from email link.
+    
+    This endpoint handles the simple email verification flow where users
+    click the link in their email to activate their account and get redirected to login.
+    """
+    try:
+        result = registration_service.verify_email(
+            token=token,
+            request=request
+        )
+        
+        # Redirect to login page with success message
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url="http://localhost:3000/auth/login?verified=true",
+            status_code=302
+        )
+    
+    except ValueError as e:
+        # Redirect to login with error message
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"http://localhost:3000/auth/login?error={str(e)}",
+            status_code=302
+        )
+    except Exception as e:
+        # Log error
+        SecurityAudit.log_security_event(
+            "EMAIL_VERIFICATION_ERROR",
+            None,
+            {"error": str(e), "token": token[:10] + "..."},
+            request
+        )
+        # Redirect to login with generic error
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url="http://localhost:3000/auth/login?error=Verification failed",
+            status_code=302
+        )
     
     except ValueError as e:
         raise HTTPException(

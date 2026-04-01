@@ -53,9 +53,9 @@ class EmailService:
                 print("⚠️  SMTP credentials not configured. Email not sent.")
                 return False
             
-            # Create verification link
-            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3002')
-            verification_link = f"{base_url}/verify-email?token={token}&type={user_type}"
+            # Create verification link - point to backend endpoint
+            backend_url = os.getenv('BACKEND_URL', 'http://localhost:8002')
+            verification_link = f"{backend_url}/api/v1/registration/verify-email?token={token}&type={user_type}"
             
             # Create email message
             msg = MIMEMultipart('alternative')
@@ -421,28 +421,126 @@ class EmailService:
             return False
 
     @staticmethod
-    def send_password_reset_email(email: str, reset_token: str):
+    def send_password_reset_email(email: str, reset_token: str) -> bool:
         """
-        Send password reset email
+        Send password reset email with link
 
         Args:
             email: User email address
             reset_token: Password reset token
         """
-        reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
-
-        print(f"\n{'='*60}")
-        print(f"📧 PASSWORD RESET EMAIL")
-        print(f"{'='*60}")
-        print(f"To: {email}")
-        print(f"Subject: Reset Your Password")
-        print(f"\nClick the link below to reset your password:")
-        print(f"{reset_link}")
-        print(f"\nThis link will expire in 15 minutes.")
-        print(f"If you didn't request this, please ignore this email.")
-        print(f"{'='*60}\n")
-
-        # TODO: Replace with actual email service (SendGrid, AWS SES, etc.)
+        try:
+            # Email configuration from environment
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@findbugplatform.com')
+            
+            if not smtp_user or not smtp_password:
+                print("⚠️  SMTP credentials not configured. Email not sent.")
+                return False
+            
+            # Create reset link
+            frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+            reset_link = f"{frontend_url}/auth/reset-password?token={reset_token}"
+            
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = 'Reset Your FindBug Password'
+            msg['From'] = smtp_from
+            msg['To'] = email
+            
+            # Email body
+            text_body = f"""
+            Password Reset Request
+            
+            We received a request to reset your password for your FindBug account.
+            
+            Click the link below to reset your password:
+            {reset_link}
+            
+            This link will expire in 15 minutes.
+            
+            If you didn't request this password reset, please ignore this email.
+            Your password will remain unchanged.
+            
+            Best regards,
+            FindBug Platform Team
+            Bahir Dar University
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: #7C3AED; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">🔐 Reset Your Password</h1>
+                  </div>
+                  
+                  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none;">
+                    <h2 style="color: #7C3AED; margin-top: 0;">Password Reset Request</h2>
+                    <p>We received a request to reset your password for your FindBug account.</p>
+                    <p>Click the button below to reset your password:</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="{reset_link}" 
+                         style="background-color: #7C3AED; color: white; padding: 15px 30px; 
+                                text-decoration: none; border-radius: 8px; display: inline-block; 
+                                font-weight: bold; font-size: 16px;">
+                        🔑 Reset Password
+                      </a>
+                    </div>
+                    
+                    <p style="color: #e74c3c; font-size: 14px; text-align: center;">
+                      ⏰ This link expires in 15 minutes
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                    
+                    <div style="background: #f1f3f4; padding: 15px; border-radius: 5px;">
+                      <p style="margin: 0; color: #666; font-size: 14px;">
+                        <strong>Can't click the button?</strong> Copy and paste this link in your browser:<br>
+                        <a href="{reset_link}" style="color: #7C3AED; word-break: break-all;">{reset_link}</a>
+                      </p>
+                    </div>
+                    
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 5px; margin-top: 20px;">
+                      <p style="margin: 0; color: #856404; font-size: 14px;">
+                        <strong>⚠️ Security Notice:</strong> If you didn't request this password reset, 
+                        please ignore this email. Your password will remain unchanged.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div style="background: #f1f3f4; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;">
+                    <p style="margin: 0;">FindBug Platform - Bug Bounty & Security Research</p>
+                    <p style="margin: 5px 0 0;">Bahir Dar University - Cyber Security Program</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            # Attach both plain text and HTML versions
+            part1 = MIMEText(text_body, 'plain')
+            part2 = MIMEText(html_body, 'html')
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            # Send email
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            print(f"✅ Password reset email sent to {email}")
+            print(f"   Link: {reset_link}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send password reset email: {e}")
+            return False
 
     @staticmethod
     def send_html_email(
