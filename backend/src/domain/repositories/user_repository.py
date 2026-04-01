@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import datetime
 import uuid
 
-from src.domain.models.user import User, UserRole
+from src.domain.models.user import User
 
 
 class UserRepository:
@@ -17,6 +17,8 @@ class UserRepository:
     
     def get_by_id(self, user_id: uuid.UUID) -> Optional[User]:
         """Get user by ID"""
+        if isinstance(user_id, str):
+            user_id = uuid.UUID(user_id)
         return self.db.query(User).filter(User.id == user_id).first()
     
     def get_by_email(self, email: str) -> Optional[User]:

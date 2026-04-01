@@ -3,11 +3,12 @@ Bug Bounty Platform - Main Application
 FastAPI Backend Server
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration
 from src.api.v1.endpoints import simulation_gateway
+from src.core.database import get_database_status
 
 # Version and metadata
 VERSION = "1.0.0"
@@ -77,13 +78,19 @@ app.include_router(email_preferences.router, prefix="/api/v1")
 app.include_router(payment_methods.router, prefix="/api/v1")
 app.include_router(duplicate_detection.router, prefix="/api/v1")
 
-
 # Health Check Endpoint
 @app.get("/health", tags=["Health"])
-async def health_check():
+async def health_check(response: Response):
     """Health check endpoint"""
+    database_status = get_database_status()
+    overall_status = "healthy" if database_status == "healthy" else "degraded"
+
+    if database_status != "healthy":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
     return {
-        "status": "healthy",
+        "status": overall_status,
+        "database": database_status,
         "app": APP_NAME,
         "version": VERSION,
         "environment": "development"

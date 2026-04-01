@@ -3,23 +3,26 @@ FastAPI dependency injection functions for FindBug Platform
 """
 from typing import Optional
 from fastapi import Depends, Header
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from src.core.database import SessionLocal
+from src.core.database import get_db
 from src.core.security import verify_access_token
 from src.core.exceptions import UnauthorizedException, ForbiddenException
 from src.domain.repositories.user_repository import UserRepository
 from src.utils.constants import UserRole
 
 
-# ─── Database ─────────────────────────────────────────────────────────────────
-def get_db() -> Session:
-    """Yield a SQLAlchemy database session."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def _get_user_from_token_claims(
+    repo: UserRepository,
+    user_id_claim: Optional[str],
+    email_claim: Optional[str],
+):
+    """Resolve the authenticated user from explicit token claims."""
+    if user_id_claim:
+        return repo.get_by_id(user_id_claim)
+    if email_claim:
+        return repo.get_by_email(email_claim)
+    return None
 
 
 # ─── Bearer token extraction ─────────────────────────────────────────────────
@@ -43,35 +46,16 @@ def get_current_user(
     if not payload:
         raise UnauthorizedException("Invalid or expired token.")
 
-    # Try user_id first (new format), fall back to sub (email) for compatibility
-    user_id = payload.get("user_id") or payload.get("sub")
-    if not user_id:
+    user_id_claim = payload.get("user_id")
+    email_claim = payload.get("sub")
+    if not user_id_claim and not email_claim:
         raise UnauthorizedException("Token missing user identifier.")
 
     repo = UserRepository(db)
-    # If user_id looks like UUID, use get_by_id, otherwise use get_by_email
     try:
-        from uuid import UUID
-        from src.domain.models.user import User
-        from src.domain.models.organization import Organization
-        from src.domain.models.researcher import Researcher
-        
-        UUID(user_id)  # Validate UUID format
-        # Eager load relationships to avoid lazy loading issues
-        user = db.query(User).options(
-            joinedload(User.organization),
-            joinedload(User.researcher)
-        ).filter(User.id == user_id).first()
-    except (ValueError, AttributeError):
-        # Not a UUID, treat as email
-        from src.domain.models.user import User
-        from src.domain.models.organization import Organization
-        from src.domain.models.researcher import Researcher
-        
-        user = db.query(User).options(
-            joinedload(User.organization),
-            joinedload(User.researcher)
-        ).filter(User.email == user_id).first()
+        user = _get_user_from_token_claims(repo, user_id_claim, email_claim)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise UnauthorizedException("Token missing valid user identifier.") from exc
     
     if not user:
         raise UnauthorizedException("User account not found.")
@@ -88,21 +72,17 @@ def get_current_user_optional(
     if not authorization or not authorization.startswith("Bearer "):
         return None
     token = authorization.split(" ", 1)[1]
+    payload = verify_access_token(token)
+    if not payload:
+        return None
+    user_id_claim = payload.get("user_id")
+    email_claim = payload.get("sub")
+    if not user_id_claim and not email_claim:
+        return None
+    repo = UserRepository(db)
     try:
-        payload = verify_access_token(token)
-        if not payload:
-            return None
-        # Try user_id first, fall back to sub (email)
-        user_id = payload.get("user_id") or payload.get("sub")
-        repo = UserRepository(db)
-        # If user_id looks like UUID, use get_by_id, otherwise use get_by_email
-        try:
-            from uuid import UUID
-            UUID(user_id)
-            return repo.get_by_id(user_id)
-        except (ValueError, AttributeError):
-            return repo.get_by_email(user_id)
-    except Exception:
+        return _get_user_from_token_claims(repo, user_id_claim, email_claim)
+    except (ValueError, TypeError, AttributeError):
         return None
 
 

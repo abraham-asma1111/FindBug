@@ -98,10 +98,26 @@ class DashboardService:
         if rank and total_researchers > 0:
             percentile = ((total_researchers - rank + 1) / total_researchers) * 100
         
-        # Recent submissions (last 5)
-        recent_submissions = self.db.query(VulnerabilityReport).filter(
+        # Submission pipeline feed (latest 25) with program info
+        recent_submissions_query = self.db.query(VulnerabilityReport).filter(
             VulnerabilityReport.researcher_id == researcher_id
-        ).order_by(desc(VulnerabilityReport.submitted_at)).limit(5).all()
+        ).order_by(desc(VulnerabilityReport.submitted_at)).limit(25).all()
+        
+        # Format submissions with program name
+        recent_submissions = []
+        for report in recent_submissions_query:
+            submission_data = {
+                'id': str(report.id),
+                'report_number': report.report_number,
+                'title': report.title,
+                'status': report.status,
+                'assigned_severity': report.assigned_severity,
+                'cvss_score': float(report.cvss_score) if report.cvss_score else None,
+                'submitted_at': report.submitted_at.isoformat() if report.submitted_at else None,
+                'bounty_amount': float(report.bounty_amount) if report.bounty_amount else None,
+                'program_name': report.program.name if report.program else None
+            }
+            recent_submissions.append(submission_data)
         
         # Program participation
         active_programs = self.db.query(ProgramParticipation).filter(
@@ -109,8 +125,8 @@ class DashboardService:
             ProgramParticipation.status == 'active'
         ).count()
         
-        # Monthly trend (last 6 months)
-        monthly_trend = self._get_researcher_monthly_trend(researcher_id)
+        # Monthly trend (last 12 months)
+        monthly_trend = self._get_researcher_monthly_trend(researcher_id, months=12)
         
         return {
             'overview': {
@@ -137,15 +153,14 @@ class DashboardService:
     def _get_researcher_monthly_trend(
         self,
         researcher_id: UUID,
-        months: int = 6
+        months: int = 12
     ) -> List[Dict]:
         """Get researcher monthly submission and earnings trend."""
         trend = []
         
         for i in range(months - 1, -1, -1):
-            month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            month_start = month_start - timedelta(days=30 * i)
-            month_end = month_start + timedelta(days=30)
+            month_start = self._get_month_start(months_ago=i)
+            month_end = self._get_next_month_start(month_start)
             
             submissions = self.db.query(VulnerabilityReport).filter(
                 VulnerabilityReport.researcher_id == researcher_id,
@@ -164,11 +179,26 @@ class DashboardService:
             
             trend.append({
                 'month': month_start.strftime('%Y-%m'),
+                'label': month_start.strftime('%b'),
                 'submissions': submissions,
                 'earnings': float(earnings)
             })
         
         return trend
+
+    def _get_month_start(self, months_ago: int = 0) -> datetime:
+        """Get the first day of a month relative to the current UTC month."""
+        now = datetime.utcnow()
+        month_index = (now.year * 12 + now.month - 1) - months_ago
+        year = month_index // 12
+        month = month_index % 12 + 1
+        return datetime(year, month, 1)
+
+    def _get_next_month_start(self, month_start: datetime) -> datetime:
+        """Get the first day of the month after month_start."""
+        if month_start.month == 12:
+            return datetime(month_start.year + 1, 1, 1)
+        return datetime(month_start.year, month_start.month + 1, 1)
     
     # Organization Dashboard
     

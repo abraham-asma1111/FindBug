@@ -4,11 +4,15 @@ Authentication Endpoints - API routes for user authentication
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
-from src.core.database import get_db
+from src.core.database import get_db, is_database_disconnect_error
+from src.core.kyc_service import PersonaKYCService
+from src.core.logging import get_logger
 from src.core.security import SecurityAudit, InputSanitization
 from src.services.auth_service import AuthService
 from src.domain.models.user import User
-from src.domain.repositories import UserRepository, ResearcherRepository, OrganizationRepository
+from src.domain.repositories.organization_repository import OrganizationRepository
+from src.domain.repositories.researcher_repository import ResearcherRepository
+from src.domain.repositories.user_repository import UserRepository
 from src.core.dependencies import get_current_user, get_current_verified_user
 from src.api.v1.schemas.auth import (
     RegisterResearcherRequest,
@@ -31,6 +35,7 @@ from src.api.v1.schemas.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = get_logger(__name__)
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
@@ -41,6 +46,18 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     return AuthService(user_repo, researcher_repo, organization_repo, db)
 
 
+def raise_database_unavailable(exc: Exception, action: str) -> None:
+    """Translate transient DB disconnects into a consistent 503 response."""
+    if is_database_disconnect_error(exc):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"{action} is temporarily unavailable while the database reconnects. "
+                "Please try again."
+            ),
+        ) from exc
+
+
 @router.post(
     "/register/researcher",
     response_model=RegisterResponse,
@@ -49,7 +66,7 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     description="Register a new security researcher account - Extended ERD"
 )
 async def register_researcher(
-    data: RegisterResearcherRequest = None,
+    data: RegisterResearcherRequest,
     request: Request = None,
     auth_service: AuthService = Depends(get_auth_service)
 ):
@@ -61,13 +78,6 @@ async def register_researcher(
     - Password: min 8 chars, uppercase, lowercase, digit, special char
     - Optional: bio, website, github, twitter
     """
-    # Handle GET requests without data
-    if data is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Registration data required"
-        )
-    
     try:
         # Validate password confirmation
         if data.password != data.password_confirm:
@@ -104,6 +114,7 @@ async def register_researcher(
             {"error": str(e), "role": "researcher"},
             request
         )
+        raise_database_unavailable(e, "Registration")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Registration failed. Please try again."
@@ -117,15 +128,8 @@ async def register_researcher(
     summary="Register as Organization",
     description="Register a new organization account - Extended ERD"
 )
-@router.post(
-    "/register/organization",
-    response_model=RegisterResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Register as Organization",
-    description="Register a new organization account - Extended ERD"
-)
 async def register_organization(
-    data: RegisterOrganizationRequest = None,
+    data: RegisterOrganizationRequest,
     request: Request = None,
     auth_service: AuthService = Depends(get_auth_service)
 ):
@@ -138,13 +142,6 @@ async def register_organization(
     - Company name: min 2 chars
     - Optional: industry, website, subscription_type
     """
-    # Handle GET requests without data
-    if data is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Registration data required"
-        )
-    
     try:
         # Validate password confirmation
         if data.password != data.password_confirm:
@@ -183,6 +180,7 @@ async def register_organization(
             {"error": str(e), "role": "organization"},
             request
         )
+        raise_database_unavailable(e, "Registration")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Registration failed. Please try again."
@@ -196,7 +194,7 @@ async def register_organization(
     description="Authenticate user and receive JWT token"
 )
 async def login(
-    data: LoginRequest = None,
+    data: LoginRequest,
     request: Request = None,
     auth_service: AuthService = Depends(get_auth_service)
 ):
@@ -210,13 +208,6 @@ async def login(
     - Failed login attempt tracking
     - Security event logging
     """
-    # Handle GET requests without data
-    if data is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Login credentials required"
-        )
-    
     try:
         result = auth_service.login(
             email=data.email,
@@ -241,6 +232,7 @@ async def login(
             {"error": str(e), "email": data.email},
             request
         )
+        raise_database_unavailable(e, "Login")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed. Please try again."
@@ -278,6 +270,7 @@ async def verify_email(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "Email verification")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Email verification failed. Please try again."
@@ -305,6 +298,7 @@ async def resend_verification(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "Verification email delivery")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send verification email. Please try again."
@@ -345,6 +339,7 @@ async def enable_mfa(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "MFA enablement")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to enable MFA. Please try again."
@@ -383,6 +378,7 @@ async def verify_mfa_setup(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "MFA verification")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="MFA verification failed. Please try again."
@@ -421,6 +417,7 @@ async def disable_mfa(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "MFA disablement")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to disable MFA. Please try again."
@@ -450,9 +447,8 @@ async def refresh_token(
             detail=str(e)
         )
     except Exception as e:
-        print(f"[ERROR] Refresh token failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Refresh token failed", extra={"error": str(e)})
+        raise_database_unavailable(e, "Token refresh")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Token refresh failed: {str(e)}"
@@ -511,6 +507,7 @@ async def reset_password(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "Password reset")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password reset failed. Please try again."
@@ -553,6 +550,7 @@ async def change_password(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "Password change")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password change failed. Please try again."
@@ -590,6 +588,7 @@ async def logout(
             detail=str(e)
         )
     except Exception as e:
+        raise_database_unavailable(e, "Logout")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout failed. Please try again."
@@ -622,9 +621,6 @@ async def start_kyc_verification(
     4. User completes ID + selfie verification
     5. Persona sends webhook with results
     """
-    from src.core.kyc_service import PersonaKYCService
-    from src.domain.repositories.researcher_repository import ResearcherRepository
-    
     # Only researchers can do KYC
     if current_user.role != "researcher":
         raise HTTPException(
@@ -662,11 +658,11 @@ async def start_kyc_verification(
         db.commit()
         
         # Log security event
-        SecurityAudit.log_event(
-            user_id=str(current_user.id),
-            event_type="kyc_started",
-            ip_address=request.client.host,
-            details={"inquiry_id": inquiry_data["inquiry_id"]}
+        SecurityAudit.log_security_event(
+            "KYC_STARTED",
+            str(current_user.id),
+            {"inquiry_id": inquiry_data["inquiry_id"]},
+            request,
         )
         
         return {
@@ -694,8 +690,6 @@ async def get_kyc_status(
     db: Session = Depends(get_db)
 ):
     """Get KYC verification status"""
-    from src.domain.repositories.researcher_repository import ResearcherRepository
-    
     if current_user.role != "researcher":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -735,9 +729,6 @@ async def persona_webhook(
     - inquiry.failed - Verification failed
     - inquiry.expired - Session expired
     """
-    from src.core.kyc_service import PersonaKYCService
-    from src.domain.repositories.researcher_repository import ResearcherRepository
-    
     # Get raw body for signature verification
     body = await request.body()
     signature = request.headers.get("Persona-Signature", "")
@@ -753,27 +744,40 @@ async def persona_webhook(
     # Parse webhook data
     webhook_data = await request.json()
     result = kyc_service.process_webhook(webhook_data)
+    researcher_id = result.get("researcher_id")
+    inquiry_id = result.get("inquiry_id")
+
+    if not researcher_id or not inquiry_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Webhook payload is missing researcher or inquiry identifiers"
+        )
     
     # Update researcher KYC status
     researcher_repo = ResearcherRepository(db)
-    researcher = researcher_repo.get(result["researcher_id"])
-    
-    if researcher:
-        researcher.kyc_status = result["kyc_status"]
-        if result["verified_at"]:
-            # Store verification timestamp if needed
-            pass
-        db.commit()
-        
-        # Log security event
-        SecurityAudit.log_event(
-            user_id=str(researcher.user_id),
-            event_type="kyc_completed",
-            ip_address=request.client.host,
-            details={
-                "kyc_status": result["kyc_status"],
-                "inquiry_id": result["inquiry_id"]
-            }
+    researcher = researcher_repo.get(researcher_id)
+
+    if not researcher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Researcher profile not found for webhook payload"
         )
+
+    researcher.kyc_status = result["kyc_status"]
+    if result["verified_at"]:
+        # Store verification timestamp if needed
+        pass
+    db.commit()
+
+    # Log security event
+    SecurityAudit.log_security_event(
+        "KYC_COMPLETED",
+        str(researcher.user_id),
+        {
+            "kyc_status": result["kyc_status"],
+            "inquiry_id": inquiry_id
+        },
+        request,
+    )
     
     return {"status": "processed"}
