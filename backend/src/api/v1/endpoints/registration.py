@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.security import SecurityAudit
-from src.services.simple_registration_service import SimpleRegistrationService
+from src.services.registration_service import RegistrationService
 from src.domain.repositories.pending_registration_repository import PendingRegistrationRepository
 from src.domain.repositories import UserRepository, ResearcherRepository, OrganizationRepository
 from src.api.v1.schemas.registration import (
