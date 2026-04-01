@@ -13,6 +13,11 @@ interface PortalShellProps {
   subtitle: string;
   navItems: PortalNavItem[];
   moduleTabs?: PortalNavItem[];
+  headerAlign?: 'left' | 'center';
+  eyebrowText?: string;
+  eyebrowClassName?: string;
+  hideTitle?: boolean;
+  hideSubtitle?: boolean;
   children: ReactNode;
 }
 
@@ -22,6 +27,11 @@ export default function PortalShell({
   subtitle,
   navItems,
   moduleTabs,
+  headerAlign = 'left',
+  eyebrowText,
+  eyebrowClassName = '',
+  hideTitle = false,
+  hideSubtitle = false,
   children,
 }: PortalShellProps) {
   const pathname = usePathname();
@@ -38,7 +48,7 @@ export default function PortalShell({
   return (
     <div className="min-h-screen bg-[#f5f1ec] text-[#2d2a26]">
       <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="border-b border-[#ddd4cb] bg-[#faf6f1] px-6 py-8 text-[#2d2a26] lg:border-b-0 lg:border-r">
+        <aside className="border-b border-[#ddd4cb] bg-[#faf6f1] px-6 py-8 text-[#2d2a26] lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="space-y-8">
             <div>
               <Link
@@ -88,67 +98,101 @@ export default function PortalShell({
           </div>
         </aside>
 
-        <main className="px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-          <header className="mb-5 rounded-[2rem] border border-[#ddd4cb] bg-gradient-to-r from-white via-[#fcfaf7] to-[#f7efe8] px-6 py-6 shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8b8177]">
-                  {getRoleLabel(user.role)} Portal
-                </p>
-                <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26]">{title}</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760]">{subtitle}</p>
-              </div>
+        <div className="flex min-h-screen min-w-0 flex-col">
+          <header className="sticky top-0 z-20 border-b border-[#ddd4cb] bg-[#fcfaf7]/95 backdrop-blur">
+            <div className="px-4 py-5 sm:px-6 lg:px-10">
+              {headerAlign === 'center' ? (
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+                  <div className="hidden lg:block" />
+                  <div className="max-w-3xl text-center">
+                    <p className={`font-semibold uppercase text-[#8b8177] ${eyebrowClassName || 'text-xs tracking-[0.25em]'}`}>
+                      {eyebrowText || `${getRoleLabel(user.role)} Portal`}
+                    </p>
+                    {!hideTitle ? <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26]">{title}</h1> : null}
+                    {!hideSubtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760]">{subtitle}</p> : null}
+                  </div>
 
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/dashboard/mfa"
-                  className="rounded-full border border-[#d5ccc3] bg-white px-4 py-2 text-sm font-medium text-[#4f4943] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
-                >
-                  Security
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="rounded-full bg-[#ef2330] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#d81c29]"
-                >
-                  Log Out
-                </button>
-              </div>
+                  <div className="flex items-center justify-center gap-3 lg:justify-end">
+                    <Link
+                      href="/dashboard/mfa"
+                      className="rounded-full border border-[#d5ccc3] bg-white px-4 py-2 text-sm font-medium text-[#4f4943] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
+                    >
+                      Security
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="rounded-full bg-[#ef2330] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#d81c29]"
+                    >
+                      Log Out
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className={`font-semibold uppercase text-[#8b8177] ${eyebrowClassName || 'text-xs tracking-[0.25em]'}`}>
+                      {eyebrowText || `${getRoleLabel(user.role)} Portal`}
+                    </p>
+                    {!hideTitle ? <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26]">{title}</h1> : null}
+                    {!hideSubtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760]">{subtitle}</p> : null}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href="/dashboard/mfa"
+                      className="rounded-full border border-[#d5ccc3] bg-white px-4 py-2 text-sm font-medium text-[#4f4943] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
+                    >
+                      Security
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="rounded-full bg-[#ef2330] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#d81c29]"
+                    >
+                      Log Out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </header>
 
-          {moduleTabs?.length ? (
-            <nav className="mb-8 flex flex-wrap gap-3 rounded-[1.75rem] border border-[#ddd4cb] bg-[#faf6f1] px-4 py-3 shadow-sm">
-              {moduleTabs.map((item) => {
-                const isActive = isActiveRoute(item.href);
+            {moduleTabs?.length ? (
+              <nav className="border-t border-[#ddd4cb] bg-[#faf6f1] px-4 py-3 sm:px-6 lg:px-10">
+                <div className="flex flex-wrap gap-3">
+                  {moduleTabs.map((item) => {
+                    const isActive = isActiveRoute(item.href);
 
-                return (
-                  <Link
-                    key={`${item.href}-top`}
-                    href={item.href}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? 'bg-[#fde9e7] text-[#9d1f1f]'
-                        : 'bg-white text-[#4f4943] hover:bg-[#f7efe8] hover:text-[#2d2a26]'
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    {item.badge !== undefined ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${
-                          isActive ? 'bg-[#f9c6c2] text-[#8e1b22]' : 'bg-[#f3ede6] text-[#6d6760]'
+                    return (
+                      <Link
+                        key={`${item.href}-top`}
+                        href={item.href}
+                        className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                          isActive
+                            ? 'bg-[#fde9e7] text-[#9d1f1f]'
+                            : 'bg-white text-[#4f4943] hover:bg-[#f7efe8] hover:text-[#2d2a26]'
                         }`}
                       >
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </nav>
-          ) : null}
+                        <span>{item.label}</span>
+                        {item.badge !== undefined ? (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${
+                              isActive ? 'bg-[#f9c6c2] text-[#8e1b22]' : 'bg-[#f3ede6] text-[#6d6760]'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </nav>
+            ) : null}
+          </header>
 
-          {children}
-        </main>
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

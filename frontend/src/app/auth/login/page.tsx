@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 import { getDashboardRouteForRole } from '@/lib/portal';
+import { API_URL } from '@/lib/api';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -56,7 +57,10 @@ function LoginPageContent() {
         setShowMFA(true);
         setError('Please enter your 6-digit MFA code');
       } else {
-        const errorMessage = err.response?.data?.detail || 'Login failed. Please try again.';
+        const errorMessage = err.response?.data?.detail
+          || (err.request ? `Cannot reach backend at ${API_URL}. Restart the frontend after env changes and make sure the API server is running there.` : null)
+          || err.message
+          || 'Login failed. Please try again.';
         
         if (errorMessage.includes('MFA') || errorMessage.includes('two-factor')) {
           setShowMFA(true);
