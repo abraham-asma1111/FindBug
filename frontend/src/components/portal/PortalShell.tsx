@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import type { PortalNavItem, UserProfile } from '@/lib/portal';
-import { getRoleLabel } from '@/lib/portal';
+import { getPortalName } from '@/lib/portal';
 
 interface PortalShellProps {
   user: UserProfile;
@@ -64,7 +64,7 @@ export default function PortalShell({
 
             <div>
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[#8b8177]">
-                Workspace
+                {getPortalName(user.role)}
               </p>
               <nav className="space-y-2">
               {navItems.map((item) => {
@@ -100,13 +100,13 @@ export default function PortalShell({
 
         <div className="flex min-h-screen min-w-0 flex-col">
           <header className="sticky top-0 z-20 border-b border-[#ddd4cb] bg-[#fcfaf7]/95 backdrop-blur">
-            <div className="px-4 py-5 sm:px-6 lg:px-10">
+            <div className="px-4 py-5 sm:px-6 lg:px-6">
               {headerAlign === 'center' ? (
                 <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
                   <div className="hidden lg:block" />
                   <div className="max-w-3xl text-center">
                     <p className={`font-semibold uppercase text-[#8b8177] ${eyebrowClassName || 'text-xs tracking-[0.25em]'}`}>
-                      {eyebrowText || `${getRoleLabel(user.role)} Portal`}
+                      {eyebrowText || getPortalName(user.role)}
                     </p>
                     {!hideTitle ? <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26]">{title}</h1> : null}
                     {!hideSubtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760]">{subtitle}</p> : null}
@@ -131,7 +131,7 @@ export default function PortalShell({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className={`font-semibold uppercase text-[#8b8177] ${eyebrowClassName || 'text-xs tracking-[0.25em]'}`}>
-                      {eyebrowText || `${getRoleLabel(user.role)} Portal`}
+                      {eyebrowText || getPortalName(user.role)}
                     </p>
                     {!hideTitle ? <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26]">{title}</h1> : null}
                     {!hideSubtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760]">{subtitle}</p> : null}
@@ -156,7 +156,7 @@ export default function PortalShell({
             </div>
 
             {moduleTabs?.length ? (
-              <nav className="border-t border-[#ddd4cb] bg-[#faf6f1] px-4 py-3 sm:px-6 lg:px-10">
+              <nav className="border-t border-[#ddd4cb] bg-[#faf6f1] px-4 py-3 sm:px-6 lg:px-6">
                 <div className="flex flex-wrap gap-3">
                   {moduleTabs.map((item) => {
                     const isActive = isActiveRoute(item.href);
@@ -189,7 +189,7 @@ export default function PortalShell({
             ) : null}
           </header>
 
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-6 lg:py-8">
             {children}
           </main>
         </div>

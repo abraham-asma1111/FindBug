@@ -43,24 +43,60 @@ export interface PortalNavItem {
 }
 
 export function getPortalNavItems(role: UserRole): PortalNavItem[] {
+  // Admin Console
   if (isAdminRole(role)) {
     return [
-      { href: '/admin/dashboard', label: 'Overview' },
-      { href: '/admin/staff/create', label: 'Staff Provisioning' },
+      { href: '/admin/dashboard', label: 'Dashboard' },
+      { href: '/admin/users', label: 'Users' },
+      { href: '/admin/staff', label: 'Staff' },
+      { href: '/admin/programs', label: 'Programs' },
+      { href: '/admin/reports', label: 'Reports' },
+      { href: '/admin/finance', label: 'Finance' },
+      { href: '/admin/platform', label: 'Platform' },
+      { href: '/admin/audit-logs', label: 'Audit Logs' },
     ];
   }
 
-  if (isStaffRole(role)) {
-    return [{ href: '/staff/dashboard', label: 'Operations' }];
+  // Triage Specialist Desk
+  if (role === 'triage_specialist') {
+    return [
+      { href: '/triage/dashboard', label: 'Dashboard' },
+      { href: '/triage/queue', label: 'Queue' },
+      { href: '/triage/reports', label: 'Reports' },
+      { href: '/triage/duplicates', label: 'Duplicates' },
+      { href: '/triage/analytics', label: 'Analytics' },
+      { href: '/triage/messages', label: 'Messages' },
+    ];
   }
 
+  // Finance Officer Desk
+  if (role === 'finance_officer') {
+    return [
+      { href: '/finance/dashboard', label: 'Dashboard' },
+      { href: '/finance/payments', label: 'Payments' },
+      { href: '/finance/payouts', label: 'Payouts' },
+      { href: '/finance/kyc', label: 'KYC' },
+      { href: '/finance/billing', label: 'Billing' },
+      { href: '/finance/reports', label: 'Financial Reports' },
+    ];
+  }
+
+  // Organization Portal
   if (role === 'organization') {
     return [
-      { href: '/organization/dashboard', label: 'Overview' },
+      { href: '/organization/dashboard', label: 'Dashboard' },
       { href: '/organization/programs', label: 'Programs' },
+      { href: '/organization/reports', label: 'Reports' },
+      { href: '/organization/services', label: 'Services' },
+      { href: '/organization/analytics', label: 'Analytics' },
+      { href: '/organization/billing', label: 'Billing' },
+      { href: '/organization/integrations', label: 'Integrations' },
+      { href: '/organization/messages', label: 'Messages' },
+      { href: '/organization/settings', label: 'Settings' },
     ];
   }
 
+  // Researcher Portal (default)
   return [
     { href: '/researcher/dashboard', label: 'Dashboard' },
     { href: '/researcher/engagements', label: 'Engagements' },
@@ -87,8 +123,12 @@ export function getDashboardRouteForRole(role: UserRole): string {
     return '/admin/dashboard';
   }
 
-  if (isStaffRole(role)) {
-    return '/staff/dashboard';
+  if (role === 'triage_specialist') {
+    return '/triage/dashboard';
+  }
+
+  if (role === 'finance_officer') {
+    return '/finance/dashboard';
   }
 
   if (role === 'organization') {
@@ -96,6 +136,25 @@ export function getDashboardRouteForRole(role: UserRole): string {
   }
 
   return '/researcher/dashboard';
+}
+
+export function getPortalName(role: UserRole): string {
+  switch (role) {
+    case 'researcher':
+      return 'Researcher Portal';
+    case 'organization':
+      return 'Organization Portal';
+    case 'triage_specialist':
+      return 'Triage Desk';
+    case 'finance_officer':
+      return 'Finance Desk';
+    case 'admin':
+      return 'Admin Console';
+    case 'super_admin':
+      return 'Super Admin Console';
+    default:
+      return 'Operations Desk';
+  }
 }
 
 export function getRoleLabel(role: UserRole): string {

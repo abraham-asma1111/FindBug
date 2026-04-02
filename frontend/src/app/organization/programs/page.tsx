@@ -1,118 +1,139 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
-import SectionCard from '@/components/dashboard/SectionCard';
 import PortalShell from '@/components/portal/PortalShell';
-import api from '@/lib/api';
-import { formatCurrency, formatDateTime, getPortalNavItems } from '@/lib/portal';
+import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
-
-interface OrganizationProgram {
-  id: string;
-  name: string;
-  description?: string | null;
-  type: string;
-  status: string;
-  visibility: string;
-  budget?: number | string | null;
-  created_at?: string | null;
-}
+import { useApiQuery } from '@/hooks/useApiQuery';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Tabs from '@/components/ui/Tabs';
+import EmptyState from '@/components/ui/EmptyState';
+import ProgramList from '@/components/organization/programs/ProgramList';
+import ProgramCreateModal from '@/components/organization/programs/ProgramCreateModal';
 
 export default function OrganizationProgramsPage() {
   const user = useAuthStore((state) => state.user);
-  const [programs, setPrograms] = useState<OrganizationProgram[]>([]);
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('active');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Fetch programs based on active tab
+  const { data: programs, isLoading, error, refetch } = useApiQuery(
+    activeTab === 'archived' ? '/programs/archived' : '/programs/my-programs',
+    { enabled: !!user }
+  );
 
-    const loadPrograms = async () => {
-      try {
-        setIsLoading(true);
-        const response = await api.get('/programs/my-programs');
-        if (!cancelled) {
-          setPrograms(response.data || []);
-          setError('');
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err.response?.data?.detail || 'Failed to load organization programs.');
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
+  // Filter programs by status for tabs
+  const activePrograms = programs?.filter((p: any) => 
+    p.status === 'public' || p.status === 'paused'
+  ) || [];
+  
+  const draftPrograms = programs?.filter((p: any) => 
+    p.status === 'draft'
+  ) || [];
 
-    loadPrograms();
+  const tabs = [
+    { id: 'active', label: 'Active Programs', count: activePrograms.length },
+    { id: 'drafts', label: 'Drafts', count: draftPrograms.length },
+    { id: 'archived', label: 'Archived', count: activeTab === 'archived' ? programs?.length || 0 : 0 },
+  ];
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const getCurrentPrograms = () => {
+    if (activeTab === 'archived') return programs || [];
+    if (activeTab === 'drafts') return draftPrograms;
+    return activePrograms;
+  };
 
   return (
     <ProtectedRoute allowedRoles={['organization']}>
-      {user ? (
+      {user && (
         <PortalShell
           user={user}
-          title="Program Portfolio"
-          subtitle="Current organization-owned programs from `/programs/my-programs`, with creation and editing UI as the next vertical slice."
+          title="Programs Management"
+          subtitle="Create and manage your bug bounty programs"
           navItems={getPortalNavItems(user.role)}
         >
-          {error ? (
-            <div className="mb-6 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318]">
-              {error}
+          <div className="space-y-6">
+            {/* Header with Create Button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-[#2d2a26]">Bug Bounty Programs</h2>
+                <p className="mt-1 text-sm text-[#6d6760]">
+                  Manage your security programs and invite researchers
+                </p>
+              </div>
+              <Button onClick={() => setShowCreateModal(true)}>
+                + Create Program
+              </Button>
             </div>
-          ) : null}
 
-        <SectionCard
-          title="Owned Programs"
-          description="The backend already exposes portfolio data; the next frontend slice is the program creation and edit workflow."
-        >
-          <div className="space-y-4">
-            {programs.length ? (
-              programs.map((program) => (
-                <article key={program.id} className="rounded-3xl border border-[#e6ddd4] bg-white p-5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#edf5fb] px-3 py-1 text-xs font-semibold text-[#2d78a8]">
-                      {program.type}
-                    </span>
-                    <span className="rounded-full bg-[#faf1e1] px-3 py-1 text-xs font-semibold text-[#9a6412]">
-                      {program.status}
-                    </span>
-                    <span className="rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-semibold text-[#5f5851]">
-                      {program.visibility}
-                    </span>
-                  </div>
-                  <h3 className="mt-4 text-lg font-semibold text-[#2d2a26]">{program.name}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[#6d6760]">
-                    {program.description || 'Program description will surface in the next create/edit flow.'}
-                  </p>
-                  <div className="mt-4 grid gap-3 border-t border-[#eee6de] pt-4 text-sm md:grid-cols-2">
-                    <div>
-                      <p className="text-[#8b8177]">Budget</p>
-                      <p className="mt-1 font-semibold text-[#2d2a26]">{formatCurrency(Number(program.budget || 0))}</p>
-                    </div>
-                    <div>
-                      <p className="text-[#8b8177]">Created</p>
-                      <p className="mt-1 font-semibold text-[#2d2a26]">{formatDateTime(program.created_at)}</p>
-                    </div>
-                  </div>
-                </article>
-              ))
+            {/* Tabs */}
+            <Tabs
+              tabs={tabs}
+              activeTab={activeTab}
+              onChange={setActiveTab}
+            />
+
+            {/* Error State */}
+            {error && (
+              <Card className="border-[#f2c0bc] bg-[#fff2f1]">
+                <p className="text-sm text-[#b42318]">{error}</p>
+              </Card>
+            )}
+
+            {/* Programs List */}
+            {isLoading ? (
+              <Card>
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#e6ddd4] border-t-[#2d2a26]"></div>
+                </div>
+              </Card>
+            ) : getCurrentPrograms().length > 0 ? (
+              <ProgramList 
+                programs={getCurrentPrograms()} 
+                onUpdate={refetch}
+                isArchived={activeTab === 'archived'}
+              />
             ) : (
-              <p className="text-sm text-[#6d6760]">
-                {isLoading ? 'Loading programs...' : 'No organization programs available yet.'}
-              </p>
+              <EmptyState
+                title={
+                  activeTab === 'drafts' 
+                    ? 'No draft programs' 
+                    : activeTab === 'archived'
+                    ? 'No archived programs'
+                    : 'No active programs'
+                }
+                description={
+                  activeTab === 'drafts'
+                    ? 'Draft programs will appear here'
+                    : activeTab === 'archived'
+                    ? 'Archived programs will appear here'
+                    : 'Create your first bug bounty program to get started'
+                }
+                action={
+                  activeTab === 'active' ? (
+                    <Button onClick={() => setShowCreateModal(true)}>
+                      Create Your First Program
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
           </div>
-        </SectionCard>
+
+          {/* Create Program Modal */}
+          {showCreateModal && (
+            <ProgramCreateModal
+              onClose={() => setShowCreateModal(false)}
+              onSuccess={() => {
+                setShowCreateModal(false);
+                refetch();
+              }}
+            />
+          )}
         </PortalShell>
-      ) : null}
+      )}
     </ProtectedRoute>
   );
 }

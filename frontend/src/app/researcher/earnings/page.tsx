@@ -1,21 +1,124 @@
-import ResearcherPlaceholderPage from '@/components/portal/ResearcherPlaceholderPage';
+'use client';
 
-export default function ResearcherEarningsPage() {
+import { useState } from 'react';
+import ProtectedRoute from '@/components/common/ProtectedRoute';
+import PortalShell from '@/components/portal/PortalShell';
+import SectionCard from '@/components/dashboard/SectionCard';
+import { getPortalNavItems } from '@/lib/portal';
+import { useAuthStore } from '@/store/authStore';
+import WalletBalance from '@/components/researcher/earnings/WalletBalance';
+import TransactionList from '@/components/researcher/earnings/TransactionList';
+import PayoutMethods from '@/components/researcher/earnings/PayoutMethods';
+import KYCStatus from '@/components/researcher/earnings/KYCStatus';
+
+export default function EarningsPage() {
+  const user = useAuthStore((state) => state.user);
+  const [activeTab, setActiveTab] = useState('overview');
+
   return (
-    <ResearcherPlaceholderPage
-      title="Earnings"
-      subtitle="Follow pending, approved, and paid rewards as reports move through acceptance and payout."
-      description="This page establishes the sidebar route for the researcher payout workflow while the detailed finance widgets are being built."
-      workflow={[
-        'Surface pending rewards from accepted submissions before they become payable.',
-        'Show payment milestones such as review, approval, processing, and completion.',
-        'Connect earnings history back to the underlying reports so payout status is always explainable.',
-      ]}
-      focusAreas={[
-        'The final screen should separate pending, scheduled, and completed payouts clearly.',
-        'Payment method and compliance dependencies should be visible before a payout fails.',
-        'The module will later consume the wallet and payment-method services already present in the backend.',
-      ]}
-    />
+    <ProtectedRoute allowedRoles={['researcher']}>
+      {user ? (
+        <PortalShell
+          user={user}
+          title="Earnings"
+          subtitle="Manage your wallet, transactions, and payouts"
+          navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Researcher Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
+        >
+          {/* Tabs */}
+          <div className="mb-6 flex justify-center">
+            <div className="flex gap-6">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
+                  activeTab === 'overview'
+                    ? 'bg-[#ef2330] text-white'
+                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('transactions')}
+                className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
+                  activeTab === 'transactions'
+                    ? 'bg-[#ef2330] text-white'
+                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                }`}
+              >
+                Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab('payout-methods')}
+                className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
+                  activeTab === 'payout-methods'
+                    ? 'bg-[#ef2330] text-white'
+                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                }`}
+              >
+                Payout Methods
+              </button>
+              <button
+                onClick={() => setActiveTab('kyc')}
+                className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
+                  activeTab === 'kyc'
+                    ? 'bg-[#ef2330] text-white'
+                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                }`}
+              >
+                KYC Status
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <WalletBalance />
+              
+              <SectionCard
+                title="Recent Transactions"
+                description="Your latest earnings and withdrawals"
+                headerAlign="center"
+              >
+                <TransactionList limit={5} showFilters={false} />
+              </SectionCard>
+            </div>
+          )}
+
+          {activeTab === 'transactions' && (
+            <SectionCard
+              title="Transaction History"
+              description="All your earnings, bonuses, and withdrawals"
+              headerAlign="center"
+            >
+              <TransactionList limit={50} showFilters={true} />
+            </SectionCard>
+          )}
+
+          {activeTab === 'payout-methods' && (
+            <SectionCard
+              title="Payout Methods"
+              description="Manage your bank accounts and payment methods"
+              headerAlign="center"
+            >
+              <PayoutMethods />
+            </SectionCard>
+          )}
+
+          {activeTab === 'kyc' && (
+            <SectionCard
+              title="KYC Verification"
+              description="Complete your identity verification to enable withdrawals"
+              headerAlign="center"
+            >
+              <KYCStatus />
+            </SectionCard>
+          )}
+        </PortalShell>
+      ) : null}
+    </ProtectedRoute>
   );
 }
