@@ -12,6 +12,16 @@ export interface EngagementProgram {
   source: 'catalog' | 'recommendation' | 'matching';
 }
 
+export interface ProgramScope {
+  id: string;
+  programId: string;
+  assetType: string;
+  assetIdentifier: string;
+  isInScope: boolean;
+  description?: string | null;
+  maxSeverity?: string | null;
+}
+
 export interface ProgramInvitation {
   id: string;
   programId: string;

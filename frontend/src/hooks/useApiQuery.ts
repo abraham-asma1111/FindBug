@@ -57,12 +57,27 @@ export function useApiQuery<T = any>(
     } catch (err) {
       let errorMessage = 'An error occurred';
       
-      // Extract error message from axios error response
+      // Extract error message from various error formats
       if (err && typeof err === 'object') {
         const axiosError = err as any;
-        if (axiosError.response?.data?.detail) {
+        
+        // Check for Pydantic validation errors (array of error objects)
+        if (Array.isArray(axiosError.response?.data?.detail)) {
+          const validationErrors = axiosError.response.data.detail;
+          errorMessage = validationErrors
+            .map((e: any) => `${e.loc?.join('.') || 'Field'}: ${e.msg}`)
+            .join(', ');
+        }
+        // Check for string detail
+        else if (typeof axiosError.response?.data?.detail === 'string') {
           errorMessage = axiosError.response.data.detail;
-        } else if (axiosError.message) {
+        }
+        // Check for message field
+        else if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message;
+        }
+        // Check for error message
+        else if (axiosError.message) {
           errorMessage = axiosError.message;
         }
       }

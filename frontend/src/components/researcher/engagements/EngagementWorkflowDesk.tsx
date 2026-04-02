@@ -1,7 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import SectionCard from '@/components/dashboard/SectionCard';
+import type { ProgramScope } from '@/hooks/useResearcherEngagementsData';
+import api from '@/lib/api';
 import EngagementReportComposer from './EngagementReportComposer';
 import { formatStatusLabel } from './shared';
 import type { EngagementWorkflowItem } from './shared';
@@ -75,6 +78,44 @@ function getStageTone(state: 'done' | 'current' | 'upcoming'): string {
   }
 }
 
+function getSelectedProgramId(item: EngagementWorkflowItem | null): string {
+  if (!item) {
+    return '';
+  }
+
+  if (item.kind === 'program-open' || item.kind === 'program-joined') {
+    return item.entityId;
+  }
+
+  if (item.kind === 'program-invitation') {
+    return item.reportProgramId || '';
+  }
+
+  return '';
+}
+
+function normalizeScope(raw: any): ProgramScope | null {
+  const id = typeof raw?.id === 'string' ? raw.id : '';
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    programId: typeof (raw?.program_id ?? raw?.programId) === 'string' ? raw.program_id ?? raw.programId : '',
+    assetType: typeof (raw?.asset_type ?? raw?.assetType) === 'string' ? raw.asset_type ?? raw.assetType : 'asset',
+    assetIdentifier:
+      typeof (raw?.asset_identifier ?? raw?.assetIdentifier) === 'string'
+        ? raw.asset_identifier ?? raw.assetIdentifier
+        : 'Unknown asset',
+    isInScope: Boolean(raw?.is_in_scope ?? raw?.isInScope),
+    description: typeof raw?.description === 'string' ? raw.description : null,
+    maxSeverity:
+      typeof (raw?.max_severity ?? raw?.maxSeverity) === 'string' ? raw.max_severity ?? raw.maxSeverity : null,
+  };
+}
+
 export default function EngagementWorkflowDesk({
   item,
   isLoading,
@@ -84,6 +125,57 @@ export default function EngagementWorkflowDesk({
   onRespondMatchingInvitation,
   onStartCodeReview,
 }: EngagementWorkflowDeskProps) {
+  const [programScopes, setProgramScopes] = useState<ProgramScope[]>([]);
+  const [isLoadingProgramScopes, setIsLoadingProgramScopes] = useState(false);
+  const [programScopeError, setProgramScopeError] = useState('');
+
+  const selectedProgramId = getSelectedProgramId(item);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedProgramId) {
+      setProgramScopes([]);
+      setProgramScopeError('');
+      setIsLoadingProgramScopes(false);
+      return;
+    }
+
+    const loadProgramScopes = async () => {
+      try {
+        setIsLoadingProgramScopes(true);
+        setProgramScopeError('');
+
+        const response = await api.get(`/programs/${selectedProgramId}/scopes`);
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextScopes = Array.isArray(response.data)
+          ? response.data.map(normalizeScope).filter((scope): scope is ProgramScope => Boolean(scope))
+          : [];
+
+        setProgramScopes(nextScopes);
+      } catch (err: any) {
+        if (!cancelled) {
+          setProgramScopes([]);
+          setProgramScopeError(err.response?.data?.detail || 'Failed to load program scope.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingProgramScopes(false);
+        }
+      }
+    };
+
+    loadProgramScopes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProgramId]);
+
   async function handlePrimaryAction() {
     if (!item) {
       return;
@@ -111,6 +203,8 @@ export default function EngagementWorkflowDesk({
 
   const isProgramInvitation = item?.kind === 'program-invitation';
   const isMatchingInvitation = item?.kind === 'matching-invitation';
+  const inScopeAssets = programScopes.filter((scope) => scope.isInScope);
+  const outOfScopeAssets = programScopes.filter((scope) => !scope.isInScope);
   const primaryActionPending =
     item &&
     ((item.kind === 'program-open' && pendingAction === `join-${item.entityId}`) ||
@@ -158,7 +252,13 @@ export default function EngagementWorkflowDesk({
               <p className="mt-2 text-sm leading-6 text-[#5b534c]">{item.nextStep}</p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
+              {item.kind === 'program-joined' ? (
+                <span className="rounded-full border border-[#bfd5c5] bg-[#eef7ef] px-4 py-2 text-xs font-semibold text-[#24613a]">
+                  Joined
+                </span>
+              ) : null}
+
               {item.kind !== 'program-joined' && item.kind !== 'live-event' && item.kind !== 'ptaas' ? (
                 <button
                   type="button"
@@ -197,13 +297,106 @@ export default function EngagementWorkflowDesk({
                   href={item.reportHref}
                   className="rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-white"
                 >
-                  Open full queue
+                  {item.kind === 'program-joined' ? 'Report vulnerability' : 'Open full queue'}
                 </Link>
               ) : null}
             </div>
           </div>
 
           <div className="space-y-5">
+            {selectedProgramId ? (
+              <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Scope Coverage</p>
+                    <p className="mt-2 text-sm leading-6 text-[#5b534c]">
+                      Review the allowed assets before you test or submit a finding.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full bg-[#eef7ef] px-3 py-1 text-[#24613a]">
+                      {inScopeAssets.length} in scope
+                    </span>
+                    <span className="rounded-full bg-[#fff2f1] px-3 py-1 text-[#b42318]">
+                      {outOfScopeAssets.length} out of scope
+                    </span>
+                  </div>
+                </div>
+
+                {isLoadingProgramScopes ? (
+                  <div className="mt-4 rounded-2xl border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-4 text-sm text-[#6d6760]">
+                    Loading scope assets...
+                  </div>
+                ) : programScopeError ? (
+                  <div className="mt-4 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318]">
+                    {programScopeError}
+                  </div>
+                ) : programScopes.length ? (
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-[#24613a]">In-Scope Assets</h4>
+                      {inScopeAssets.length ? (
+                        inScopeAssets.map((scope) => (
+                          <div key={scope.id} className="rounded-2xl border border-[#d9eadc] bg-[#f7fbf8] p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-[#2d2a26]">{scope.assetIdentifier}</p>
+                              <span className="rounded-full bg-[#eef7ef] px-3 py-1 text-xs font-semibold text-[#24613a]">
+                                {formatStatusLabel(scope.assetType)}
+                              </span>
+                            </div>
+                            {scope.description ? (
+                              <p className="mt-2 text-sm leading-6 text-[#5b534c]">{scope.description}</p>
+                            ) : null}
+                            {scope.maxSeverity ? (
+                              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6d6760]">
+                                Max severity: {formatStatusLabel(scope.maxSeverity)}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[#d9eadc] bg-[#f7fbf8] p-4 text-sm text-[#5b534c]">
+                          No in-scope assets are listed for this program yet.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-[#b42318]">Out-of-Scope Assets</h4>
+                      {outOfScopeAssets.length ? (
+                        outOfScopeAssets.map((scope) => (
+                          <div key={scope.id} className="rounded-2xl border border-[#f2d0cd] bg-[#fff7f6] p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-[#2d2a26]">{scope.assetIdentifier}</p>
+                              <span className="rounded-full bg-[#fff2f1] px-3 py-1 text-xs font-semibold text-[#b42318]">
+                                {formatStatusLabel(scope.assetType)}
+                              </span>
+                            </div>
+                            {scope.description ? (
+                              <p className="mt-2 text-sm leading-6 text-[#5b534c]">{scope.description}</p>
+                            ) : null}
+                            {scope.maxSeverity ? (
+                              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6d6760]">
+                                Max severity: {formatStatusLabel(scope.maxSeverity)}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-[#f2d0cd] bg-[#fff7f6] p-4 text-sm text-[#5b534c]">
+                          No out-of-scope assets are listed for this program.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-4 text-sm text-[#6d6760]">
+                    No scope assets are defined for this program yet.
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Workflow Path</p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">

@@ -116,14 +116,33 @@ export default function AdminDashboardPage() {
           title="Platform Overview"
           subtitle="Cross-role admin surface for user growth, financial health, operations visibility, and staff provisioning."
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Admin Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
+          hideTitle
+          hideSubtitle
         >
+          <section className="rounded-[36px] border border-[#d8d0c8] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(255,255,255,0.72)_35%,rgba(244,195,139,0.28)_75%),linear-gradient(135deg,#f7efe6_0%,#f6e8d3_45%,#efe1cf_100%)] p-6 shadow-sm sm:p-8">
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8b8177]">
+                Admin Dashboard
+              </p>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#2d2a26] sm:text-5xl">
+                Platform oversight and operational control.
+              </h1>
+              <p className="mt-4 text-sm leading-7 text-[#5f5851] sm:text-base">
+                Cross-role admin surface for user growth, financial health, operations visibility, and staff provisioning.
+              </p>
+            </div>
+          </section>
+
           {error ? (
-            <div className="mb-6 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318]">
+            <div className="mt-6 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318]">
               {error}
             </div>
           ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Users" value={isLoading ? '...' : String(dashboard?.users.total ?? 0)} helper={`${dashboard?.users.active_30d ?? 0} active in 30d`} />
           <StatCard label="Programs" value={isLoading ? '...' : String(dashboard?.programs.total ?? 0)} helper={`${dashboard?.programs.active ?? 0} currently active`} />
           <StatCard label="Reports" value={isLoading ? '...' : String(dashboard?.reports.total ?? 0)} helper={`${dashboard?.reports.new_30d ?? 0} new in 30d`} />

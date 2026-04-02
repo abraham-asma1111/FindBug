@@ -99,7 +99,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   // Researcher Portal (default)
   return [
     { href: '/researcher/dashboard', label: 'Dashboard' },
-    { href: '/researcher/engagements', label: 'Engagements' },
+    { href: '/researcher/programs', label: 'Programs' },
     { href: '/researcher/reports', label: 'Reports' },
     { href: '/researcher/earnings', label: 'Earnings' },
     { href: '/researcher/reputation', label: 'Reputation' },

@@ -3,17 +3,19 @@
 import { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
-import Tabs from '@/components/ui/Tabs';
+import SimpleTabs from '@/components/ui/SimpleTabs';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatCurrency, formatDateTime } from '@/lib/portal';
 import Card from '@/components/ui/Card';
+import RewardEditModal from './RewardEditModal';
+import ScopeAddModal from './ScopeAddModal';
 
 interface Program {
   id: string;
   name: string;
   description?: string;
-  program_type: string;
+  type: string;
   status: string;
   visibility: string;
   budget?: number;
@@ -37,6 +39,8 @@ export default function ProgramDetailModal({
   isArchived = false 
 }: ProgramDetailModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [showRewardEditModal, setShowRewardEditModal] = useState(false);
+  const [showScopeAddModal, setShowScopeAddModal] = useState(false);
 
   // Fetch program details
   const { data: programDetails } = useApiQuery(`/programs/${program.id}`, {
@@ -44,7 +48,7 @@ export default function ProgramDetailModal({
   });
 
   // Fetch scopes
-  const { data: scopes } = useApiQuery(`/programs/${program.id}/scopes`, {
+  const { data: scopes, refetch: refetchScopes } = useApiQuery(`/programs/${program.id}/scopes`, {
     enabled: activeTab === 'scope',
   });
 
@@ -54,40 +58,94 @@ export default function ProgramDetailModal({
   });
 
   // Mutations
-  const { mutate: publishProgram, isLoading: isPublishing } = useApiMutation(
+  const { mutate: publishProgram, isLoading: isPublishing, error: publishError } = useApiMutation(
     `/programs/${program.id}/publish`,
     'POST',
-    { onSuccess: onUpdate }
+    { 
+      onSuccess: () => {
+        alert('Program published successfully!');
+        onUpdate();
+        onClose();
+      },
+      onError: (error) => {
+        console.error('Publish error:', error);
+      }
+    }
   );
 
-  const { mutate: pauseProgram, isLoading: isPausing } = useApiMutation(
+  const { mutate: pauseProgram, isLoading: isPausing, error: pauseError } = useApiMutation(
     `/programs/${program.id}/pause`,
     'POST',
-    { onSuccess: onUpdate }
+    { 
+      onSuccess: () => {
+        alert('Program paused successfully!');
+        onUpdate();
+        onClose();
+      },
+      onError: (error) => {
+        console.error('Pause error:', error);
+      }
+    }
   );
 
-  const { mutate: resumeProgram, isLoading: isResuming } = useApiMutation(
+  const { mutate: resumeProgram, isLoading: isResuming, error: resumeError } = useApiMutation(
     `/programs/${program.id}/resume`,
     'POST',
-    { onSuccess: onUpdate }
+    { 
+      onSuccess: () => {
+        alert('Program resumed successfully!');
+        onUpdate();
+        onClose();
+      },
+      onError: (error) => {
+        console.error('Resume error:', error);
+      }
+    }
   );
 
-  const { mutate: closeProgram, isLoading: isClosing } = useApiMutation(
+  const { mutate: closeProgram, isLoading: isClosing, error: closeError } = useApiMutation(
     `/programs/${program.id}/close`,
     'POST',
-    { onSuccess: onUpdate }
+    { 
+      onSuccess: () => {
+        alert('Program closed successfully!');
+        onUpdate();
+        onClose();
+      },
+      onError: (error) => {
+        console.error('Close error:', error);
+      }
+    }
   );
 
-  const { mutate: archiveProgram, isLoading: isArchiving } = useApiMutation(
+  const { mutate: archiveProgram, isLoading: isArchiving, error: archiveError } = useApiMutation(
     `/programs/${program.id}/archive`,
     'POST',
-    { onSuccess: onUpdate }
+    { 
+      onSuccess: () => {
+        alert('Program archived successfully!');
+        onUpdate();
+        onClose();
+      },
+      onError: (error) => {
+        console.error('Archive error:', error);
+      }
+    }
   );
 
-  const { mutate: restoreProgram, isLoading: isRestoring } = useApiMutation(
+  const { mutate: restoreProgram, isLoading: isRestoring, error: restoreError } = useApiMutation(
     `/programs/${program.id}/restore`,
     'POST',
-    { onSuccess: onUpdate }
+    { 
+      onSuccess: () => {
+        alert('Program restored successfully!');
+        onUpdate();
+        onClose();
+      },
+      onError: (error) => {
+        console.error('Restore error:', error);
+      }
+    }
   );
 
   const tabs = [
@@ -102,11 +160,11 @@ export default function ProgramDetailModal({
       {/* Status Badges */}
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-          program.program_type === 'bounty' 
+          program.type === 'bounty' 
             ? 'bg-[#edf5fb] text-[#2d78a8]' 
             : 'bg-[#f3e8ff] text-[#6b21a8]'
         }`}>
-          {program.program_type.toUpperCase()}
+          {program.type.toUpperCase()}
         </span>
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
           program.status === 'public' 
@@ -167,7 +225,11 @@ export default function ProgramDetailModal({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-[#2d2a26]">In-Scope Assets</h4>
-        <Button variant="secondary" size="small">
+        <Button 
+          variant="secondary" 
+          size="sm"
+          onClick={() => setShowScopeAddModal(true)}
+        >
           + Add Scope
         </Button>
       </div>
@@ -179,7 +241,10 @@ export default function ProgramDetailModal({
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#2d2a26]">{scope.asset_type}</p>
-                  <p className="text-sm text-[#6d6760] mt-1">{scope.target}</p>
+                  <p className="text-sm text-[#6d6760] mt-1">{scope.asset_identifier}</p>
+                  {scope.description && (
+                    <p className="text-xs text-[#8b8177] mt-1">{scope.description}</p>
+                  )}
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   scope.is_in_scope 
@@ -195,7 +260,7 @@ export default function ProgramDetailModal({
       ) : (
         <Card className="bg-[#faf6f1]">
           <p className="text-sm text-[#6d6760] text-center py-8">
-            {program.scope || 'No scope defined yet'}
+            {program.scope || 'No scope defined yet. Click "+ Add Scope" to add assets.'}
           </p>
         </Card>
       )}
@@ -206,7 +271,11 @@ export default function ProgramDetailModal({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-[#2d2a26]">Reward Tiers</h4>
-        <Button variant="secondary" size="small">
+        <Button 
+          variant="secondary" 
+          size="sm"
+          onClick={() => setShowRewardEditModal(true)}
+        >
           Edit Rewards
         </Button>
       </div>
@@ -245,6 +314,20 @@ export default function ProgramDetailModal({
 
   const renderSettings = () => (
     <div className="space-y-6">
+      {/* Display any mutation errors */}
+      {(publishError || pauseError || resumeError || closeError || archiveError || restoreError) && (
+        <div className="rounded-xl border border-[#f2c0bc] bg-[#fff2f1] p-4">
+          <p className="text-sm text-[#b42318]">
+            {publishError?.message || 
+             pauseError?.message || 
+             resumeError?.message || 
+             closeError?.message || 
+             archiveError?.message || 
+             restoreError?.message}
+          </p>
+        </div>
+      )}
+
       <div>
         <h4 className="text-sm font-semibold text-[#2d2a26] mb-4">Program Actions</h4>
         <div className="space-y-3">
@@ -341,23 +424,51 @@ export default function ProgramDetailModal({
   };
 
   return (
-    <Modal
-      isOpen={true}
-      onClose={onClose}
-      title={program.name}
-      size="large"
-    >
-      <div className="space-y-6">
-        <Tabs
-          tabs={tabs}
-          activeTab={activeTab}
-          onChange={setActiveTab}
-        />
+    <>
+      <Modal
+        isOpen={true}
+        onClose={onClose}
+        title={program.name}
+        size="xl"
+      >
+        <div className="space-y-6">
+          <SimpleTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={setActiveTab}
+          />
 
-        <div className="min-h-[400px]">
-          {renderContent()}
+          <div className="min-h-[400px]">
+            {renderContent()}
+          </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+
+      {/* Reward Edit Modal */}
+      {showRewardEditModal && (
+        <RewardEditModal
+          programId={program.id}
+          existingRewards={rewards || []}
+          onClose={() => setShowRewardEditModal(false)}
+          onSuccess={() => {
+            setShowRewardEditModal(false);
+            // Refetch rewards
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* Scope Add Modal */}
+      {showScopeAddModal && (
+        <ScopeAddModal
+          programId={program.id}
+          onClose={() => setShowScopeAddModal(false)}
+          onSuccess={() => {
+            setShowScopeAddModal(false);
+            refetchScopes();
+          }}
+        />
+      )}
+    </>
   );
 }

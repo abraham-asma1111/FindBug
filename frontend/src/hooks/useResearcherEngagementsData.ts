@@ -14,6 +14,7 @@ export type {
   EngagementProgram,
   LiveEventAssignment,
   MatchingInvitation,
+  ProgramScope,
   ProgramInvitation,
   ProgramParticipation,
   PTaaSOpportunity,
@@ -49,7 +50,7 @@ function buildCriticalLoaders(signal: AbortSignal): LoaderEntry[] {
   return [
     { key: 'publicPrograms', request: api.get('/programs', { params: { limit: 18 }, signal }) },
     { key: 'programInvitations', request: api.get('/programs/invitations/my-invitations', { signal }) },
-    { key: 'participations', request: api.get('/programs/programs/my-participations', { signal }) },
+    { key: 'participations', request: api.get('/programs/my-participations', { signal }) },
     { key: 'matchingInvitations', request: api.get('/matching/invitations', { signal }) },
   ];
 }

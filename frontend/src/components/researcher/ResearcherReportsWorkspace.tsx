@@ -390,7 +390,7 @@ export default function ResearcherReportsWorkspace() {
             api.get('/reports/my-reports', { params: { limit: 100, offset: 0 } }),
             api.get('/researcher/reports/statistics'),
             api.get('/researcher/reports/timeline', { params: { days: 30 } }),
-            api.get('/programs/programs/my-participations'),
+            api.get('/programs/my-participations'),
           ]);
 
         if (cancelled) {
@@ -533,7 +533,7 @@ export default function ResearcherReportsWorkspace() {
       api.get('/reports/my-reports', { params: { limit: 100, offset: 0 } }),
       api.get('/researcher/reports/statistics'),
       api.get('/researcher/reports/timeline', { params: { days: 30 } }),
-      api.get('/programs/programs/my-participations'),
+      api.get('/programs/my-participations'),
     ]);
 
     const nextReports = reportsResponse.data?.reports || [];

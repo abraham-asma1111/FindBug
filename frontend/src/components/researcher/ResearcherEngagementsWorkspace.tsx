@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
@@ -16,7 +16,6 @@ import {
   buildInvitationRows,
   buildJoinedProgramIds,
   buildOpportunityRadar,
-  buildPublicProgramWorkflowItems,
   buildProgramDirectory,
   composeWorkflowItems,
   createCodeReviewWorkflowAdapter,
@@ -24,9 +23,7 @@ import {
   createLiveEventWorkflowAdapter,
   createPTaaSWorkflowAdapter,
   createParticipationWorkflowAdapter,
-  createPublicProgramWorkflowAdapter,
   getActiveTrackStep,
-  getProgramReportHref,
   pickDefaultWorkflowItem,
 } from '@/components/researcher/engagements/selectors';
 import type { EngagementProgram } from '@/hooks/useResearcherEngagementsData';
@@ -36,6 +33,7 @@ import { formatCompactNumber, getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 
 export default function ResearcherEngagementsWorkspace() {
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const {
     recommendedPrograms,
@@ -56,23 +54,23 @@ export default function ResearcherEngagementsWorkspace() {
   const [actionSuccess, setActionSuccess] = useState('');
   const [pendingAction, setPendingAction] = useState('');
   const [selectedWorkflowKey, setSelectedWorkflowKey] = useState('');
+  const [optimisticJoinedProgramIds, setOptimisticJoinedProgramIds] = useState<Set<string>>(new Set());
 
   const serviceWarnings = new Set(warnings);
-  const joinedProgramIds = buildJoinedProgramIds(participations);
+  const joinedProgramIds = new Set([
+    ...buildJoinedProgramIds(participations),
+    ...optimisticJoinedProgramIds,
+  ]);
   const programDirectory = buildProgramDirectory(recommendedPrograms, publicPrograms, matchedPrograms, participations);
   const opportunityRadar = buildOpportunityRadar(recommendedPrograms, matchedPrograms);
   const invitationRows = buildInvitationRows(programInvitations, matchingInvitations, programDirectory);
   const activeTracks = buildActiveTracks(participations, liveEvents, codeReviewAssignments);
-  const publicProgramWorkflowItems = buildPublicProgramWorkflowItems(publicPrograms, participations, joinedProgramIds).filter(
-    (item) => item.kind === 'program-open'
-  );
   const workflowItems = composeWorkflowItems([
     createParticipationWorkflowAdapter(participations),
     createInvitationWorkflowAdapter(programInvitations, matchingInvitations, programDirectory),
     createLiveEventWorkflowAdapter(liveEvents),
     createCodeReviewWorkflowAdapter(codeReviewAssignments),
     createPTaaSWorkflowAdapter(ptaasOpportunities),
-    createPublicProgramWorkflowAdapter(publicProgramWorkflowItems),
   ]);
 
   const resolvedWorkflowKey = selectedWorkflowKey || pickDefaultWorkflowItem(workflowItems)?.key || '';
@@ -101,13 +99,7 @@ export default function ResearcherEngagementsWorkspace() {
   const matchingInvitationById = new Map(matchingInvitations.map((invitation) => [invitation.id, invitation]));
 
   function selectWorkflowByProgram(programId: string) {
-    const nextItem = workflowItems.find(
-      (item) => item.reportProgramId === programId || (item.kind === 'program-open' && item.entityId === programId)
-    );
-
-    if (nextItem) {
-      setSelectedWorkflowKey(nextItem.key);
-    }
+    router.push(`/researcher/programs/${programId}`);
   }
 
   function selectWorkflowByTrack(trackId: string, trackType: string) {
@@ -136,17 +128,36 @@ export default function ResearcherEngagementsWorkspace() {
       return;
     }
 
+    if (joinedProgramIds.has(program.id)) {
+      setActionError('');
+      setActionSuccess(`You already joined ${program.name}.`);
+      refreshData();
+      router.push(`/researcher/programs/${program.id}`);
+      return;
+    }
+
     try {
       setPendingAction(`join-${program.id}`);
       setActionError('');
       setActionSuccess('');
 
-      await api.post(`/programs/programs/${program.id}/join`);
+      await api.post(`/programs/${program.id}/join`);
+      setOptimisticJoinedProgramIds((current) => new Set(current).add(program.id));
       setActionSuccess(
         `You joined ${program.name}. The engagement now unlocks direct vulnerability submission from the action desk.`
       );
       refreshData();
+      router.push(`/researcher/programs/${program.id}`);
     } catch (err: any) {
+      if (err.response?.status === 409) {
+        setOptimisticJoinedProgramIds((current) => new Set(current).add(program.id));
+        setActionError('');
+        setActionSuccess(`You already joined ${program.name}.`);
+        refreshData();
+        router.push(`/researcher/programs/${program.id}`);
+        return;
+      }
+
       setActionError(err.response?.data?.detail || `Failed to join ${program.name}.`);
     } finally {
       setPendingAction('');
@@ -220,21 +231,13 @@ export default function ResearcherEngagementsWorkspace() {
   function renderProgramAction(program: EngagementProgram) {
     if (joinedProgramIds.has(program.id)) {
       return (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => selectWorkflowByProgram(program.id)}
-            className="inline-flex rounded-full bg-[#2d2a26] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#1f1c19]"
-          >
-            Report vulnerability
-          </button>
-          <Link
-            href={getProgramReportHref(program.id, program.name)}
-            className="inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
-          >
-            Open queue
-          </Link>
-        </div>
+        <button
+          type="button"
+          disabled
+          className="inline-flex cursor-default rounded-full border border-[#bfd5c5] bg-[#eef7ef] px-4 py-2 text-xs font-semibold text-[#24613a]"
+        >
+          Joined
+        </button>
       );
     }
 

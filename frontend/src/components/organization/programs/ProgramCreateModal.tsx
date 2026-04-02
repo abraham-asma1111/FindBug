@@ -7,6 +7,7 @@ import { useApiMutation } from '@/hooks/useApiMutation';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
+import api from '@/lib/api';
 
 interface ProgramCreateModalProps {
   onClose: () => void;
@@ -18,24 +19,72 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    program_type: 'bounty',
+    type: 'bounty',
     scope: '',
-    rules: '',
     reward_tiers: [] as any[],
+    rules: '',
   });
 
   const { mutate: createProgram, isLoading, error } = useApiMutation(
     '/programs',
     'POST',
     {
-      onSuccess: () => {
+      onSuccess: async (program: any) => {
+        // After program is created, add scopes
+        if (formData.scope.trim()) {
+          try {
+            // Parse scope text into individual lines
+            const scopeLines = formData.scope
+              .split('\n')
+              .map(line => line.trim())
+              .filter(line => line.length > 0 && !line.startsWith('#'));
+
+            // Create a scope for each line
+            for (const line of scopeLines) {
+              // Remove leading dashes/bullets
+              const cleanLine = line.replace(/^[-•*]\s*/, '').trim();
+              
+              if (cleanLine) {
+                await api.post(`/programs/${program.id}/scopes`, {
+                  asset_type: 'web_app', // Default type
+                  asset_identifier: cleanLine,
+                  is_in_scope: true,
+                  description: cleanLine,
+                  max_severity: 'critical'
+                });
+              }
+            }
+          } catch (err) {
+            console.error('Error creating scopes:', err);
+          }
+        }
+
+        // After scopes, add reward tiers if any
+        if (formData.reward_tiers.length > 0) {
+          try {
+            await api.post(`/programs/${program.id}/rewards`, {
+              tiers: formData.reward_tiers
+            });
+          } catch (err) {
+            console.error('Error creating reward tiers:', err);
+          }
+        }
+
         onSuccess();
       },
     }
   );
 
   const handleSubmit = () => {
-    createProgram(formData);
+    // Remove scope, reward_tiers, and rules from the payload as they're handled separately
+    const { scope, reward_tiers, rules, ...programData } = formData;
+    
+    // Add rules_of_engagement if rules were provided
+    const payload = rules.trim() 
+      ? { ...programData, rules_of_engagement: rules }
+      : programData;
+    
+    createProgram(payload);
   };
 
   const isStepValid = () => {
@@ -79,8 +128,8 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
 
             <Select
               label="Program Type"
-              value={formData.program_type}
-              onChange={(e) => setFormData({ ...formData, program_type: e.target.value })}
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
               options={[
                 { value: 'bounty', label: 'Bug Bounty (Paid)' },
                 { value: 'vdp', label: 'VDP (Vulnerability Disclosure Program)' },
@@ -184,7 +233,7 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
       isOpen={true}
       onClose={onClose}
       title="Create Bug Bounty Program"
-      size="large"
+      size="xl"
     >
       <div className="space-y-6">
         {/* Progress Steps */}
@@ -224,7 +273,7 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
         {/* Error Message */}
         {error && (
           <div className="rounded-xl border border-[#f2c0bc] bg-[#fff2f1] p-4">
-            <p className="text-sm text-[#b42318]">{error}</p>
+            <p className="text-sm text-[#b42318]">{error.message || 'An error occurred'}</p>
           </div>
         )}
 

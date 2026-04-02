@@ -48,7 +48,7 @@ export default function ReportDetailModal({ reportId, isOpen, onClose }: ReportD
   const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'timeline'>('details');
   
   const { data: report, isLoading, error } = useApiQuery<ReportDetail>(
-    reportId || '',
+    reportId ? `/reports/${reportId}` : '',
     { enabled: !!reportId && isOpen }
   );
 

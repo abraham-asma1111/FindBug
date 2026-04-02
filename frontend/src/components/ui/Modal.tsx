@@ -64,24 +64,24 @@ export default function Modal({
       <div 
         className={`
           relative w-full ${sizes[size]}
-          bg-white dark:bg-slate-900
-          border border-slate-200 dark:border-slate-800
-          rounded-lg shadow-2xl
+          bg-white
+          border border-[#e6ddd4]
+          rounded-2xl shadow-2xl
           max-h-[90vh] overflow-y-auto
         `}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#e6ddd4]">
             {title && (
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <h2 className="text-xl font-bold text-[#2d2a26]">
                 {title}
               </h2>
             )}
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="ml-auto text-[#8b8177] hover:text-[#2d2a26] transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

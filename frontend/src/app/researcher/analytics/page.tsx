@@ -181,6 +181,9 @@ export default function ResearcherAnalyticsPage() {
           title="Analytics"
           subtitle="Track your performance, earnings trends, and specialization insights."
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Researcher Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           {/* Time Period Selector */}
           <div className="mb-6 flex justify-end items-center">

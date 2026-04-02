@@ -192,6 +192,9 @@ export default function ResearcherMessagesPage() {
           title="Messages"
           subtitle="Communicate with organizations, staff, and other researchers about reports and engagements."
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Researcher Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           <div className="flex h-[600px] rounded-2xl bg-[#faf6f1] border border-[#e6ddd4] overflow-hidden">
             {/* Conversations List */}

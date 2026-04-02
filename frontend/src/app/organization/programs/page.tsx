@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Tabs from '@/components/ui/Tabs';
+import SimpleTabs from '@/components/ui/SimpleTabs';
 import EmptyState from '@/components/ui/EmptyState';
 import ProgramList from '@/components/organization/programs/ProgramList';
 import ProgramCreateModal from '@/components/organization/programs/ProgramCreateModal';
@@ -24,19 +24,19 @@ export default function OrganizationProgramsPage() {
     { enabled: !!user }
   );
 
-  // Filter programs by status for tabs
-  const activePrograms = programs?.filter((p: any) => 
-    p.status === 'public' || p.status === 'paused'
-  ) || [];
+  // Filter programs by status for tabs (only for non-archived)
+  const activePrograms = activeTab !== 'archived' 
+    ? (programs?.filter((p: any) => p.status === 'public' || p.status === 'paused') || [])
+    : [];
   
-  const draftPrograms = programs?.filter((p: any) => 
-    p.status === 'draft'
-  ) || [];
+  const draftPrograms = activeTab !== 'archived'
+    ? (programs?.filter((p: any) => p.status === 'draft') || [])
+    : [];
 
   const tabs = [
-    { id: 'active', label: 'Active Programs', count: activePrograms.length },
-    { id: 'drafts', label: 'Drafts', count: draftPrograms.length },
-    { id: 'archived', label: 'Archived', count: activeTab === 'archived' ? programs?.length || 0 : 0 },
+    { id: 'active', label: 'Active Programs', count: activeTab === 'active' ? activePrograms.length : 0 },
+    { id: 'drafts', label: 'Drafts', count: activeTab === 'drafts' ? draftPrograms.length : 0 },
+    { id: 'archived', label: 'Archived', count: activeTab === 'archived' ? (programs?.length || 0) : 0 },
   ];
 
   const getCurrentPrograms = () => {
@@ -51,25 +51,28 @@ export default function OrganizationProgramsPage() {
         <PortalShell
           user={user}
           title="Programs Management"
-          subtitle="Create and manage your bug bounty programs"
+          subtitle=""
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Organization Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
-          <div className="space-y-6">
+          <div className="mt-8 space-y-8">
             {/* Header with Create Button */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-[#2d2a26]">Bug Bounty Programs</h2>
-                <p className="mt-1 text-sm text-[#6d6760]">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 ml-12">
+                <h2 className="text-3xl font-bold text-[#2d2a26]">Bug Bounty Programs</h2>
+                <p className="mt-3 text-sm text-[#6d6760]">
                   Manage your security programs and invite researchers
                 </p>
               </div>
               <Button onClick={() => setShowCreateModal(true)}>
-                + Create Program
+                Create Program
               </Button>
             </div>
 
             {/* Tabs */}
-            <Tabs
+            <SimpleTabs
               tabs={tabs}
               activeTab={activeTab}
               onChange={setActiveTab}
@@ -78,7 +81,7 @@ export default function OrganizationProgramsPage() {
             {/* Error State */}
             {error && (
               <Card className="border-[#f2c0bc] bg-[#fff2f1]">
-                <p className="text-sm text-[#b42318]">{error}</p>
+                <p className="text-sm text-[#b42318]">{error.message || 'An error occurred'}</p>
               </Card>
             )}
 

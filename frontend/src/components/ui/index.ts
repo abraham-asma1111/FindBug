@@ -35,7 +35,7 @@ export type { SelectProps } from './Select';
 export { default as Spinner } from './Spinner';
 export type { SpinnerProps } from './Spinner';
 
-export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
+export { default as Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
 export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } from './Tabs';
 
 export { default as Textarea } from './Textarea';

@@ -24,7 +24,7 @@ export default function ProgramCatalogTable({
   return (
     <SectionCard
       title="Program Catalog"
-      description="Public programs and VDP opportunities that can turn directly into researcher report workflow."
+      description="Public programs and VDP opportunities. Open each program in its own detail page before joining."
     >
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
@@ -71,7 +71,7 @@ export default function ProgramCatalogTable({
                         onClick={() => onInspect(program.id)}
                         className="rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
                       >
-                        Workflow
+                        View details
                       </button>
                       {renderAction(program)}
                     </div>

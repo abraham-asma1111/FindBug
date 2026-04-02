@@ -12,11 +12,13 @@ interface Comment {
   comment_type: string;
   is_internal: boolean;
   created_at: string;
+  author_id?: string;
+  author_role?: string;
   user: {
     id: string;
     username: string;
     role: string;
-  };
+  } | null;
 }
 
 interface ReportCommentsProps {
@@ -49,7 +51,7 @@ export default function ReportComments({ reportId }: ReportCommentsProps) {
     if (newComment.trim()) {
       addComment({
         comment_text: newComment.trim(),
-        comment_type: 'general',
+        comment_type: 'comment',
         is_internal: false,
       });
     }
@@ -90,6 +92,26 @@ export default function ReportComments({ reportId }: ReportCommentsProps) {
     }
   };
 
+  const getCommentAuthorName = (comment: Comment) => {
+    if (comment.user?.username) {
+      return comment.user.username;
+    }
+
+    if (comment.author_role) {
+      return formatRoleLabel(comment.author_role);
+    }
+
+    return 'Unknown user';
+  };
+
+  const getCommentAuthorRole = (comment: Comment) => {
+    return comment.user?.role || comment.author_role || 'unknown';
+  };
+
+  const formatRoleLabel = (role: string) => {
+    return role.replace(/[_-]/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -117,7 +139,7 @@ export default function ReportComments({ reportId }: ReportCommentsProps) {
               <div className="flex items-start gap-4">
                 {/* Avatar */}
                 <Avatar
-                  fallback={comment.user.username}
+                  fallback={getCommentAuthorName(comment)}
                   size="md"
                   className="flex-shrink-0"
                 />
@@ -126,14 +148,14 @@ export default function ReportComments({ reportId }: ReportCommentsProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-sm font-semibold text-[#2d2a26]">
-                      {comment.user.username}
+                      {getCommentAuthorName(comment)}
                     </p>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getRoleBadgeColor(
-                        comment.user.role
+                        getCommentAuthorRole(comment)
                       )}`}
                     >
-                      {comment.user.role.replace('_', ' ').toUpperCase()}
+                      {formatRoleLabel(getCommentAuthorRole(comment)).toUpperCase()}
                     </span>
                     <span className="text-xs text-[#8b8177]">•</span>
                     <span className="text-xs text-[#8b8177]">

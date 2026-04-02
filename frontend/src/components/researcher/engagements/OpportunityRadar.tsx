@@ -17,7 +17,7 @@ export default function OpportunityRadar({ isLoading, programs, renderAction, on
   return (
     <SectionCard
       title="Opportunity Radar"
-      description="Bug bounty and VDP opportunities most aligned with your profile and current market fit."
+      description="Bug bounty and VDP opportunities most aligned with your profile. Open the detail page to inspect scope before joining."
     >
       <div className="grid gap-4 md:grid-cols-2">
         {programs.length ? (
@@ -59,7 +59,7 @@ export default function OpportunityRadar({ isLoading, programs, renderAction, on
                     onClick={() => onInspect(program.id)}
                     className="rounded-full border border-[#d8d0c8] bg-white/70 px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-white"
                   >
-                    Open workflow
+                    View details
                   </button>
                   {renderAction(program)}
                 </div>

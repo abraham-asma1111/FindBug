@@ -1,18 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
-import SectionCard from '@/components/dashboard/SectionCard';
 import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
 import {
   formatCompactNumber,
   formatCurrency,
-  formatDateTime,
   getPortalNavItems,
 } from '@/lib/portal';
-import { type ResearcherDashboardData, useResearcherDashboardData } from '@/hooks/useResearcherDashboardData';
+import SectionCard from '@/components/dashboard/SectionCard';
+import {
+  type ResearcherDashboardData,
+  type ResearcherSubmission,
+  useResearcherDashboardData,
+} from '@/hooks/useResearcherDashboardData';
+import {
+  buildResearcherDashboardAlerts,
+  formatDashboardMetricLabel,
+  ResearcherDashboardAlertsSection,
+  ResearcherDashboardInsightsSection,
+  ResearcherDashboardJumpboardSection,
+} from '@/components/researcher/dashboard/ResearcherDashboardSections';
 import { useAuthStore } from '@/store/authStore';
 
 const submissionTabs = ['new', 'triaged', 'valid', 'invalid', 'closed'] as const;
@@ -59,107 +69,51 @@ function formatSubmissionStatus(status?: string | null): string {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function formatTrendLabel(month: string, label?: string): string {
-  if (label) {
-    return label;
-  }
-
-  const parsedMonth = new Date(`${month}-01T00:00:00Z`);
-
-  if (Number.isNaN(parsedMonth.getTime())) {
-    return month;
-  }
-
-  return parsedMonth.toLocaleDateString('en-US', { month: 'short' });
-}
-
-function formatMetricLabel(value?: string | null): string {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  return value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function getNotificationTone(priority?: string | null): string {
-  switch (priority?.toLowerCase()) {
-    case 'critical':
-    case 'high':
-      return 'bg-[#fff2f1] text-[#b42318]';
-    case 'medium':
-      return 'bg-[#faf1e1] text-[#9a6412]';
-    default:
-      return 'bg-[#eef5fb] text-[#2d78a8]';
-  }
-}
-
-function getSubmissionWorkflow(status?: string | null): {
+function getSubmissionWorkflow(submission?: ResearcherSubmission): {
   nextStep: string;
   actionLabel: string;
   href: string;
 } {
-  switch (normalizeSubmissionStatus(status)) {
+  const detailHref = submission?.id ? `/researcher/reports/${submission.id}` : '/researcher/reports';
+
+  switch (normalizeSubmissionStatus(submission?.status)) {
     case 'new':
       return {
         nextStep: 'Complete the evidence package and watch for first triage contact.',
         actionLabel: 'Open report',
-        href: '/researcher/reports',
+        href: detailHref,
       };
     case 'triaged':
       return {
         nextStep: 'Review triage feedback and respond with clarifications or more proof.',
         actionLabel: 'Review triage',
-        href: '/researcher/reports',
+        href: detailHref,
       };
     case 'valid':
       return {
         nextStep: 'Track remediation and bounty approval from the report detail flow.',
         actionLabel: 'Track payout',
-        href: '/researcher/reports',
+        href: detailHref,
       };
     case 'invalid':
       return {
         nextStep: 'Read the decision carefully and capture lessons for your next submission.',
         actionLabel: 'Review notes',
-        href: '/researcher/reports',
+        href: detailHref,
       };
     case 'closed':
       return {
         nextStep: 'Keep the final state as portfolio and earnings history.',
         actionLabel: 'View history',
-        href: '/researcher/reports',
+        href: detailHref,
       };
     default:
       return {
         nextStep: 'Open the report workflow and inspect the current handoff state.',
         actionLabel: 'Open workflow',
-        href: '/researcher/reports',
+        href: detailHref,
       };
   }
-}
-
-function getNotificationHref(type?: string | null, actionUrl?: string | null): string {
-  if (actionUrl?.startsWith('/')) {
-    return actionUrl;
-  }
-
-  const normalizedType = type?.toLowerCase() || '';
-
-  if (normalizedType.includes('message')) {
-    return '/researcher/messages';
-  }
-
-  if (normalizedType.includes('payment') || normalizedType.includes('wallet') || normalizedType.includes('payout')) {
-    return '/researcher/earnings';
-  }
-
-  if (normalizedType.includes('simulation')) {
-    return '/researcher/simulation';
-  }
-
-  return '/researcher/reports';
 }
 
 function buildTwelveMonthTrend(
@@ -209,84 +163,156 @@ export default function ResearcherDashboardPage() {
   const maxMonthlySubmissions = monthlyTrend.reduce((highest, entry) => {
     return Math.max(highest, entry.submissions);
   }, 1);
-  const recentSubmissions = data?.recent_submissions ?? [];
+  const recentSubmissions = useMemo(() => {
+    return [...(data?.recent_submissions ?? [])].sort((left, right) => {
+      const leftTime = left.submitted_at ? new Date(left.submitted_at).getTime() : 0;
+      const rightTime = right.submitted_at ? new Date(right.submitted_at).getTime() : 0;
+      return rightTime - leftTime;
+    });
+  }, [data?.recent_submissions]);
   const filteredSubmissions = recentSubmissions.filter(
     (submission) => normalizeSubmissionStatus(submission.status) === activeTab
   );
+
   const unavailableWidgets = new Set(secondaryWarnings);
   const notificationsUnavailable = unavailableWidgets.has('notifications');
   const messagesUnavailable = unavailableWidgets.has('messages');
   const walletUnavailable = unavailableWidgets.has('wallet');
   const performanceUnavailable = unavailableWidgets.has('performance');
   const simulationUnavailable = unavailableWidgets.has('simulation');
-  const simulationStatEntries = Object.entries(simulation?.stats || {})
-    .filter(([, value]) => typeof value === 'number')
-    .slice(0, 4)
-    .map(([key, value]) => ({
-      key,
-      label: formatMetricLabel(key),
-      value: formatCompactNumber(Number(value)),
-    }));
+  const reputationUnavailable = unavailableWidgets.has('reputation');
+
+  const overview = data?.overview;
+  const earnings = data?.earnings;
+  const reputation = data?.reputation;
+  const walletAvailable = wallet?.available_balance ?? 0;
+  const totalSubmissions = overview?.total_submissions ?? 0;
+  const activePrograms = overview?.active_programs ?? 0;
+  const newSubmissionCount = overview?.submissions_by_status?.new ?? 0;
+  const sixMonthSuccessRate = performance?.metrics?.success_rate ?? 0;
+  const rank = myReputation?.rank_info?.rank ?? reputation?.rank ?? null;
+  const percentile = myReputation?.rank_info?.percentile ?? reputation?.percentile ?? null;
+  const alerts = buildResearcherDashboardAlerts({
+    notifications,
+    unreadMessages,
+    walletAvailable,
+    activePrograms,
+    secondaryWarnings,
+    isLoading,
+    messagesUnavailable,
+    walletUnavailable,
+  });
+
   const workflowModules = [
     {
       href: '/researcher/engagements',
       module: 'Engagements',
-      signal: isLoading ? '...' : `${formatCompactNumber(data?.overview.active_programs)} active`,
-      workflow: 'Review joined programs, invitations, and matching opportunities before drafting findings.',
+      signal: isLoading ? 'Loading...' : `${formatCompactNumber(activePrograms)} active`,
+      workflow: 'Discover programs, respond to invitations, and confirm where you are allowed to submit.',
       actionText: 'Open engagements',
+      accent: 'from-[#103c37] via-[#175e55] to-[#23948c]',
     },
     {
       href: '/researcher/reports',
       module: 'Reports',
-      signal: isLoading ? '...' : `${data?.overview.submissions_by_status?.new || 0} still new`,
-      workflow: 'Submit new findings, answer triage requests, and keep evidence attached to each report.',
+      signal: isLoading ? 'Loading...' : `${formatCompactNumber(newSubmissionCount)} awaiting progress`,
+      workflow: 'Draft, submit, edit, comment on, and track the full report handoff into triage.',
       actionText: 'Open reports',
+      accent: 'from-[#52212a] via-[#8e2430] to-[#ef2330]',
     },
     {
       href: '/researcher/earnings',
       module: 'Earnings',
       signal: isLoading
-        ? '...'
+        ? 'Loading...'
         : walletUnavailable
           ? 'Service unavailable'
-          : formatCurrency(wallet?.available_balance ?? data?.earnings.pending_earnings),
-      workflow: 'Check balance, payout blockers, and KYC state before requesting a withdrawal.',
+          : formatCurrency(walletAvailable),
+      workflow: 'Inspect balance, payout requests, payout methods, and KYC blockers before cashing out.',
       actionText: 'Open earnings',
-    },
-    {
-      href: '/researcher/messages',
-      module: 'Messages',
-      signal: isLoading ? '...' : messagesUnavailable ? 'Service unavailable' : `${formatCompactNumber(unreadMessages)} unread`,
-      workflow: 'Handle follow-ups from triage and organizations without leaving the portal workflow.',
-      actionText: 'Open inbox',
-    },
-    {
-      href: '/researcher/reputation',
-      module: 'Reputation',
-      signal: isLoading ? '...' : `#${myReputation?.rank_info?.rank || data?.reputation.rank || '-'}`,
-      workflow: myReputation?.rank_info
-        ? `Top ${Math.round(myReputation.rank_info.percentile)}% of researchers`
-        : 'Current leaderboard position',
-      actionText: 'Open reputation',
+      accent: 'from-[#57411d] via-[#956226] to-[#d89b16]',
     },
     {
       href: '/researcher/simulation',
       module: 'Simulation',
-      signal: simulationUnavailable ? 'Service unavailable' : simulationStatEntries[0]?.value || 'Private',
-      workflow: simulationUnavailable
-        ? 'The training service did not answer. Retry from the simulation module.'
-        : simulationStatEntries[0]?.label || 'Training metrics stay private to you',
+      signal: simulationUnavailable ? 'Service unavailable' : 'Open workspace',
+      workflow: 'Use training exercises to sharpen skills that feed back into live program results.',
       actionText: 'Open simulation',
+      accent: 'from-[#1e2f52] via-[#2d78a8] to-[#6bb3d8]',
+    },
+    {
+      href: '/researcher/analytics',
+      module: 'Analytics',
+      signal: performanceUnavailable ? 'Service unavailable' : `${Math.round(sixMonthSuccessRate)}% success`,
+      workflow: 'Track historical output, severity mix, and long-term patterns in your findings.',
+      actionText: 'Open analytics',
+      accent: 'from-[#503b2c] via-[#8c6239] to-[#c96d3a]',
+    },
+    {
+      href: '/researcher/reputation',
+      module: 'Reputation',
+      signal: isLoading ? 'Loading...' : rank ? `Rank #${rank}` : 'Unranked',
+      workflow: 'Measure current standing, percentile, and competitive position in the researcher pool.',
+      actionText: 'Open reputation',
+      accent: 'from-[#3b2346] via-[#694175] to-[#9b6fb0]',
+    },
+    {
+      href: '/researcher/messages',
+      module: 'Messages',
+      signal: messagesUnavailable ? 'Service unavailable' : `${formatCompactNumber(unreadMessages)} unread`,
+      workflow: 'Keep conversation history close to the work: triage clarifications, organizer replies, and follow-up.',
+      actionText: 'Open inbox',
+      accent: 'from-[#28333d] via-[#405668] to-[#607d94]',
     },
   ];
+
+  const primaryAction = !isLoading && activePrograms === 0
+    ? {
+        label: 'Next best action',
+        title: 'Join a program before starting new live submissions',
+        description: 'The roadmap puts discovery first. Pick a public program or accept an invitation to unlock direct report flow.',
+        href: '/researcher/engagements',
+        actionText: 'Review opportunities',
+      }
+    : !isLoading && newSubmissionCount > 0
+      ? {
+          label: 'Next best action',
+          title: 'Advance your new reports into triage',
+          description: 'Your newest submissions still need evidence follow-up or first triage contact.',
+          href: '/researcher/reports',
+          actionText: 'Continue reports',
+        }
+      : !isLoading && !messagesUnavailable && unreadMessages > 0
+        ? {
+            label: 'Next best action',
+            title: 'Reply to pending workflow messages',
+            description: 'Inbox pressure is the fastest way for a report to stall. Clear open questions from triage or organizations.',
+            href: '/researcher/messages',
+            actionText: 'Open inbox',
+          }
+        : !isLoading && !walletUnavailable && walletAvailable > 0
+          ? {
+              label: 'Next best action',
+              title: 'Review payout readiness',
+              description: 'You have available balance. Confirm payout method, KYC status, and withdrawal request details.',
+              href: '/researcher/earnings',
+              actionText: 'Open earnings',
+            }
+          : {
+              label: 'Next best action',
+              title: 'Keep momentum with practice or analytics',
+              description: 'If the live queue is clear, use simulation and analytics to improve the next reporting cycle.',
+              href: '/researcher/simulation',
+              actionText: 'Open simulation',
+            };
 
   return (
     <ProtectedRoute allowedRoles={['researcher']}>
       {user ? (
         <PortalShell
           user={user}
-          title="Researcher Overview"
-          subtitle="Track submission throughput, earnings, and reputation from the first cross-role bug bounty slice."
+          title="Researcher Dashboard"
+          subtitle="Roadmap-aligned control center for engagements, reports, earnings, and training."
           navItems={getPortalNavItems(user.role)}
           headerAlign="center"
           eyebrowText="Researcher Portal"
@@ -300,472 +326,287 @@ export default function ResearcherDashboardPage() {
             </div>
           ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Total Submissions"
-            value={isLoading ? '...' : formatCompactNumber(data?.overview.total_submissions)}
-            helper="Lifetime reports submitted"
-          />
-          <StatCard
-            label="Active Programs"
-            value={isLoading ? '...' : formatCompactNumber(data?.overview.active_programs)}
-            helper="Programs you are currently active in"
-          />
-          <StatCard
-            label="Total Earnings"
-            value={isLoading ? '...' : formatCurrency(data?.earnings.total_earnings)}
-            helper={`Pending ${formatCurrency(data?.earnings.pending_earnings)}`}
-          />
-          <StatCard
-            label="Reputation"
-            value={isLoading ? '...' : formatCompactNumber(data?.reputation.score)}
-            helper={
-              data
-                ? `Rank ${data.reputation.rank || '-'} of ${data.reputation.total_researchers || 0}`
-                : 'Leaderboard position'
-            }
-          />
-        </div>
+          <section className="rounded-[36px] border border-[#d8d0c8] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(255,255,255,0.72)_35%,rgba(244,195,139,0.28)_75%),linear-gradient(135deg,#f7efe6_0%,#f6e8d3_45%,#efe1cf_100%)] p-6 shadow-sm sm:p-8">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8b8177]">
+                  Researcher Dashboard
+                </p>
+                <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-[#2d2a26] sm:text-5xl">
+                  Operate the discovery-to-payout workflow from one board.
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-[#5f5851] sm:text-base">
+                  The roadmap puts this page at the top of the researcher lifecycle: overview cards first,
+                  then alerts, recent activity, and direct jumps into engagements, reports, earnings, analytics,
+                  messages, reputation, and simulation.
+                </p>
 
-        <div className="mt-6">
-          <SectionCard
-            title="Submission Pipeline"
-            description="All your submitted reports with status and rewards."
-            headerAlign="center"
-          >
-            <div className="mb-5 grid grid-cols-2 gap-3 border-b border-[#e6ddd4] pb-4 sm:grid-cols-5">
-              {submissionTabs.map((tab) => {
-                const isActive = tab === activeTab;
-
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? 'justify-center bg-[#ef2330] text-white'
-                        : 'justify-center bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
-                    }`}
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    href="/researcher/engagements"
+                    className="inline-flex rounded-full bg-[#2d2a26] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1f1c19]"
                   >
-                    <span className="capitalize">{tab}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#e6ddd4]">
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">DATE</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">ID</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">REPORT TITLE</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">PROGRAM</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">REWARDS</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">CVSS</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">STATUS</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">NEXT STEP</th>
-                    <th className="pb-3 font-semibold text-[#2d2a26]">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    Array.from({ length: 4 }).map((_, index) => (
-                      <tr key={`loading-${index}`} className="border-b border-[#efe7de] last:border-0">
-                        <td className="py-4 pr-4" colSpan={9}>
-                          <div className="h-8 animate-pulse rounded-xl bg-[#f3ede6]" />
-                        </td>
-                      </tr>
-                    ))
-                  ) : filteredSubmissions.length ? (
-                    filteredSubmissions.map((submission) => {
-                      const workflow = getSubmissionWorkflow(submission.status);
-
-                      return (
-                      <tr key={submission.id} className="border-b border-[#e6ddd4] last:border-0">
-                        <td className="py-3 pr-4 text-[#6d6760]">
-                          {submission.submitted_at
-                            ? new Date(submission.submitted_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              })
-                            : '-'}
-                        </td>
-                        <td className="py-3 pr-4 text-[#6d6760]">{submission.report_number || '-'}</td>
-                        <td className="py-3 pr-4 font-medium text-[#2d2a26]">{submission.title}</td>
-                        <td className="py-3 pr-4 text-[#6d6760]">{submission.program_name || '-'}</td>
-                        <td className="py-3 pr-4 text-[#6d6760]">
-                          {submission.bounty_amount ? formatCurrency(submission.bounty_amount) : '-'}
-                        </td>
-                        <td className="py-3 pr-4 text-[#6d6760]">
-                          {submission.cvss_score ? submission.cvss_score.toFixed(1) : submission.assigned_severity || '-'}
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                              statusTone[normalizeSubmissionStatus(submission.status) || submission.status || ''] ||
-                              'bg-[#f3ede6] text-[#5f5851]'
-                            }`}
-                          >
-                            {formatSubmissionStatus(submission.status)}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-4 text-sm text-[#6d6760]">{workflow.nextStep}</td>
-                        <td className="py-3">
-                          <Link
-                            href={workflow.href}
-                            className="inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
-                          >
-                            {workflow.actionLabel}
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={9} className="py-10 text-center">
-                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
-                          No results found
-                        </p>
-                        <p className="mt-2 text-sm text-[#6d6760]">
-                          No {activeTab} submissions are available in the current dashboard data.
-                        </p>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <SectionCard
-            title="Reputation Snapshot"
-            description="How you currently rank against the researcher pool."
-            headerAlign="center"
-          >
-            <div className="space-y-4 text-sm text-[#6d6760]">
-              <div className="rounded-2xl bg-[#faf6f1] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">Percentile</p>
-                <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                  {myReputation?.rank_info ? `${Math.round(myReputation.rank_info.percentile)}%` : data ? `${data.reputation.percentile}%` : '...'}
-                </p>
+                    Review engagements
+                  </Link>
+                  <Link
+                    href="/researcher/reports"
+                    className="inline-flex rounded-full border border-[#c9beb1] bg-white/80 px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
+                  >
+                    Submit or track reports
+                  </Link>
+                  <Link
+                    href="/researcher/earnings"
+                    className="inline-flex rounded-full border border-[#c9beb1] bg-white/60 px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
+                  >
+                    Open earnings
+                  </Link>
+                </div>
               </div>
-              <div className="rounded-2xl bg-[#faf6f1] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">Paid Earnings</p>
-                <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                  {isLoading
-                    ? '...'
-                    : formatCurrency(myReputation?.profile?.total_earnings ?? data?.earnings.paid_earnings)}
-                </p>
+
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <div className="rounded-[28px] bg-[#2d2a26] p-5 text-white shadow-[0_18px_40px_rgba(45,42,38,0.2)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">Live Queue</p>
+                  <p className="mt-3 text-3xl font-semibold">
+                    {isLoading ? '...' : formatCompactNumber(newSubmissionCount + unreadMessages + unreadNotifications)}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/78">
+                    Combined attention load from new submissions, unread messages, and unread notifications.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-[#ddd4cb] bg-white/80 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b8177]">Wallet Ready</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#2d2a26]">
+                    {isLoading ? '...' : walletUnavailable ? 'Unavailable' : formatCurrency(walletAvailable)}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#6d6760]">
+                    Available payout balance linked from the researcher earnings workflow.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-[#ddd4cb] bg-white/80 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b8177]">Standing</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#2d2a26]">
+                    {isLoading ? '...' : rank ? `#${rank}` : 'Private'}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#6d6760]">
+                    {percentile !== null ? `Top ${Math.round(percentile)}% of ranked researchers.` : 'Open reputation for ranking detail.'}
+                  </p>
+                </div>
               </div>
             </div>
-          </SectionCard>
+          </section>
 
-          <SectionCard
-            title="Monthly Trend"
-            description="Reports submitted during each of the last 12 months."
-            headerAlign="center"
-          >
-            <div className="space-y-3">
-              {monthlyTrend.length ? (
-                <div className="rounded-[28px] bg-[#faf6f1] p-5">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
-                        12-month submission view
-                      </p>
-                      <p className="mt-1 text-sm text-[#6d6760]">
-                        Each bar shows how many reports you submitted in that month.
-                      </p>
-                    </div>
-                    <p className="text-right text-xs text-[#8b8177]">
-                      Peak month: <span className="font-semibold text-[#2d2a26]">{maxMonthlySubmissions}</span> reports
-                    </p>
-                  </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            <StatCard
+              label="Total Submissions"
+              value={isLoading ? '...' : formatCompactNumber(totalSubmissions)}
+              helper="Lifetime reports submitted"
+            />
+            <StatCard
+              label="Active Programs"
+              value={isLoading ? '...' : formatCompactNumber(activePrograms)}
+              helper="Joined programs and active tracks"
+            />
+            <StatCard
+              label="Unread Alerts"
+              value={isLoading ? '...' : notificationsUnavailable ? 'Unavailable' : formatCompactNumber(unreadNotifications)}
+              helper="Unread notifications from linked services"
+            />
+            <StatCard
+              label="Unread Messages"
+              value={isLoading ? '...' : messagesUnavailable ? 'Unavailable' : formatCompactNumber(unreadMessages)}
+              helper="Open workflow conversations"
+            />
+            <StatCard
+              label="Available Wallet"
+              value={isLoading ? '...' : walletUnavailable ? 'Unavailable' : formatCurrency(walletAvailable)}
+              helper={`Pending ${formatCurrency(earnings?.pending_earnings ?? 0)}`}
+            />
+            <StatCard
+              label="6-Month Success"
+              value={isLoading ? '...' : performanceUnavailable ? 'Unavailable' : `${Math.round(sixMonthSuccessRate)}%`}
+              helper={reputationUnavailable ? 'Performance service only' : `Rank ${rank || '-'} in researcher pool`}
+            />
+          </div>
 
-                  <div className="flex h-72 items-end gap-2">
-                    {monthlyTrend.map((entry) => {
-                      const barHeight = (entry.submissions / maxMonthlySubmissions) * 100;
+          <div className="mt-6">
+            <ResearcherDashboardAlertsSection alerts={alerts} isLoading={isLoading} />
+          </div>
+
+          <div className="mt-6">
+            <SectionCard
+              title="Recent Activity"
+              description="Recent submission movement plus the current handoff status for each report."
+              headerAlign="center"
+            >
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                <div>
+                  <div className="mb-5 grid grid-cols-2 gap-3 border-b border-[#e6ddd4] pb-4 sm:grid-cols-5">
+                    {submissionTabs.map((tab) => {
+                      const isActive = tab === activeTab;
 
                       return (
-                        <div key={entry.month} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-                          <p className="mb-2 text-center text-xs font-semibold text-[#2d2a26]">
-                            {entry.submissions}
-                          </p>
-                          <div className="flex h-52 items-end justify-center">
-                            <div className="flex h-full w-full max-w-[44px] items-end rounded-[18px] bg-white/75 px-1 pb-1 shadow-inner">
-                              <div
-                                className="w-full rounded-[14px] bg-gradient-to-t from-[#c96d3a] via-[#df8a53] to-[#f4c38b] shadow-[0_14px_30px_rgba(201,109,58,0.18)]"
-                                style={{ height: entry.submissions > 0 ? `${Math.max(barHeight, 10)}%` : '4px' }}
-                                title={`${entry.month}: ${entry.submissions} reports submitted`}
-                              />
-                            </div>
-                          </div>
-                          <p className="mt-3 truncate text-center text-xs font-semibold uppercase tracking-[0.16em] text-[#8b8177]">
-                            {formatTrendLabel(entry.month, entry.label)}
-                          </p>
-                        </div>
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setActiveTab(tab)}
+                          className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
+                            isActive
+                              ? 'bg-[#ef2330] text-white'
+                              : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                          }`}
+                        >
+                          <span className="capitalize">{tab}</span>
+                        </button>
                       );
                     })}
                   </div>
-                </div>
-              ) : (
-                <p className="text-sm text-[#6d6760]">
-                  {isLoading ? 'Loading trend data...' : 'No trend data available yet.'}
-                </p>
-              )}
-            </div>
-          </SectionCard>
-        </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-          <SectionCard
-            title="Workflow Modules"
-            description="Each researcher sidebar module owns a concrete step in the report-to-payout lifecycle."
-            headerAlign="center"
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#e6ddd4]">
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">MODULE</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">LIVE SIGNAL</th>
-                    <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">WORKFLOW ROLE</th>
-                    <th className="pb-3 font-semibold text-[#2d2a26]">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workflowModules.map((item) => (
-                    <tr key={item.module} className="border-b border-[#e6ddd4] last:border-0">
-                      <td className="py-4 pr-4 font-semibold text-[#2d2a26]">{item.module}</td>
-                      <td className="py-4 pr-4 text-[#6d6760]">{item.signal}</td>
-                      <td className="py-4 pr-4 text-[#6d6760]">{item.workflow}</td>
-                      <td className="py-4">
-                        <Link
-                          href={item.href}
-                          className="inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
-                        >
-                          {item.actionText}
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Operational Signals"
-            description="Unread notifications, message pressure, and payout position from the linked workflow services."
-            headerAlign="center"
-          >
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl bg-[#faf6f1] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Notifications</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                    {isLoading ? '...' : notificationsUnavailable ? 'Unavailable' : formatCompactNumber(unreadNotifications)}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-[#faf6f1] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Unread Messages</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                    {isLoading ? '...' : messagesUnavailable ? 'Unavailable' : formatCompactNumber(unreadMessages)}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-[#faf6f1] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Available Wallet</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                    {isLoading
-                      ? '...'
-                      : walletUnavailable
-                        ? 'Unavailable'
-                        : formatCurrency(wallet?.available_balance)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3 border-t border-[#e6ddd4] pt-4">
-                {notificationsUnavailable ? (
-                  <div className="rounded-2xl border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-4 text-sm text-[#6d6760]">
-                    Notification service data is unavailable right now. Core report metrics still work; open the reports or messages modules directly if you need to continue workflow.
-                  </div>
-                ) : notifications.length ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
                         <tr className="border-b border-[#e6ddd4]">
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">PRIORITY</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">ALERT</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">RECEIVED</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">DATE</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">REPORT</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">PROGRAM</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">SEVERITY</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">STATUS</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">NEXT STEP</th>
                           <th className="pb-3 font-semibold text-[#2d2a26]">ACTION</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {notifications.map((notification) => (
-                          <tr key={notification.id} className="border-b border-[#e6ddd4] last:border-0">
-                            <td className="py-4 pr-4">
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getNotificationTone(
-                                  notification.priority
-                                )}`}
-                              >
-                                {formatMetricLabel(notification.priority || notification.type || 'update')}
-                              </span>
-                            </td>
-                            <td className="py-4 pr-4">
-                              <p className="font-semibold text-[#2d2a26]">{notification.title}</p>
-                              <p className="mt-1 text-[#6d6760]">{notification.message}</p>
-                            </td>
-                            <td className="py-4 pr-4 text-[#6d6760]">{formatDateTime(notification.created_at)}</td>
-                            <td className="py-4">
-                              <Link
-                                href={getNotificationHref(notification.type, notification.action_url)}
-                                className="inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
-                              >
-                                {notification.action_text || 'Open workflow'}
-                              </Link>
+                        {isLoading ? (
+                          Array.from({ length: 4 }).map((_, index) => (
+                            <tr key={`dashboard-loading-${index}`} className="border-b border-[#efe7de] last:border-0">
+                              <td className="py-4 pr-4" colSpan={7}>
+                                <div className="h-8 animate-pulse rounded-xl bg-[#f3ede6]" />
+                              </td>
+                            </tr>
+                          ))
+                        ) : filteredSubmissions.length ? (
+                          filteredSubmissions.slice(0, 6).map((submission) => {
+                            const workflow = getSubmissionWorkflow(submission);
+
+                            return (
+                              <tr key={submission.id || submission.report_number || submission.title} className="border-b border-[#e6ddd4] last:border-0">
+                                <td className="py-3 pr-4 text-[#6d6760]">
+                                  {submission.submitted_at
+                                    ? new Date(submission.submitted_at).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                      })
+                                    : '-'}
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <p className="font-medium text-[#2d2a26]">{submission.title}</p>
+                                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#8b8177]">
+                                    {submission.report_number || 'No report number'}
+                                  </p>
+                                </td>
+                                <td className="py-3 pr-4 text-[#6d6760]">{submission.program_name || '-'}</td>
+                                <td className="py-3 pr-4">
+                                  <span
+                                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                      severityTone[(submission.assigned_severity || '').toLowerCase()] ||
+                                      'bg-[#f3ede6] text-[#5f5851]'
+                                    }`}
+                                  >
+                                    {submission.cvss_score
+                                      ? `CVSS ${submission.cvss_score.toFixed(1)}`
+                                      : formatDashboardMetricLabel(submission.assigned_severity || 'unscored')}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <span
+                                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                      statusTone[normalizeSubmissionStatus(submission.status) || submission.status || ''] ||
+                                      'bg-[#f3ede6] text-[#5f5851]'
+                                    }`}
+                                  >
+                                    {formatSubmissionStatus(submission.status)}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-4 text-[#6d6760]">{workflow.nextStep}</td>
+                                <td className="py-3">
+                                  <Link
+                                    href={workflow.href}
+                                    className="inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
+                                  >
+                                    {workflow.actionLabel}
+                                  </Link>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={7} className="py-10 text-center">
+                              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+                                No recent activity
+                              </p>
+                              <p className="mt-2 text-sm text-[#6d6760]">
+                                No {activeTab} submissions are available in the current dashboard data.
+                              </p>
                             </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <p className="text-sm text-[#6d6760]">
-                    {isLoading ? 'Loading notification feed...' : 'No unread notifications. Your dashboard is clear right now.'}
-                  </p>
-                )}
-              </div>
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          <SectionCard
-            title="Performance Focus"
-            description="Researcher analytics from the dedicated performance service."
-            headerAlign="center"
-          >
-            <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-[#faf6f1] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">6-Month Success Rate</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                    {isLoading ? '...' : performance ? `${Math.round(performance.metrics.success_rate)}%` : 'Unavailable'}
-                  </p>
                 </div>
-                <div className="rounded-2xl bg-[#faf6f1] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">6-Month Paid Earnings</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
-                    {isLoading ? '...' : performance ? formatCurrency(performance.metrics.earnings) : 'Unavailable'}
-                  </p>
-                </div>
-              </div>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Severity Distribution</p>
-                <div className="mt-4 space-y-3">
-                  {Object.entries(performance?.severity_distribution || {}).map(([severity, count]) => {
-                    const total = Object.values(performance?.severity_distribution || {}).reduce(
-                      (sum, value) => sum + value,
-                      0
-                    );
-                    const width = total ? (count / total) * 100 : 0;
-
-                    return (
-                      <div key={severity} className="grid grid-cols-[88px_minmax(0,1fr)_32px] items-center gap-3">
-                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
-                          {formatMetricLabel(severity)}
-                        </span>
-                        <div className="h-3 overflow-hidden rounded-full bg-[#f3ede6]">
-                          <div
-                            className={`h-full rounded-full ${severityTone[severity] ? severityTone[severity].split(' ')[0] : 'bg-[#c96d3a]'}`}
-                            style={{ width: `${Math.max(width, count ? 10 : 0)}%` }}
-                          />
-                        </div>
-                        <span className="text-right text-sm font-semibold text-[#2d2a26]">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="border-t border-[#e6ddd4] pt-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Top Vulnerability Types</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {(performance?.top_vulnerability_types || []).length ? (
-                    performance?.top_vulnerability_types.map((entry) => (
-                      <span
-                        key={`${entry.type}-${entry.count}`}
-                        className="rounded-full bg-[#edf5fb] px-3 py-2 text-xs font-semibold text-[#2d78a8]"
-                      >
-                        {entry.type || 'Unspecified'} · {entry.count}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-sm text-[#6d6760]">
-                      {isLoading
-                        ? 'Loading specialization data...'
-                        : performanceUnavailable
-                          ? 'Performance analytics are unavailable right now.'
-                          : 'No specialization pattern is available yet.'}
+                <div className="space-y-4">
+                  <div className="rounded-[28px] bg-[#faf6f1] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+                      Submission Status Mix
                     </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Simulation Snapshot"
-            description="Private training metrics from the simulation gateway stay visible only to you."
-            headerAlign="center"
-          >
-            <div className="space-y-5">
-              <div className="rounded-3xl bg-[#faf6f1] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Privacy Note</p>
-                <p className="mt-3 text-sm leading-6 text-[#6d6760]">
-                  {simulation?.privacy_note || 'Simulation scores stay private and are surfaced here only as personal progress signals.'}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {simulationStatEntries.length ? (
-                  simulationStatEntries.map((entry) => (
-                    <div key={entry.key} className="rounded-2xl border border-[#e6ddd4] bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
-                        {entry.label}
-                      </p>
-                      <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">{entry.value}</p>
+                    <div className="mt-4 space-y-3">
+                      {submissionTabs.map((tab) => (
+                        <div key={`count-${tab}`} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
+                          <span className="text-sm font-semibold capitalize text-[#2d2a26]">{tab}</span>
+                          <span className="text-sm font-semibold text-[#6d6760]">
+                            {isLoading ? '...' : formatCompactNumber(overview?.submissions_by_status?.[tab] ?? 0)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))
-                ) : (
-                <div className="rounded-2xl border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-5 text-sm leading-6 text-[#6d6760] sm:col-span-2">
-                  {isLoading
-                    ? 'Loading private simulation metrics...'
-                      : simulationUnavailable
-                        ? 'Simulation metrics are unavailable right now. Open the simulation workspace to retry the service.'
-                        : 'No simulation metrics were returned. Open the simulation module to initialize practice activity.'}
-                </div>
-              )}
-              </div>
+                  </div>
 
-              <Link
-                href="/researcher/simulation"
-                className="inline-flex rounded-full bg-[#2d2a26] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1f1c19]"
-              >
-                Open Simulation Workspace
-              </Link>
-            </div>
-          </SectionCard>
-        </div>
+                  <div className="rounded-[28px] bg-[#2d2a26] p-5 text-white">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+                      {primaryAction.label}
+                    </p>
+                    <h3 className="mt-4 text-2xl font-semibold leading-tight">{primaryAction.title}</h3>
+                    <p className="mt-3 text-sm leading-6 text-white/80">{primaryAction.description}</p>
+                    <Link
+                      href={primaryAction.href}
+                      className="mt-5 inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:bg-[#f5efe8]"
+                    >
+                      {primaryAction.actionText}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+          </div>
+
+          <div className="mt-6">
+            <ResearcherDashboardJumpboardSection workflowModules={workflowModules} />
+          </div>
+
+          <ResearcherDashboardInsightsSection
+            isLoading={isLoading}
+            performanceUnavailable={performanceUnavailable}
+            simulationUnavailable={simulationUnavailable}
+            earnings={earnings}
+            performance={performance}
+            myReputation={myReputation}
+            reputation={reputation}
+            monthlyTrend={monthlyTrend}
+            maxMonthlySubmissions={maxMonthlySubmissions}
+            simulation={simulation}
+          />
         </PortalShell>
       ) : null}
     </ProtectedRoute>
