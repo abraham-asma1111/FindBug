@@ -12,9 +12,12 @@ from src.domain.models.report import (
     ReportStatusHistory
 )
 from src.domain.models.program import BountyProgram, ProgramParticipation
-from src.domain.models.user import UserRole
+from src.domain.models.user import UserRole, User
 from src.core.role_access import role_from_str
 from src.domain.repositories.report_repository import ReportRepository
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ReportService:
@@ -48,6 +51,7 @@ class ReportService:
     def submit_report(
         self,
         researcher_id: UUID,
+        user_id: UUID,  # User ID for status history
         program_id: UUID,
         title: str,
         description: str,
@@ -90,52 +94,71 @@ class ReportService:
             limit=5
         )
         
-        # Create report
-        report = VulnerabilityReport(
-            report_number=self.generate_report_number(),
-            program_id=program_id,
-            researcher_id=researcher_id,
-            title=title,
-            description=description,
-            steps_to_reproduce=steps_to_reproduce,
-            impact_assessment=impact_assessment,
-            suggested_severity=suggested_severity,
-            affected_asset=affected_asset,
-            vulnerability_type=vulnerability_type,
-            status="new",
-            submitted_at=datetime.utcnow(),
-            last_activity_at=datetime.utcnow()
-        )
-        
-        report = self.report_repo.create(report)
-        
-        # Add status history
-        self.report_repo.add_status_history(
-            ReportStatusHistory(
-                report_id=report.id,
-                from_status=None,
-                to_status="new",
-                change_reason="Report submitted",
-                changed_by=researcher_id
+        try:
+            # Create report
+            report = VulnerabilityReport(
+                report_number=self.generate_report_number(),
+                program_id=program_id,
+                researcher_id=researcher_id,
+                title=title,
+                description=description,
+                steps_to_reproduce=steps_to_reproduce,
+                impact_assessment=impact_assessment,
+                suggested_severity=suggested_severity,
+                affected_asset=affected_asset,
+                vulnerability_type=vulnerability_type,
+                status="new",
+                submitted_at=datetime.utcnow(),
+                last_activity_at=datetime.utcnow()
             )
-        )
-        
-        # Send notification to organization (FREQ-12)
-        from src.services.notification_service import NotificationService
-        notification_service = NotificationService(self.db)
-        notification_service.notify_report_submitted(
-            report=report,
-            organization_user_id=program.organization.user_id
-        )
-        
-        # Log audit trail (FREQ-17)
-        self.audit_service.log_report_submitted(
-            report_id=report.id,
-            researcher_id=researcher_id,
-            program_id=program_id
-        )
-        
-        return report
+            
+            report = self.report_repo.create(report)
+            
+            # Add status history
+            self.report_repo.add_status_history(
+                ReportStatusHistory(
+                    report_id=report.id,
+                    from_status=None,
+                    to_status="new",
+                    change_reason="Report submitted",
+                    changed_by=user_id  # Use user_id instead of researcher_id
+                )
+            )
+            
+            # Send notification to organization (FREQ-12)
+            from src.services.notification_service import NotificationService
+            notification_service = NotificationService(self.db)
+            notification_service.notify_report_submitted(
+                report=report,
+                organization_user_id=program.organization.user_id
+            )
+            
+            # Log audit trail (FREQ-17)
+            from src.domain.models.researcher import Researcher
+            researcher = self.db.query(Researcher).filter(Researcher.id == researcher_id).first()
+            researcher_email = researcher.user.email if researcher and researcher.user else "unknown"
+            
+            self.audit_service.log_report_submitted(
+                report_id=report.id,
+                researcher_id=researcher_id,
+                researcher_email=researcher_email,
+                program_name=program.name
+            )
+            
+            # Commit transaction
+            self.db.commit()
+            
+            return report
+            
+        except Exception as e:
+            # Rollback transaction on any error
+            self.db.rollback()
+            logger.error(f"Failed to submit report: {str(e)}", extra={
+                "researcher_id": str(researcher_id),
+                "program_id": str(program_id),
+                "title": title
+            })
+            raise
     
     def get_researcher_reports(
         self,
@@ -165,6 +188,8 @@ class ReportService:
         - Organization can view reports for their programs
         - Triage specialists can view all reports
         """
+        from src.domain.models.researcher import Researcher
+        
         report = self.report_repo.get_by_id(report_id)
         
         if not report:
@@ -173,7 +198,11 @@ class ReportService:
         # Access control
         r = role_from_str(user_role)
         if r == UserRole.RESEARCHER:
-            if str(report.researcher_id) != str(user_id):
+            # Get researcher ID from user
+            researcher = self.db.query(Researcher).filter(Researcher.user_id == user_id).first()
+            if not researcher:
+                raise PermissionError("Researcher profile not found")
+            if str(report.researcher_id) != str(researcher.id):
                 raise PermissionError("You can only view your own reports")
         elif r == UserRole.ORGANIZATION:
             # Check if report belongs to organization's program
@@ -274,6 +303,37 @@ class ReportService:
             limit=limit,
             offset=offset
         )
+    
+    def get_organization_reports(
+        self,
+        organization_id: UUID,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[VulnerabilityReport]:
+        """Get all reports across all organization programs."""
+        # Get all programs for this organization
+        programs = self.db.query(BountyProgram).filter(
+            BountyProgram.organization_id == organization_id
+        ).all()
+        
+        if not programs:
+            return []
+        
+        program_ids = [p.id for p in programs]
+        
+        # Get reports for all programs
+        query = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.program_id.in_(program_ids)
+        )
+        
+        if status:
+            query = query.filter(VulnerabilityReport.status == status)
+        
+        query = query.order_by(VulnerabilityReport.submitted_at.desc())
+        query = query.limit(limit).offset(offset)
+        
+        return query.all()
     
     def get_report_statistics(
         self,

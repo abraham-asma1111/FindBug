@@ -39,10 +39,7 @@ def create_program(
             organization_id=str(current_user.organization.id),
             name=program_data.name,
             description=program_data.description,
-            program_type=program_data.program_type,
-            scope=program_data.scope,
-            reward_tiers=program_data.reward_tiers,
-            rules=program_data.rules
+            program_type=program_data.type
         )
         
         return ProgramResponse.from_orm(program)
@@ -113,6 +110,31 @@ def get_my_programs(
     )
     
     return programs
+
+
+@router.get("/my-participations", status_code=status.HTTP_200_OK)
+def get_my_participations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get programs the researcher has joined.
+    
+    Only for researchers.
+    """
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can view participations"
+        )
+    
+    service = ProgramService(db)
+    
+    participations = service.get_researcher_participations(
+        researcher_id=current_user.researcher.id
+    )
+    
+    return participations
 
 
 @router.get("/{program_id}", response_model=ProgramResponse)
@@ -428,8 +450,8 @@ def respond_to_invitation(
     return invitation
 
 
-@router.post("/programs/{program_id}/join", status_code=status.HTTP_200_OK)
-@router.get("/programs/{program_id}/join", status_code=status.HTTP_200_OK)
+@router.post("/{program_id}/join", status_code=status.HTTP_200_OK)
+@router.get("/{program_id}/join", status_code=status.HTTP_200_OK)
 def join_program(
     program_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -459,32 +481,6 @@ def join_program(
         "program_id": str(program_id),
         "joined_at": participation.joined_at
     }
-
-
-@router.get("/programs/my-participations", status_code=status.HTTP_200_OK)
-def get_my_participations(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get programs the researcher has joined.
-    
-    Only for researchers.
-    """
-    if current_user.role != "researcher":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only researchers can view participations"
-        )
-    
-    service = ProgramService(db)
-    
-    participations = service.get_researcher_participations(
-        researcher_id=current_user.researcher.id
-    )
-    
-    return participations
-
 
 
 @router.post("/{program_id}/pause", response_model=ProgramResponse)
@@ -666,6 +662,53 @@ def restore_program(
     updated_program = service.program_repo.update_program(program)
     
     return updated_program
+
+
+@router.delete("/{program_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{program_id}/delete", status_code=status.HTTP_200_OK)
+@router.get("/{program_id}/delete", status_code=status.HTTP_200_OK)
+def delete_program(
+    program_id: UUID,
+    current_user: User = Depends(require_organization),
+    db: Session = Depends(get_db)
+):
+    """
+    Permanently delete a program.
+    
+    Only draft programs or archived programs can be permanently deleted.
+    Only the organization that owns the program can delete it.
+    Supports DELETE, POST, and GET methods for compatibility.
+    """
+    service = ProgramService(db)
+    
+    # Get program including archived ones
+    program = service.program_repo.get_program_by_id(program_id)
+    
+    if not program:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Program not found"
+        )
+    
+    # Verify ownership
+    if program.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this program"
+        )
+    
+    # Only allow deletion of draft or archived programs
+    if program.status not in ['draft'] and not program.deleted_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only draft or archived programs can be permanently deleted"
+        )
+    
+    # Permanently delete
+    db.delete(program)
+    db.commit()
+    
+    return {"message": "Program deleted successfully"}
 
 
 @router.get("/archived", response_model=List[ProgramListResponse])

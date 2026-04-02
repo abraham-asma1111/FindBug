@@ -734,3 +734,183 @@ class PaymentService:
         query = query.order_by(Transaction.created_at.desc())
         
         return query.offset(skip).limit(limit).all()
+
+    def get_user_payment_methods(self, user_id: str) -> List:
+        """
+        Get user's payment methods.
+        Requires KYC verification.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            List of payment methods
+            
+        Raises:
+            HTTPException: If user is not KYC verified
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        from src.services.kyc_service import KYCService
+        from fastapi import HTTPException, status
+        
+        # Check KYC verification
+        kyc_service = KYCService(self.db)
+        kyc_status = kyc_service.get_kyc_status(user_id)
+        
+        if kyc_status["status"] != "approved":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="KYC verification required to access payment methods"
+            )
+        
+        return self.db.query(PaymentMethod).filter(
+            PaymentMethod.user_id == UUID(user_id)
+        ).order_by(PaymentMethod.created_at.desc()).all()
+
+    def add_payment_method(self, user_id: str, method_data: dict):
+        """
+        Add new payment method for user.
+        Requires KYC verification.
+        
+        Args:
+            user_id: User ID
+            method_data: Payment method data
+            
+        Returns:
+            Created payment method
+            
+        Raises:
+            HTTPException: If user is not KYC verified
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        from src.services.kyc_service import KYCService
+        from fastapi import HTTPException, status
+        
+        # Check KYC verification
+        kyc_service = KYCService(self.db)
+        kyc_status = kyc_service.get_kyc_status(user_id)
+        
+        if kyc_status["status"] != "approved":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="KYC verification required to add payment methods"
+            )
+        
+        # If this is set as default, unset other defaults
+        if method_data.get("is_default", False):
+            self.db.query(PaymentMethod).filter(
+                PaymentMethod.user_id == UUID(user_id),
+                PaymentMethod.is_default == True
+            ).update({"is_default": False})
+        
+        payment_method = PaymentMethod(
+            user_id=UUID(user_id),
+            method_type=method_data["method_type"],
+            account_number=method_data.get("account_number"),
+            account_name=method_data.get("account_name"),
+            bank_name=method_data.get("bank_name"),
+            phone_number=method_data.get("phone_number"),
+            is_default=method_data.get("is_default", False),
+            is_verified=False  # New methods need verification
+        )
+        
+        self.db.add(payment_method)
+        self.db.commit()
+        self.db.refresh(payment_method)
+        
+        return payment_method
+
+    def update_payment_method(self, method_id: str, method_data: dict):
+        """
+        Update payment method.
+        
+        Args:
+            method_id: Payment method ID
+            method_data: Updated data
+            
+        Returns:
+            Updated payment method or None if not found
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        
+        payment_method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == UUID(method_id)
+        ).first()
+        
+        if not payment_method:
+            return None
+        
+        # If setting as default, unset other defaults for this user
+        if method_data.get("is_default", False):
+            self.db.query(PaymentMethod).filter(
+                PaymentMethod.user_id == payment_method.user_id,
+                PaymentMethod.id != UUID(method_id),
+                PaymentMethod.is_default == True
+            ).update({"is_default": False})
+        
+        # Update fields
+        for field, value in method_data.items():
+            if hasattr(payment_method, field):
+                setattr(payment_method, field, value)
+        
+        self.db.commit()
+        self.db.refresh(payment_method)
+        
+        return payment_method
+
+    def delete_payment_method(self, method_id: str) -> bool:
+        """
+        Delete payment method.
+        
+        Args:
+            method_id: Payment method ID
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        
+        payment_method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == UUID(method_id)
+        ).first()
+        
+        if not payment_method:
+            return False
+        
+        self.db.delete(payment_method)
+        self.db.commit()
+        
+        return True
+
+    def set_default_payment_method(self, method_id: str, user_id: str) -> bool:
+        """
+        Set default payment method for user.
+        
+        Args:
+            method_id: Payment method ID
+            user_id: User ID
+            
+        Returns:
+            True if updated, False if not found
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        
+        # First, unset all defaults for this user
+        self.db.query(PaymentMethod).filter(
+            PaymentMethod.user_id == UUID(user_id),
+            PaymentMethod.is_default == True
+        ).update({"is_default": False})
+        
+        # Set the specified method as default
+        payment_method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == UUID(method_id),
+            PaymentMethod.user_id == UUID(user_id)
+        ).first()
+        
+        if not payment_method:
+            return False
+        
+        payment_method.is_default = True
+        self.db.commit()
+        
+        return True

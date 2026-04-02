@@ -10,7 +10,7 @@ from .staff_profiles import TriageSpecialist, Administrator, FinancialOfficer
 from .kyc import KYCVerification
 from .security_log import SecurityEvent, LoginHistory
 from .triage import TriageQueue, TriageAssignment, ValidationResult, DuplicateDetection
-from .payment_extended import PayoutRequest, Transaction, PaymentGateway, PaymentHistory
+from .payment_extended import PayoutRequest, Transaction, PaymentGateway, PaymentHistory, PaymentMethod
 from .ops import WebhookEndpoint, WebhookLog, EmailTemplate, DataExport, ComplianceReport
 from .program import BountyProgram, ProgramScope, RewardTier, ProgramInvitation, ProgramParticipation
 from .report import VulnerabilityReport, ReportAttachment, ReportComment, ReportStatusHistory
@@ -89,7 +89,7 @@ __all__ = [
     # Triage workflow (new)
     "TriageQueue", "TriageAssignment", "ValidationResult", "DuplicateDetection",
     # Payment completeness (new)
-    "PayoutRequest", "Transaction", "PaymentGateway", "PaymentHistory",
+    "PayoutRequest", "Transaction", "PaymentGateway", "PaymentHistory", "PaymentMethod",
     # Ops tables (new)
     "WebhookEndpoint", "WebhookLog", "EmailTemplate", "DataExport", "ComplianceReport",
     # Bug bounty core

@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
+from src.core.logging import get_logger
 from src.api.v1.middlewares.auth import get_current_user
 from src.domain.models.user import User
 from src.services.report_service import ReportService
 from src.api.v1.schemas.report import (
     ReportCreate,
+    ReportUpdate,
     ReportResponse,
     ReportDetailResponse,
     ReportListResponse,
@@ -20,6 +22,7 @@ from src.api.v1.schemas.report import (
 
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.get("/reports", status_code=status.HTTP_200_OK)
@@ -68,19 +71,23 @@ def search_reports(
     
     elif current_user.role == "organization":
         # Organizations see reports for their programs
-        if not program_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="program_id required for organization users"
+        if program_id:
+            # Filter by specific program
+            reports = service.get_program_reports(
+                program_id=program_id,
+                organization_id=current_user.organization.id,
+                status=status_filter,
+                limit=limit,
+                offset=offset
             )
-        
-        reports = service.get_program_reports(
-            program_id=program_id,
-            organization_id=current_user.organization.id,
-            status=status_filter,
-            limit=limit,
-            offset=offset
-        )
+        else:
+            # Get all reports across all organization programs
+            reports = service.get_organization_reports(
+                organization_id=current_user.organization.id,
+                status=status_filter,
+                limit=limit,
+                offset=offset
+            )
         
         # Apply search filter if provided
         if search:
@@ -174,6 +181,7 @@ def submit_report(
     try:
         report = service.submit_report(
             researcher_id=current_user.researcher.id,
+            user_id=current_user.id,  # Pass user_id for status history
             program_id=report_data.program_id,
             title=report_data.title,
             description=report_data.description,
@@ -328,12 +336,22 @@ def get_my_reports(
         offset=offset
     )
     
-    return {
-        "reports": reports,
-        "total": len(reports),
-        "limit": limit,
-        "offset": offset
-    }
+    # Format reports for frontend
+    formatted_reports = []
+    for report in reports:
+        formatted_reports.append({
+            "id": str(report.id),
+            "title": report.title,
+            "severity": report.assigned_severity or report.suggested_severity,
+            "status": report.status,
+            "program_name": report.program.name if report.program else "Unknown",
+            "submitted_at": report.submitted_at.isoformat() if report.submitted_at else None,
+            "bounty_amount": float(report.bounty_amount) if report.bounty_amount else None,
+            "report_number": report.report_number,
+            "vulnerability_type": report.vulnerability_type
+        })
+    
+    return formatted_reports
 
 
 @router.get("/reports/{report_id}", status_code=status.HTTP_200_OK)
@@ -364,12 +382,73 @@ def get_report(
                 detail="Report not found"
             )
         
-        return report
+        # Get program info separately to avoid relationship issues
+        from src.domain.models.program import BountyProgram
+        program = db.query(BountyProgram).filter(BountyProgram.id == report.program_id).first()
+        program_data = {
+            "id": str(program.id) if program else None,
+            "name": program.name if program else "Unknown Program"
+        }
+        
+        # Get researcher info separately
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.user import User as UserModel
+        researcher = db.query(Researcher).filter(Researcher.id == report.researcher_id).first()
+        researcher_user = None
+        if researcher:
+            researcher_user = db.query(UserModel).filter(UserModel.id == researcher.user_id).first()
+        
+        researcher_username = "Unknown"
+        if researcher:
+            researcher_username = researcher.username or (researcher_user.email if researcher_user else "Unknown")
+
+        researcher_data = {
+            "id": str(researcher.id) if researcher else None,
+            "username": researcher_username
+        }
+        
+        # Get attachments separately
+        from src.domain.models.report import ReportAttachment
+        attachments = db.query(ReportAttachment).filter(ReportAttachment.report_id == report.id).all()
+        attachments_data = [
+            {
+                "id": str(att.id),
+                "filename": att.filename,
+                "file_type": att.file_type,
+                "file_size": att.file_size,
+                "uploaded_at": att.uploaded_at.isoformat() if att.uploaded_at else None
+            }
+            for att in attachments
+        ]
+        
+        return {
+            "id": str(report.id),
+            "report_number": report.report_number,
+            "title": report.title,
+            "description": report.description or "",
+            "steps_to_reproduce": report.steps_to_reproduce or "",
+            "impact_assessment": report.impact_assessment or "",
+            "affected_asset": report.affected_asset or "",
+            "suggested_severity": report.suggested_severity,
+            "vulnerability_type": report.vulnerability_type,
+            "status": report.status,
+            "created_at": report.submitted_at.isoformat() if report.submitted_at else None,
+            "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+            "program": program_data,
+            "researcher": researcher_data,
+            "attachments": attachments_data
+        }
     
     except PermissionError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
+        )
+    except Exception as e:
+        logger.exception("Error getting report %s", report_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving report: {str(e)}"
         )
 
 
@@ -834,3 +913,110 @@ def get_report_activity(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
         )
+
+
+@router.put("/reports/{report_id}", status_code=status.HTTP_200_OK)
+def update_report(
+    report_id: UUID,
+    report_data: ReportUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a report - Only allowed for reports with status 'new'.
+    
+    Researchers can only update their own reports.
+    """
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can update reports"
+        )
+    
+    service = ReportService(db)
+    
+    # Get the report
+    report = service.get_report_by_id(
+        report_id=report_id,
+        user_id=current_user.id,
+        user_role=current_user.role
+    )
+    
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report not found"
+        )
+    
+    # Check if report can be edited (only 'new' status)
+    if report.status != "new":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only reports with 'new' status can be edited"
+        )
+    
+    # Update fields if provided
+    updates = report_data.dict(exclude_unset=True)
+    for field_name, value in updates.items():
+        setattr(report, field_name, value)
+    
+    db.commit()
+    db.refresh(report)
+    
+    return {
+        "message": "Report updated successfully",
+        "report_id": str(report.id),
+        "report_number": report.report_number
+    }
+
+
+@router.delete("/reports/{report_id}", status_code=status.HTTP_200_OK)
+def delete_report(
+    report_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a report - Only allowed for reports with status 'new'.
+    
+    Researchers can only delete their own reports.
+    This is a soft delete (sets deleted_at timestamp).
+    """
+    if current_user.role != "researcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can delete reports"
+        )
+    
+    service = ReportService(db)
+    
+    # Get the report
+    report = service.get_report_by_id(
+        report_id=report_id,
+        user_id=current_user.id,
+        user_role=current_user.role
+    )
+    
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report not found"
+        )
+    
+    # Check if report can be deleted (only 'new' status)
+    if report.status != "new":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only reports with 'new' status can be deleted"
+        )
+    
+    # Soft delete
+    from datetime import datetime
+    report.deleted_at = datetime.utcnow()
+    
+    db.commit()
+    
+    return {
+        "message": "Report deleted successfully",
+        "report_id": str(report.id)
+    }

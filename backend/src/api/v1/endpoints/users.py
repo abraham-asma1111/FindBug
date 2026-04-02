@@ -23,6 +23,18 @@ def get_my_profile(
     return service.get_profile(str(current_user.id))
 
 
+@router.get("/search", summary="Search Users")
+def search_users(
+    q: str = Query(..., min_length=2, description="Search query (email or name)"),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Search for users by email or name to start a conversation."""
+    service = UserService(db)
+    return service.search_users(q, limit, exclude_user_id=str(current_user.id))
+
+
 @router.put("/me", summary="Update Current User Profile")
 def update_my_profile(
     data: dict,

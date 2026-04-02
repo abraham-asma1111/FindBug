@@ -88,3 +88,4 @@ class User(Base):
     login_history = relationship("LoginHistory", back_populates="user", cascade="all, delete-orphan")
     data_exports = relationship("DataExport", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="user")
+    payment_methods = relationship("PaymentMethod", back_populates="user", cascade="all, delete-orphan")

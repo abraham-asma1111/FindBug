@@ -40,7 +40,7 @@ class ProgramService:
         """Create a new bounty program."""
         
         # Verify organization exists
-        org = self.org_repo.get_organization_by_id(organization_id)
+        org = self.org_repo.get_by_id(organization_id)
         if not org:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -182,18 +182,21 @@ class ProgramService:
     ):
         """Join a public program."""
         from src.domain.models.program import ProgramParticipation
-        from datetime import datetime
         
         # Check if program exists and is public
-        program = self.program_repo.get_by_id(program_id)
-        if not program:
-            raise ValueError("Program not found")
+        program = self.get_program(program_id)
         
         if program.status != "public":
-            raise ValueError("Can only join public programs. Private programs require invitation.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Can only join public programs. Private programs require invitation."
+            )
         
         if program.deleted_at:
-            raise ValueError("Cannot join archived program")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot join archived program"
+            )
         
         # Check if already joined
         existing = self.db.query(ProgramParticipation).filter(
@@ -203,7 +206,10 @@ class ProgramService:
         ).first()
         
         if existing:
-            raise ValueError("Already joined this program")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Already joined this program"
+            )
         
         # Create participation
         participation = ProgramParticipation(
@@ -233,7 +239,7 @@ class ProgramService:
         
         result = []
         for participation in participations:
-            program = self.program_repo.get_by_id(participation.program_id)
+            program = self.program_repo.get_program_by_id(participation.program_id)
             if program:
                 result.append({
                     "program": program,

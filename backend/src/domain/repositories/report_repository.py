@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, desc
 
 from src.domain.models.report import (
@@ -28,8 +28,15 @@ class ReportRepository:
         return report
     
     def get_by_id(self, report_id: UUID) -> Optional[VulnerabilityReport]:
-        """Get report by ID."""
-        return self.db.query(VulnerabilityReport).filter(
+        """Get report by ID with relationships loaded."""
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.user import User
+        
+        return self.db.query(VulnerabilityReport).options(
+            joinedload(VulnerabilityReport.program),
+            joinedload(VulnerabilityReport.researcher).joinedload(Researcher.user),
+            joinedload(VulnerabilityReport.attachments)
+        ).filter(
             VulnerabilityReport.id == report_id
         ).first()
     
@@ -65,7 +72,8 @@ class ReportRepository:
     ) -> List[VulnerabilityReport]:
         """Get all reports by a researcher."""
         query = self.db.query(VulnerabilityReport).filter(
-            VulnerabilityReport.researcher_id == researcher_id
+            VulnerabilityReport.researcher_id == researcher_id,
+            VulnerabilityReport.deleted_at.is_(None)  # Exclude deleted reports
         )
         
         if status:

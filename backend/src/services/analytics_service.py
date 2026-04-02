@@ -716,7 +716,7 @@ class AnalyticsService:
         months_data = []
         current_date = start_date
         
-        while current_date < datetime.utcnow():
+        while current_date <= datetime.utcnow():
             month_end = current_date + timedelta(days=30)
             
             reports = self.db.query(VulnerabilityReport).filter(
