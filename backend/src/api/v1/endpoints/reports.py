@@ -91,15 +91,33 @@ def search_reports(
         
         # Apply search filter if provided
         if search:
-            reports = [r for r in reports if search.lower() in r.title.lower() or search.lower() in r.description.lower()]
+            reports = [r for r in reports if search.lower() in r.title.lower() or (r.description and search.lower() in r.description.lower())]
         
         # Apply severity filter if provided
         if severity:
             reports = [r for r in reports if r.assigned_severity == severity]
         
+        # Serialize reports
+        serialized_reports = [
+            {
+                "id": str(r.id),
+                "report_number": r.report_number,
+                "title": r.title,
+                "description": r.description,
+                "status": r.status,
+                "assigned_severity": r.assigned_severity,
+                "suggested_severity": r.suggested_severity,
+                "cvss_score": float(r.cvss_score) if r.cvss_score else None,
+                "bounty_amount": float(r.bounty_amount) if r.bounty_amount else None,
+                "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
+                "program_id": str(r.program_id) if r.program_id else None,
+            }
+            for r in reports
+        ]
+        
         return {
-            "reports": reports,
-            "total": len(reports),
+            "reports": serialized_reports,
+            "total": len(serialized_reports),
             "limit": limit,
             "offset": offset
         }

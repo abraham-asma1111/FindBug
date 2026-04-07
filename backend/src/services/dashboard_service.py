@@ -306,12 +306,25 @@ class DashboardService:
         commission_rate = Decimal('0.30')
         total_commission = total_paid * commission_rate
         
-        # Recent reports (last 10)
+        # Recent reports (last 10) with program info
         recent_reports = []
         if program_ids:
-            recent_reports = self.db.query(VulnerabilityReport).filter(
+            recent_reports_query = self.db.query(VulnerabilityReport).filter(
                 VulnerabilityReport.program_id.in_(program_ids)
             ).order_by(desc(VulnerabilityReport.submitted_at)).limit(10).all()
+            
+            # Format reports with program name
+            for report in recent_reports_query:
+                report_data = {
+                    'id': str(report.id),
+                    'report_number': report.report_number,
+                    'title': report.title,
+                    'status': report.status,
+                    'assigned_severity': report.assigned_severity,
+                    'submitted_at': report.submitted_at.isoformat() if report.submitted_at else None,
+                    'program_name': report.program.name if report.program else None
+                }
+                recent_reports.append(report_data)
         
         # Monthly trend
         monthly_trend = self._get_organization_monthly_trend(program_ids)

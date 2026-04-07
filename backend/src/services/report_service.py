@@ -4,6 +4,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from src.domain.models.report import (
     VulnerabilityReport,
@@ -39,14 +40,14 @@ class ReportService:
         """Generate unique report number."""
         from datetime import datetime
         
-        # Get count of reports today
-        today = datetime.utcnow().date()
+        # Get count of reports for current year
+        current_year = datetime.utcnow().year
         count = self.db.query(VulnerabilityReport).filter(
-            VulnerabilityReport.submitted_at >= today
+            func.extract('year', VulnerabilityReport.submitted_at) == current_year
         ).count()
         
         # Format: REP-YYYY-NNNN
-        return f"REP-{datetime.utcnow().year}-{count + 1:04d}"
+        return f"REP-{current_year}-{count + 1:04d}"
     
     def submit_report(
         self,
@@ -147,6 +148,7 @@ class ReportService:
             
             # Commit transaction
             self.db.commit()
+            self.db.refresh(report)
             
             return report
             
@@ -205,11 +207,17 @@ class ReportService:
             if str(report.researcher_id) != str(researcher.id):
                 raise PermissionError("You can only view your own reports")
         elif r == UserRole.ORGANIZATION:
+            # Get organization ID from user
+            from src.domain.models.organization import Organization
+            organization = self.db.query(Organization).filter(Organization.user_id == user_id).first()
+            if not organization:
+                raise PermissionError("Organization profile not found")
+            
             # Check if report belongs to organization's program
             program = self.db.query(BountyProgram).filter(
                 BountyProgram.id == report.program_id
             ).first()
-            if not program or str(program.organization_id) != str(user_id):
+            if not program or str(program.organization_id) != str(organization.id):
                 raise PermissionError("You can only view reports for your programs")
         elif r not in (
             UserRole.TRIAGE_SPECIALIST,
