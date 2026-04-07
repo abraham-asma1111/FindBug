@@ -335,32 +335,6 @@ export default function ResearcherDashboardPage() {
                 <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-[#2d2a26] sm:text-5xl">
                   Operate the discovery-to-payout workflow from one board.
                 </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-[#5f5851] sm:text-base">
-                  The roadmap puts this page at the top of the researcher lifecycle: overview cards first,
-                  then alerts, recent activity, and direct jumps into engagements, reports, earnings, analytics,
-                  messages, reputation, and simulation.
-                </p>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <Link
-                    href="/researcher/engagements"
-                    className="inline-flex rounded-full bg-[#2d2a26] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1f1c19]"
-                  >
-                    Review engagements
-                  </Link>
-                  <Link
-                    href="/researcher/reports"
-                    className="inline-flex rounded-full border border-[#c9beb1] bg-white/80 px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
-                  >
-                    Submit or track reports
-                  </Link>
-                  <Link
-                    href="/researcher/earnings"
-                    className="inline-flex rounded-full border border-[#c9beb1] bg-white/60 px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
-                  >
-                    Open earnings
-                  </Link>
-                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
@@ -392,6 +366,27 @@ export default function ResearcherDashboardPage() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 max-w-2xl">
+              <Link
+                href="/researcher/engagements"
+                className="inline-flex items-center justify-center rounded-full bg-[#2d2a26] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f1c19]"
+              >
+                Review engagements
+              </Link>
+              <Link
+                href="/researcher/reports"
+                className="inline-flex items-center justify-center rounded-full border border-[#c9beb1] bg-white/80 px-4 py-2.5 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
+              >
+                Submit or track reports
+              </Link>
+              <Link
+                href="/researcher/earnings"
+                className="inline-flex items-center justify-center rounded-full border border-[#c9beb1] bg-white/60 px-4 py-2.5 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
+              >
+                Open earnings
+              </Link>
             </div>
           </section>
 

@@ -109,7 +109,7 @@ export default function ResearcherAnalyticsPage() {
   const pieChartData = useMemo(() => {
     if (!analyticsData) return [];
     return Object.entries(analyticsData.severity_distribution).map(([severity, count]) => ({
-      label: severity,
+      label: severity.charAt(0).toUpperCase() + severity.slice(1),
       value: count,
       color: getSeverityChartColor(severity)
     }));
@@ -276,7 +276,7 @@ export default function ResearcherAnalyticsPage() {
                 <div data-tab="overview" className="space-y-6">
                   {/* Severity Distribution */}
                   <div className="rounded-2xl bg-[#faf6f1] p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] mb-6">Severity Distribution</h3>
+                    <h3 className="text-lg font-bold text-[#2d2a26] mb-6 text-center">Severity Distribution</h3>
                     <div className="flex justify-center">
                       <PieChart
                         data={pieChartData}

@@ -161,47 +161,47 @@ export default function ProgramDetailModal({
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
           program.type === 'bounty' 
-            ? 'bg-[#edf5fb] text-[#2d78a8]' 
-            : 'bg-[#f3e8ff] text-[#6b21a8]'
+            ? 'bg-[#edf5fb] text-[#2d78a8] dark:bg-blue-900 dark:text-blue-200' 
+            : 'bg-[#f3e8ff] text-[#6b21a8] dark:bg-purple-900 dark:text-purple-200'
         }`}>
           {program.type.toUpperCase()}
         </span>
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
           program.status === 'public' 
-            ? 'bg-[#e6f7ed] text-[#0d7a3d]'
+            ? 'bg-[#e6f7ed] text-[#0d7a3d] dark:bg-green-900 dark:text-green-200'
             : program.status === 'draft'
-            ? 'bg-[#faf1e1] text-[#9a6412]'
+            ? 'bg-[#faf1e1] text-[#9a6412] dark:bg-yellow-900 dark:text-yellow-200'
             : program.status === 'paused'
-            ? 'bg-[#fff4e6] text-[#b54708]'
-            : 'bg-[#f3ede6] text-[#5f5851]'
+            ? 'bg-[#fff4e6] text-[#b54708] dark:bg-orange-900 dark:text-orange-200'
+            : 'bg-[#f3ede6] text-[#5f5851] dark:bg-slate-700 dark:text-slate-300'
         }`}>
           {program.status.charAt(0).toUpperCase() + program.status.slice(1)}
         </span>
-        <span className="rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-semibold text-[#5f5851]">
+        <span className="rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-semibold text-[#5f5851] dark:bg-slate-700 dark:text-slate-300">
           {program.visibility}
         </span>
       </div>
 
       {/* Description */}
       <div>
-        <h4 className="text-sm font-semibold text-[#2d2a26] mb-2">Description</h4>
-        <p className="text-sm text-[#6d6760] leading-relaxed whitespace-pre-wrap">
+        <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-2">Description</h4>
+        <p className="text-sm text-[#6d6760] dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
           {program.description || 'No description provided'}
         </p>
       </div>
 
       {/* Metadata Grid */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="bg-[#faf6f1]">
-          <p className="text-xs text-[#8b8177] mb-1">Budget</p>
-          <p className="text-lg font-semibold text-[#2d2a26]">
+        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+          <p className="text-xs text-[#8b8177] dark:text-slate-400 mb-1">Budget</p>
+          <p className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100">
             {program.budget ? formatCurrency(program.budget) : 'Not set'}
           </p>
         </Card>
 
-        <Card className="bg-[#faf6f1]">
-          <p className="text-xs text-[#8b8177] mb-1">Created</p>
-          <p className="text-lg font-semibold text-[#2d2a26]">
+        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+          <p className="text-xs text-[#8b8177] dark:text-slate-400 mb-1">Created</p>
+          <p className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100">
             {formatDateTime(program.created_at)}
           </p>
         </Card>
@@ -210,9 +210,9 @@ export default function ProgramDetailModal({
       {/* Rules */}
       {program.rules && (
         <div>
-          <h4 className="text-sm font-semibold text-[#2d2a26] mb-2">Program Rules</h4>
-          <div className="rounded-xl bg-[#faf6f1] border border-[#e6ddd4] p-4">
-            <p className="text-sm text-[#6d6760] leading-relaxed whitespace-pre-wrap">
+          <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-2">Program Rules</h4>
+          <div className="rounded-xl bg-[#faf6f1] dark:bg-slate-800 border border-[#e6ddd4] dark:border-slate-700 p-4">
+            <p className="text-sm text-[#6d6760] dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
               {program.rules}
             </p>
           </div>
@@ -224,7 +224,7 @@ export default function ProgramDetailModal({
   const renderScope = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-[#2d2a26]">In-Scope Assets</h4>
+        <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">In-Scope Assets</h4>
         <Button 
           variant="secondary" 
           size="sm"
@@ -237,19 +237,19 @@ export default function ProgramDetailModal({
       {scopes && scopes.length > 0 ? (
         <div className="space-y-3">
           {scopes.map((scope: any) => (
-            <Card key={scope.id} className="bg-[#faf6f1]">
+            <Card key={scope.id} className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#2d2a26]">{scope.asset_type}</p>
-                  <p className="text-sm text-[#6d6760] mt-1">{scope.asset_identifier}</p>
+                  <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">{scope.asset_type}</p>
+                  <p className="text-sm text-[#6d6760] dark:text-slate-300 mt-1">{scope.asset_identifier}</p>
                   {scope.description && (
-                    <p className="text-xs text-[#8b8177] mt-1">{scope.description}</p>
+                    <p className="text-xs text-[#8b8177] dark:text-slate-400 mt-1">{scope.description}</p>
                   )}
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   scope.is_in_scope 
-                    ? 'bg-[#e6f7ed] text-[#0d7a3d]'
-                    : 'bg-[#fde9e7] text-[#9d1f1f]'
+                    ? 'bg-[#e6f7ed] text-[#0d7a3d] dark:bg-green-900 dark:text-green-200'
+                    : 'bg-[#fde9e7] text-[#9d1f1f] dark:bg-red-900 dark:text-red-200'
                 }`}>
                   {scope.is_in_scope ? 'In Scope' : 'Out of Scope'}
                 </span>
@@ -258,8 +258,8 @@ export default function ProgramDetailModal({
           ))}
         </div>
       ) : (
-        <Card className="bg-[#faf6f1]">
-          <p className="text-sm text-[#6d6760] text-center py-8">
+        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+          <p className="text-sm text-[#6d6760] dark:text-slate-300 text-center py-8">
             {program.scope || 'No scope defined yet. Click "+ Add Scope" to add assets.'}
           </p>
         </Card>
@@ -270,7 +270,7 @@ export default function ProgramDetailModal({
   const renderRewards = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-[#2d2a26]">Reward Tiers</h4>
+        <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">Reward Tiers</h4>
         <Button 
           variant="secondary" 
           size="sm"
@@ -283,18 +283,18 @@ export default function ProgramDetailModal({
       {rewards && rewards.length > 0 ? (
         <div className="space-y-3">
           {rewards.map((reward: any) => (
-            <Card key={reward.id} className="bg-[#faf6f1]">
+            <Card key={reward.id} className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-[#2d2a26] capitalize">
+                  <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 capitalize">
                     {reward.severity}
                   </p>
-                  <p className="text-xs text-[#8b8177] mt-1">
+                  <p className="text-xs text-[#8b8177] dark:text-slate-400 mt-1">
                     {reward.description || 'Standard bounty'}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-[#2d2a26]">
+                  <p className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100">
                     {formatCurrency(reward.min_amount)} - {formatCurrency(reward.max_amount)}
                   </p>
                 </div>
@@ -303,8 +303,8 @@ export default function ProgramDetailModal({
           ))}
         </div>
       ) : (
-        <Card className="bg-[#faf6f1]">
-          <p className="text-sm text-[#6d6760] text-center py-8">
+        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+          <p className="text-sm text-[#6d6760] dark:text-slate-300 text-center py-8">
             No reward tiers configured yet
           </p>
         </Card>
@@ -316,8 +316,8 @@ export default function ProgramDetailModal({
     <div className="space-y-6">
       {/* Display any mutation errors */}
       {(publishError || pauseError || resumeError || closeError || archiveError || restoreError) && (
-        <div className="rounded-xl border border-[#f2c0bc] bg-[#fff2f1] p-4">
-          <p className="text-sm text-[#b42318]">
+        <div className="rounded-xl border border-[#f2c0bc] dark:border-red-900 bg-[#fff2f1] dark:bg-red-950 p-4">
+          <p className="text-sm text-[#b42318] dark:text-red-200">
             {publishError?.message || 
              pauseError?.message || 
              resumeError?.message || 
@@ -329,7 +329,7 @@ export default function ProgramDetailModal({
       )}
 
       <div>
-        <h4 className="text-sm font-semibold text-[#2d2a26] mb-4">Program Actions</h4>
+        <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">Program Actions</h4>
         <div className="space-y-3">
           {program.status === 'draft' && (
             <Button
@@ -400,8 +400,8 @@ export default function ProgramDetailModal({
         </div>
       </div>
 
-      <div className="rounded-xl bg-[#faf1e1] border border-[#f0d9a8] p-4">
-        <p className="text-sm text-[#9a6412]">
+      <div className="rounded-xl bg-[#faf1e1] dark:bg-yellow-900 border border-[#f0d9a8] dark:border-yellow-800 p-4">
+        <p className="text-sm text-[#9a6412] dark:text-yellow-200">
           <strong>Note:</strong> Closing a program will prevent new submissions but existing reports will remain accessible.
         </p>
       </div>

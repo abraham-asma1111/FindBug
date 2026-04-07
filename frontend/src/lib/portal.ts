@@ -40,6 +40,7 @@ export interface PortalNavItem {
   href: string;
   label: string;
   badge?: string | number;
+  children?: PortalNavItem[];
 }
 
 export function getPortalNavItems(role: UserRole): PortalNavItem[] {
@@ -85,10 +86,28 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   if (role === 'organization') {
     return [
       { href: '/organization/dashboard', label: 'Dashboard' },
-      { href: '/organization/programs', label: 'Programs' },
-      { href: '/organization/reports', label: 'Reports' },
-      { href: '/organization/services', label: 'Services' },
+      { 
+        href: '/organization/programs', 
+        label: 'Programs',
+        children: [
+          { href: '/organization/programs', label: 'Bug Bounty' },
+          { href: '/organization/programs/ai-red-teaming', label: 'AI Red Teaming' },
+          { href: '/organization/programs/ptaas', label: 'PTaaS' },
+          { href: '/organization/programs/code-review', label: 'Code Review' },
+        ]
+      },
+      { 
+        href: '/organization/reports', 
+        label: 'Reports',
+        children: [
+          { href: '/organization/reports', label: 'Bug Bounty Reports' },
+          { href: '/organization/reports/ai-red-teaming', label: 'AI Red Teaming Reports' },
+          { href: '/organization/reports/ptaas', label: 'PTaaS Reports' },
+          { href: '/organization/reports/code-review', label: 'Code Review Reports' },
+        ]
+      },
       { href: '/organization/analytics', label: 'Analytics' },
+      { href: '/organization/events', label: 'Events' },
       { href: '/organization/billing', label: 'Billing' },
       { href: '/organization/integrations', label: 'Integrations' },
       { href: '/organization/messages', label: 'Messages' },
@@ -99,14 +118,38 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   // Researcher Portal (default)
   return [
     { href: '/researcher/dashboard', label: 'Dashboard' },
-    { href: '/researcher/programs', label: 'Programs' },
-    { href: '/researcher/reports', label: 'Reports' },
+    { 
+      href: '/researcher/programs', 
+      label: 'Programs',
+      children: [
+        { href: '/researcher/programs', label: 'Bug Bounty' },
+        { href: '/researcher/programs/ai-red-teaming', label: 'AI Red Teaming' },
+        { href: '/researcher/programs/ptaas', label: 'PTaaS' },
+        { href: '/researcher/programs/code-review', label: 'Code Review' },
+      ]
+    },
+    { 
+      href: '/researcher/reports', 
+      label: 'Reports',
+      children: [
+        { href: '/researcher/reports', label: 'Bug Bounty Reports' },
+        { href: '/researcher/reports/ai-red-teaming', label: 'AI Red Teaming Reports' },
+        { href: '/researcher/reports/ptaas', label: 'PTaaS Reports' },
+        { href: '/researcher/reports/code-review', label: 'Code Review Reports' },
+      ]
+    },
     { href: '/researcher/earnings', label: 'Earnings' },
-    { href: '/researcher/reputation', label: 'Reputation' },
+    { 
+      href: '/researcher/reputation', 
+      label: 'Reputation',
+      children: [
+        { href: '/researcher/reputation/leaderboard', label: 'Leaderboard' }
+      ]
+    },
     { href: '/researcher/analytics', label: 'Analytics' },
     { href: '/researcher/messages', label: 'Messages' },
+    { href: '/researcher/events', label: 'Events' },
     { href: '/researcher/settings', label: 'Settings' },
-    { href: '/researcher/simulation', label: 'Simulation' },
   ];
 }
 
@@ -205,10 +248,10 @@ export function normalizeUser(raw: Record<string, any>): UserProfile {
 }
 
 export function formatCurrency(value: number | null | undefined): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-ET', {
     style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
+    currency: 'ETB',
+    maximumFractionDigits: 2,
   }).format(value ?? 0);
 }
 

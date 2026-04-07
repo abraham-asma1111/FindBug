@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -40,6 +40,7 @@ export default function PortalShell({
   const router = useRouter();
   const logout = useAuthStore((state) => state.logout);
   const { isDarkMode, toggleDarkMode } = useThemeStore();
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   // Apply dark mode class to html element
   useEffect(() => {
@@ -50,7 +51,35 @@ export default function PortalShell({
     }
   }, [isDarkMode]);
 
+  // Auto-expand parent items if child is active
+  useEffect(() => {
+    const newExpanded = new Set<string>();
+    navItems.forEach((item) => {
+      if (item.children) {
+        const hasActiveChild = item.children.some(
+          (child) => pathname === child.href || pathname.startsWith(`${child.href}/`)
+        );
+        if (hasActiveChild) {
+          newExpanded.add(item.href);
+        }
+      }
+    });
+    setExpandedItems(newExpanded);
+  }, [pathname, navItems]);
+
   const isActiveRoute = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  const toggleExpanded = (href: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(href)) {
+        next.delete(href);
+      } else {
+        next.add(href);
+      }
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     logout();
@@ -81,28 +110,90 @@ export default function PortalShell({
               <nav className="space-y-2">
               {navItems.map((item) => {
                 const isActive = isActiveRoute(item.href);
+                const isExpanded = expandedItems.has(item.href);
+                const hasChildren = item.children && item.children.length > 0;
 
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
-                        : 'text-[#4f4943] dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    {item.badge !== undefined ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${
-                          isActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-slate-700 text-[#6d6760] dark:text-slate-300'
+                  <div key={item.href}>
+                    {hasChildren ? (
+                      <>
+                        <div className={`flex items-center rounded-2xl transition ${
+                          isActive
+                            ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
+                            : 'text-[#4f4943] dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
+                        }`}>
+                          <Link
+                            href={item.href}
+                            className="flex-1 px-4 py-3 text-sm font-medium"
+                          >
+                            {item.label}
+                          </Link>
+                          <button
+                            onClick={() => toggleExpanded(item.href)}
+                            className="px-3 py-3"
+                          >
+                            <svg
+                              className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div className="mt-1 ml-4 space-y-1">
+                            {item.children.map((child) => {
+                              const isChildActive = isActiveRoute(child.href);
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  className={`flex items-center justify-between rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
+                                    isChildActive
+                                      ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
+                                      : 'text-[#6d6760] dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
+                                  }`}
+                                >
+                                  <span>{child.label}</span>
+                                  {child.badge !== undefined ? (
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-xs ${
+                                        isChildActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-slate-700 text-[#6d6760] dark:text-slate-300'
+                                      }`}
+                                    >
+                                      {child.badge}
+                                    </span>
+                                  ) : null}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                          isActive
+                            ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
+                            : 'text-[#4f4943] dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
                         }`}
                       >
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </Link>
+                        <span>{item.label}</span>
+                        {item.badge !== undefined ? (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${
+                              isActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-slate-700 text-[#6d6760] dark:text-slate-300'
+                            }`}
+                          >
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </Link>
+                    )}
+                  </div>
                 );
               })}
               </nav>

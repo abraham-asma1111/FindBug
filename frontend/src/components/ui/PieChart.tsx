@@ -29,47 +29,24 @@ const PieChart = memo(function PieChart({
     const total = data.reduce((sum, item) => sum + item.value, 0);
     const hasData = total > 0;
     
-    // If all values are zero, create equal segments for visualization
-    if (total === 0) {
-      const equalValue = 1; // Use 1 for each segment to create equal portions
-      const equalSegments = data.map((item, index) => {
-        const percentage = 100 / data.length; // Equal percentage for each
-        const startAngle = (index * percentage) * 3.6;
-        const endAngle = ((index + 1) * percentage) * 3.6;
-        
-        return {
-          ...item,
-          originalValue: item.value, // Keep original value for display
-          value: equalValue,
-          percentage,
-          startAngle,
-          endAngle,
-        };
-      });
-      
-      return { segments: equalSegments, total: 0, hasData: false };
-    }
-    
-    // Normal calculation when there's actual data
-    let cumulativePercentage = 0;
-    
-    const segments = data.map((item) => {
-      const percentage = total > 0 ? (item.value / total) * 100 : 0;
-      const startAngle = cumulativePercentage * 3.6; // Convert to degrees
-      const endAngle = (cumulativePercentage + percentage) * 3.6;
-      
-      cumulativePercentage += percentage;
+    // Always create equal segments for visualization (divided equally)
+    // Start from -90 degrees to account for SVG rotation, so first item appears at top
+    const equalSegments = data.map((item, index) => {
+      const percentage = 100 / data.length; // Equal percentage for each
+      const startAngle = (index * percentage) * 3.6 - 90; // Subtract 90 to start from top
+      const endAngle = ((index + 1) * percentage) * 3.6 - 90;
       
       return {
         ...item,
         originalValue: item.value, // Keep original value for display
-        percentage,
+        value: 1, // Equal value for equal portions
+        percentage: hasData ? (item.value / total) * 100 : 0, // Real percentage for display
         startAngle,
         endAngle,
       };
     });
     
-    return { segments, total, hasData: true };
+    return { segments: equalSegments, total, hasData };
   }, [data]);
 
   const radius = (size - strokeWidth) / 2;
@@ -105,10 +82,10 @@ const PieChart = memo(function PieChart({
     return (
       <div className={`flex items-center justify-center ${className}`}>
         <div 
-          className="rounded-full bg-[#f3f0eb] flex items-center justify-center"
+          className="rounded-full bg-[#f3f0eb] dark:bg-slate-700 flex items-center justify-center"
           style={{ width: size, height: size }}
         >
-          <span className="text-sm text-[#8b8177]">No data</span>
+          <span className="text-sm text-[#8b8177] dark:text-slate-400">No data</span>
         </div>
       </div>
     );
@@ -117,7 +94,7 @@ const PieChart = memo(function PieChart({
   return (
     <div className={`flex flex-col items-center ${className}`}>
       <div className="relative">
-        <svg width={size} height={size} className="transform -rotate-90">
+        <svg width={size} height={size}>
           {segments.map((segment, index) => (
             <path
               key={segment.label}
@@ -125,15 +102,51 @@ const PieChart = memo(function PieChart({
               fill={segment.color}
               stroke="white"
               strokeWidth={strokeWidth}
-              className="transition-opacity hover:opacity-80"
+              className="transition-opacity hover:opacity-80 dark:stroke-slate-800"
             />
           ))}
         </svg>
         
+        {/* Labels on slices */}
+        <svg width={size} height={size} className="absolute inset-0 pointer-events-none">
+          {segments.map((segment) => {
+            // Calculate the middle angle of the segment
+            const middleAngle = (segment.startAngle + segment.endAngle) / 2;
+            // Position label at 70% of radius from center
+            const labelRadius = radius * 0.7;
+            const labelPos = polarToCartesian(center, center, labelRadius, middleAngle);
+            
+            return (
+              <g key={`label-${segment.label}`}>
+                <text
+                  x={labelPos.x}
+                  y={labelPos.y - 7}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-xs font-bold fill-white dark:fill-white"
+                  style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
+                >
+                  {segment.label}
+                </text>
+                <text
+                  x={labelPos.x}
+                  y={labelPos.y + 7}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-sm font-bold fill-white dark:fill-white"
+                  style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
+                >
+                  {segment.originalValue ?? segment.value}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        
         {/* Center label showing total */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-[#2d2a26]">{total}</span>
-          <span className="text-xs text-[#8b8177] uppercase tracking-wider">Total</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-2xl font-bold text-[#2d2a26] dark:text-white">{total}</span>
+          <span className="text-xs text-[#8b8177] dark:text-slate-400 uppercase tracking-wider">Total</span>
         </div>
       </div>
 
@@ -148,14 +161,14 @@ const PieChart = memo(function PieChart({
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#2d2a26] capitalize truncate">
+                  <span className="text-sm font-medium text-[#2d2a26] dark:text-slate-100 capitalize truncate">
                     {segment.label}
                   </span>
-                  <span className="text-sm font-bold text-[#2d2a26] ml-2">
+                  <span className="text-sm font-bold text-[#2d2a26] dark:text-slate-100 ml-2">
                     {segment.originalValue ?? segment.value}
                   </span>
                 </div>
-                <div className="text-xs text-[#8b8177]">
+                <div className="text-xs text-[#8b8177] dark:text-slate-400">
                   {segment.percentage.toFixed(1)}%
                 </div>
               </div>

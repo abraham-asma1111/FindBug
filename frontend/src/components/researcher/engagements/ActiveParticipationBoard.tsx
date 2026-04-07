@@ -21,7 +21,7 @@ export default function ActiveParticipationBoard({
   return (
     <SectionCard
       title="Active Participation Board"
-      description="This is the handoff point from accepted opportunities into reporting, event participation, or assigned service delivery."
+      headerAlign="center"
     >
       {tracks.length ? (
         <div className="overflow-x-auto">

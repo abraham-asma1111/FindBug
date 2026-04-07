@@ -61,8 +61,8 @@ export default function OrganizationProgramsPage() {
             {/* Header with Create Button */}
             <div className="flex items-start justify-between">
               <div className="flex-1 ml-12">
-                <h2 className="text-3xl font-bold text-[#2d2a26]">Bug Bounty Programs</h2>
-                <p className="mt-3 text-sm text-[#6d6760]">
+                <h2 className="text-3xl font-bold text-[#2d2a26] dark:text-slate-100">Bug Bounty Programs</h2>
+                <p className="mt-3 text-sm text-[#6d6760] dark:text-slate-400">
                   Manage your security programs and invite researchers
                 </p>
               </div>

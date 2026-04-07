@@ -352,7 +352,7 @@ export default function ResearcherEngagementsWorkspace() {
             />
           </div>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="mt-6">
             <ProgramCatalogTable
               isLoading={isLoading}
               programs={publicPrograms}
@@ -360,6 +360,9 @@ export default function ResearcherEngagementsWorkspace() {
               renderAction={renderProgramAction}
               onInspect={selectWorkflowByProgram}
             />
+          </div>
+
+          <div className="mt-6">
             <SpecializedTracks
               liveEvents={liveEvents}
               codeReviewAssignments={codeReviewAssignments}
