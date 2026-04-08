@@ -109,7 +109,7 @@ export default function ProgramList({ programs, onUpdate, isArchived = false }: 
         {programs.map((program) => (
           <div 
             key={program.id} 
-            className="rounded-2xl border border-[#e6ddd4] dark:border-slate-700 bg-white dark:bg-slate-800 p-6 hover:border-[#d4c5b3] dark:hover:border-slate-600 transition-all hover:shadow-sm"
+            className="rounded-2xl border border-[#e6ddd4] dark:border-gray-700 bg-white dark:bg-[#111111] dark:bg-[#111111] p-6 hover:border-[#d4c5b3] dark:hover:border-slate-600 transition-all hover:shadow-sm"
           >
             <div className="flex items-start justify-between gap-6">
               <div className="flex-1 min-w-0">
@@ -141,7 +141,7 @@ export default function ProgramList({ programs, onUpdate, isArchived = false }: 
                 )}
 
                 {/* Metadata */}
-                <div className="flex flex-wrap items-center gap-8 text-sm pt-4 border-t border-[#e6ddd4] dark:border-slate-700">
+                <div className="flex flex-wrap items-center gap-8 text-sm pt-4 border-t border-[#e6ddd4] dark:border-gray-700">
                   {program.budget !== undefined && program.budget !== null && (
                     <div>
                       <p className="text-xs text-[#8b8177] dark:text-slate-400 mb-1">Budget</p>
@@ -163,7 +163,7 @@ export default function ProgramList({ programs, onUpdate, isArchived = false }: 
               <div className="flex-shrink-0 flex items-center gap-2">
                 <Link
                   href={`/organization/programs/${program.id}`}
-                  className="rounded-full border-2 border-gray-300 dark:border-slate-500 bg-white dark:bg-slate-700 px-5 py-2.5 text-sm font-semibold text-gray-900 dark:text-slate-100 transition hover:border-gray-400 dark:hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-slate-600 shadow-sm"
+                  className="rounded-full border-2 border-gray-300 dark:border-slate-500 bg-white dark:bg-[#111111] dark:bg-slate-700 px-5 py-2.5 text-sm font-semibold text-gray-900 dark:text-slate-100 transition hover:border-gray-400 dark:hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-slate-600 shadow-sm"
                 >
                   View Details
                 </Link>
@@ -172,7 +172,7 @@ export default function ProgramList({ programs, onUpdate, isArchived = false }: 
                 <div className="relative" ref={openDropdownId === program.id ? dropdownRef : null}>
                   <button
                     onClick={() => setOpenDropdownId(openDropdownId === program.id ? null : program.id)}
-                    className="rounded-full border-2 border-gray-300 dark:border-slate-500 bg-white dark:bg-slate-700 p-2.5 text-gray-900 dark:text-slate-100 transition hover:border-gray-400 dark:hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-slate-600 shadow-sm"
+                    className="rounded-full border-2 border-gray-300 dark:border-slate-500 bg-white dark:bg-[#111111] dark:bg-slate-700 p-2.5 text-gray-900 dark:text-slate-100 transition hover:border-gray-400 dark:hover:border-slate-400 hover:bg-gray-50 dark:hover:bg-slate-600 shadow-sm"
                   >
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -180,7 +180,7 @@ export default function ProgramList({ programs, onUpdate, isArchived = false }: 
                   </button>
 
                   {openDropdownId === program.id && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-xl border border-[#e6ddd4] dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
+                    <div className="absolute right-0 mt-2 w-48 rounded-xl border border-[#e6ddd4] dark:border-gray-700 bg-white dark:bg-[#111111] dark:bg-[#111111] shadow-lg z-10">
                       {isArchived ? (
                         <>
                           {/* Archived program actions */}

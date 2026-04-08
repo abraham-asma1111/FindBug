@@ -326,19 +326,19 @@ export default function ResearcherDashboardPage() {
             </div>
           ) : null}
 
-          <section className="rounded-[36px] border border-[#d8d0c8] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(255,255,255,0.72)_35%,rgba(244,195,139,0.28)_75%),linear-gradient(135deg,#f7efe6_0%,#f6e8d3_45%,#efe1cf_100%)] p-6 shadow-sm sm:p-8">
+          <section className="rounded-[36px] border border-[#d8d0c8] dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(255,255,255,0.72)_35%,rgba(244,195,139,0.28)_75%),linear-gradient(135deg,#f7efe6_0%,#f6e8d3_45%,#efe1cf_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(30,30,30,0.95),rgba(25,25,25,0.85)_35%,rgba(20,20,20,0.75)_75%),linear-gradient(135deg,#1a1a1a_0%,#151515_45%,#111111_100%)] p-6 shadow-sm sm:p-8">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8b8177]">
+                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8b8177] dark:text-gray-400">
                   Researcher Dashboard
                 </p>
-                <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-[#2d2a26] sm:text-5xl">
+                <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-[#2d2a26] dark:text-gray-300 sm:text-5xl">
                   Operate the discovery-to-payout workflow from one board.
                 </h1>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                <div className="rounded-[28px] bg-[#2d2a26] p-5 text-white shadow-[0_18px_40px_rgba(45,42,38,0.2)]">
+                <div className="rounded-[28px] bg-[#2d2a26] dark:bg-white/10 p-5 text-white shadow-[0_18px_40px_rgba(45,42,38,0.2)] dark:shadow-[0_18px_40px_rgba(0,0,0,0.4)]">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">Live Queue</p>
                   <p className="mt-3 text-3xl font-semibold">
                     {isLoading ? '...' : formatCompactNumber(newSubmissionCount + unreadMessages + unreadNotifications)}
@@ -347,21 +347,21 @@ export default function ResearcherDashboardPage() {
                     Combined attention load from new submissions, unread messages, and unread notifications.
                   </p>
                 </div>
-                <div className="rounded-[28px] border border-[#ddd4cb] bg-white/80 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b8177]">Wallet Ready</p>
-                  <p className="mt-3 text-3xl font-semibold text-[#2d2a26]">
+                <div className="rounded-[28px] border border-[#ddd4cb] dark:border-gray-800 bg-white/80 dark:bg-[#111111] p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b8177] dark:text-gray-400">Wallet Ready</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#2d2a26] dark:text-white">
                     {isLoading ? '...' : walletUnavailable ? 'Unavailable' : formatCurrency(walletAvailable)}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-[#6d6760]">
+                  <p className="mt-2 text-sm leading-6 text-[#6d6760] dark:text-gray-300">
                     Available payout balance linked from the researcher earnings workflow.
                   </p>
                 </div>
-                <div className="rounded-[28px] border border-[#ddd4cb] bg-white/80 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b8177]">Standing</p>
-                  <p className="mt-3 text-3xl font-semibold text-[#2d2a26]">
+                <div className="rounded-[28px] border border-[#ddd4cb] dark:border-gray-800 bg-white/80 dark:bg-[#111111] p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b8177] dark:text-gray-400">Standing</p>
+                  <p className="mt-3 text-3xl font-semibold text-[#2d2a26] dark:text-white">
                     {isLoading ? '...' : rank ? `#${rank}` : 'Private'}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-[#6d6760]">
+                  <p className="mt-2 text-sm leading-6 text-[#6d6760] dark:text-gray-300">
                     {percentile !== null ? `Top ${Math.round(percentile)}% of ranked researchers.` : 'Open reputation for ranking detail.'}
                   </p>
                 </div>
@@ -371,19 +371,19 @@ export default function ResearcherDashboardPage() {
             <div className="grid grid-cols-3 gap-3 max-w-2xl">
               <Link
                 href="/researcher/engagements"
-                className="inline-flex items-center justify-center rounded-full bg-[#2d2a26] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f1c19]"
+                className="inline-flex items-center justify-center rounded-full bg-[#2d2a26] dark:bg-white/10 dark:hover:bg-white/20 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f1c19]"
               >
                 Review engagements
               </Link>
               <Link
                 href="/researcher/reports"
-                className="inline-flex items-center justify-center rounded-full border border-[#c9beb1] bg-white/80 px-4 py-2.5 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
+                className="inline-flex items-center justify-center rounded-full border border-[#c9beb1] dark:border-gray-700 bg-white/80 dark:bg-[#111111] px-4 py-2.5 text-sm font-semibold text-[#2d2a26] dark:text-white transition hover:border-[#bcae9e] dark:hover:border-gray-600 hover:bg-white dark:hover:bg-neutral-800"
               >
                 Submit or track reports
               </Link>
               <Link
                 href="/researcher/earnings"
-                className="inline-flex items-center justify-center rounded-full border border-[#c9beb1] bg-white/60 px-4 py-2.5 text-sm font-semibold text-[#2d2a26] transition hover:border-[#bcae9e] hover:bg-white"
+                className="inline-flex items-center justify-center rounded-full border border-[#c9beb1] dark:border-gray-700 bg-white/60 dark:bg-[#111111] px-4 py-2.5 text-sm font-semibold text-[#2d2a26] dark:text-white transition hover:border-[#bcae9e] dark:hover:border-gray-600 hover:bg-white dark:hover:bg-neutral-800"
               >
                 Open earnings
               </Link>
@@ -435,7 +435,7 @@ export default function ResearcherDashboardPage() {
             >
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
                 <div>
-                  <div className="mb-5 grid grid-cols-2 gap-3 border-b border-[#e6ddd4] pb-4 sm:grid-cols-5">
+                  <div className="mb-5 grid grid-cols-2 gap-3 border-b border-[#e6ddd4] dark:border-gray-800 pb-4 sm:grid-cols-5">
                     {submissionTabs.map((tab) => {
                       const isActive = tab === activeTab;
 
@@ -447,7 +447,7 @@ export default function ResearcherDashboardPage() {
                           className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                             isActive
                               ? 'bg-[#ef2330] text-white'
-                              : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                              : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300 hover:bg-[#eadfd3] dark:hover:bg-neutral-700'
                           }`}
                         >
                           <span className="capitalize">{tab}</span>
@@ -459,22 +459,22 @@ export default function ResearcherDashboardPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
-                        <tr className="border-b border-[#e6ddd4]">
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">DATE</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">REPORT</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">PROGRAM</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">SEVERITY</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">STATUS</th>
-                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">NEXT STEP</th>
-                          <th className="pb-3 font-semibold text-[#2d2a26]">ACTION</th>
+                        <tr className="border-b border-[#e6ddd4] dark:border-gray-800">
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">DATE</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">REPORT</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">PROGRAM</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">SEVERITY</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">STATUS</th>
+                          <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">NEXT STEP</th>
+                          <th className="pb-3 font-semibold text-[#2d2a26] dark:text-white">ACTION</th>
                         </tr>
                       </thead>
                       <tbody>
                         {isLoading ? (
                           Array.from({ length: 4 }).map((_, index) => (
-                            <tr key={`dashboard-loading-${index}`} className="border-b border-[#efe7de] last:border-0">
+                            <tr key={`dashboard-loading-${index}`} className="border-b border-[#efe7de] dark:border-gray-800 last:border-0">
                               <td className="py-4 pr-4" colSpan={7}>
-                                <div className="h-8 animate-pulse rounded-xl bg-[#f3ede6]" />
+                                <div className="h-8 animate-pulse rounded-xl bg-[#f3ede6] dark:bg-neutral-800" />
                               </td>
                             </tr>
                           ))
@@ -483,8 +483,8 @@ export default function ResearcherDashboardPage() {
                             const workflow = getSubmissionWorkflow(submission);
 
                             return (
-                              <tr key={submission.id || submission.report_number || submission.title} className="border-b border-[#e6ddd4] last:border-0">
-                                <td className="py-3 pr-4 text-[#6d6760]">
+                              <tr key={submission.id || submission.report_number || submission.title} className="border-b border-[#e6ddd4] dark:border-gray-800 last:border-0">
+                                <td className="py-3 pr-4 text-[#6d6760] dark:text-gray-300">
                                   {submission.submitted_at
                                     ? new Date(submission.submitted_at).toLocaleDateString('en-US', {
                                         month: 'short',
@@ -494,17 +494,17 @@ export default function ResearcherDashboardPage() {
                                     : '-'}
                                 </td>
                                 <td className="py-3 pr-4">
-                                  <p className="font-medium text-[#2d2a26]">{submission.title}</p>
-                                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#8b8177]">
+                                  <p className="font-medium text-[#2d2a26] dark:text-white">{submission.title}</p>
+                                  <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#8b8177] dark:text-gray-400">
                                     {submission.report_number || 'No report number'}
                                   </p>
                                 </td>
-                                <td className="py-3 pr-4 text-[#6d6760]">{submission.program_name || '-'}</td>
+                                <td className="py-3 pr-4 text-[#6d6760] dark:text-gray-300">{submission.program_name || '-'}</td>
                                 <td className="py-3 pr-4">
                                   <span
                                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                                       severityTone[(submission.assigned_severity || '').toLowerCase()] ||
-                                      'bg-[#f3ede6] text-[#5f5851]'
+                                      'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                                     }`}
                                   >
                                     {submission.cvss_score
@@ -516,17 +516,17 @@ export default function ResearcherDashboardPage() {
                                   <span
                                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                                       statusTone[normalizeSubmissionStatus(submission.status) || submission.status || ''] ||
-                                      'bg-[#f3ede6] text-[#5f5851]'
+                                      'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                                     }`}
                                   >
                                     {formatSubmissionStatus(submission.status)}
                                   </span>
                                 </td>
-                                <td className="py-3 pr-4 text-[#6d6760]">{workflow.nextStep}</td>
+                                <td className="py-3 pr-4 text-[#6d6760] dark:text-gray-300">{workflow.nextStep}</td>
                                 <td className="py-3">
                                   <Link
                                     href={workflow.href}
-                                    className="inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
+                                    className="inline-flex rounded-full border border-[#d8d0c8] dark:border-gray-700 px-4 py-2 text-xs font-semibold text-[#2d2a26] dark:text-white transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-800"
                                   >
                                     {workflow.actionLabel}
                                   </Link>
@@ -537,10 +537,10 @@ export default function ResearcherDashboardPage() {
                         ) : (
                           <tr>
                             <td colSpan={7} className="py-10 text-center">
-                              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+                              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">
                                 No recent activity
                               </p>
-                              <p className="mt-2 text-sm text-[#6d6760]">
+                              <p className="mt-2 text-sm text-[#6d6760] dark:text-gray-300">
                                 No {activeTab} submissions are available in the current dashboard data.
                               </p>
                             </td>
@@ -552,15 +552,15 @@ export default function ResearcherDashboardPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="rounded-[28px] bg-[#faf6f1] p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+                  <div className="rounded-[28px] bg-[#faf6f1] dark:bg-[#111111] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400 dark:text-gray-400">
                       Submission Status Mix
                     </p>
                     <div className="mt-4 space-y-3">
                       {submissionTabs.map((tab) => (
-                        <div key={`count-${tab}`} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
-                          <span className="text-sm font-semibold capitalize text-[#2d2a26]">{tab}</span>
-                          <span className="text-sm font-semibold text-[#6d6760]">
+                        <div key={`count-${tab}`} className="flex items-center justify-between rounded-2xl bg-white dark:bg-[#111111] dark:bg-neutral-900 px-4 py-3">
+                          <span className="text-sm font-semibold capitalize text-[#2d2a26] dark:text-white dark:text-white">{tab}</span>
+                          <span className="text-sm font-semibold text-[#6d6760] dark:text-gray-300 dark:text-gray-400">
                             {isLoading ? '...' : formatCompactNumber(overview?.submissions_by_status?.[tab] ?? 0)}
                           </span>
                         </div>
@@ -576,7 +576,7 @@ export default function ResearcherDashboardPage() {
                     <p className="mt-3 text-sm leading-6 text-white/80">{primaryAction.description}</p>
                     <Link
                       href={primaryAction.href}
-                      className="mt-5 inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:bg-[#f5efe8]"
+                      className="mt-5 inline-flex rounded-full bg-white dark:bg-[#111111] dark:bg-neutral-800 px-5 py-3 text-sm font-semibold text-[#2d2a26] dark:text-white dark:text-white transition hover:bg-[#f5efe8] dark:hover:bg-neutral-700"
                     >
                       {primaryAction.actionText}
                     </Link>

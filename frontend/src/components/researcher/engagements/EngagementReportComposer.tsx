@@ -22,7 +22,7 @@ export default function EngagementReportComposer({
     });
 
   return (
-    <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-5">
+    <div className="rounded-[28px] border border-[#e6ddd4] bg-white dark:bg-[#111111] p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Inline Report Composer</p>

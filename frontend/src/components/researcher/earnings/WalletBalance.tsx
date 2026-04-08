@@ -116,7 +116,7 @@ export default function WalletBalance() {
             <button
               onClick={() => setIsWithdrawModalOpen(true)}
               disabled={(balanceData?.available_balance || 0) < 100}
-              className="mt-3 inline-flex rounded-full bg-white px-6 py-2 text-sm font-semibold text-[#ef2330] transition hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-3 inline-flex rounded-full bg-white dark:bg-[#111111] px-6 py-2 text-sm font-semibold text-[#ef2330] transition hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Request Withdrawal
             </button>
@@ -185,7 +185,7 @@ export default function WalletBalance() {
               onChange={(e) => setWithdrawAmount(e.target.value)}
               min="100"
               step="0.01"
-              className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+              className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
             />
             <p className="mt-2 text-xs text-[#6d6760]">
               Minimum withdrawal: 100 ETB

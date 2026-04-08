@@ -126,12 +126,12 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
               placeholder="Search transactions..."
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+              className="rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
             />
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-              className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+              className="rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
             >
               <option value="">All Types</option>
               <option value="credit">Credits</option>
@@ -165,7 +165,7 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
             >
               <div className="flex items-center gap-4">
                 {/* Icon */}
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white flex items-center justify-center border border-[#e6ddd4]">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white dark:bg-[#111111] flex items-center justify-center border border-[#e6ddd4]">
                   {getTransactionIcon(transaction.transaction_type)}
                 </div>
 

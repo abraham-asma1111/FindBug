@@ -93,7 +93,7 @@ export default function OrganizationReportsPage() {
         >
           <div className="space-y-6">
             {/* Horizontal Filters Bar */}
-            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white dark:bg-[#111111] px-4 py-3 dark:border-gray-700 dark:bg-[#111111]">
               {/* Search Input */}
               <div className="relative flex-1 max-w-xs">
                 <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -150,7 +150,7 @@ export default function OrganizationReportsPage() {
               </div>
 
               {/* Add Filter Button */}
-              <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">
+              <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-[#111111] px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -164,7 +164,7 @@ export default function OrganizationReportsPage() {
                   setSeverityFilter('');
                   setActiveTab('');
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-[#111111] px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -176,7 +176,7 @@ export default function OrganizationReportsPage() {
               <div className="h-8 w-px bg-gray-200 dark:bg-slate-600"></div>
 
               {/* Sort Button */}
-              <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">
+              <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white dark:bg-[#111111] px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
                 </svg>
@@ -195,7 +195,7 @@ export default function OrganizationReportsPage() {
             {isLoading ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={`loading-${i}`} className="h-80 animate-pulse rounded-2xl bg-gray-100 dark:bg-slate-800" />
+                  <div key={`loading-${i}`} className="h-80 animate-pulse rounded-2xl bg-gray-100 dark:bg-[#111111]" />
                 ))}
               </div>
             ) : reports && reports.length > 0 ? (
@@ -203,10 +203,10 @@ export default function OrganizationReportsPage() {
                 {reports.map((report: any) => (
                   <div
                     key={report.id}
-                    className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                    className="group relative flex flex-col rounded-2xl border border-gray-200 bg-white dark:bg-[#111111] p-6 shadow-sm transition-all hover:shadow-md dark:border-gray-700 dark:bg-[#111111]"
                   >
                     {/* Program Icon/Avatar */}
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gray-200 bg-white dark:bg-[#111111] dark:border-slate-600 dark:bg-slate-700">
                       <svg className="h-8 w-8 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
@@ -260,7 +260,7 @@ export default function OrganizationReportsPage() {
                     </div>
 
                     {/* Stats */}
-                    <div className="mb-4 space-y-2 border-t border-gray-100 pt-4 dark:border-slate-700">
+                    <div className="mb-4 space-y-2 border-t border-gray-100 pt-4 dark:border-gray-700">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-500 dark:text-slate-400">Reports</span>
                         <span className="font-bold text-gray-900 dark:text-slate-100">1</span>

@@ -100,12 +100,12 @@ export default function ReportDetailPage() {
             <nav className="flex items-center gap-2 text-sm">
               <button
                 onClick={() => router.push('/researcher/reports')}
-                className="text-[#6d6760] hover:text-[#2d2a26] transition"
+                className="text-[#6d6760] dark:text-gray-400 hover:text-[#2d2a26] dark:hover:text-white transition"
               >
                 My reports
               </button>
               <svg
-                className="h-4 w-4 text-[#8b8177]"
+                className="h-4 w-4 text-[#8b8177] dark:text-gray-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -128,8 +128,8 @@ export default function ReportDetailPage() {
               <Spinner size="lg" />
             </div>
           ) : isError || !report ? (
-            <div className="rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-6 text-center">
-              <p className="text-sm text-[#b42318]">
+            <div className="rounded-2xl border border-[#f2c0bc] dark:border-red-900 bg-[#fff2f1] dark:bg-[#111111] p-6 text-center">
+              <p className="text-sm text-[#b42318] dark:text-red-400">
                 Failed to load report details. Please try again.
               </p>
               <button
@@ -142,29 +142,29 @@ export default function ReportDetailPage() {
           ) : (
             <div className="space-y-6">
               {/* Header */}
-              <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
+              <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <h1 className="text-2xl font-bold text-[#2d2a26] mb-3">
+                    <h1 className="text-2xl font-bold text-[#2d2a26] dark:text-white mb-3">
                       {report.title}
                     </h1>
                     <div className="flex flex-wrap items-center gap-3">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          severityColors[report.suggested_severity] || 'bg-[#f3ede6] text-[#5f5851]'
+                          severityColors[report.suggested_severity] || 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                         }`}
                       >
                         {report.suggested_severity.toUpperCase()}
                       </span>
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          statusColors[report.status] || 'bg-[#f3ede6] text-[#5f5851]'
+                          statusColors[report.status] || 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                         }`}
                       >
                         {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                       </span>
                       {report.vulnerability_type && (
-                        <span className="rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-semibold text-[#5f5851]">
+                        <span className="rounded-full bg-[#f3ede6] dark:bg-neutral-800 px-3 py-1 text-xs font-semibold text-[#5f5851] dark:text-gray-300">
                           {report.vulnerability_type}
                         </span>
                       )}
@@ -175,14 +175,14 @@ export default function ReportDetailPage() {
                       <>
                         <button
                           onClick={handleEdit}
-                          className="rounded-full border border-[#d8d0c8] px-4 py-2 text-sm font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
+                          className="rounded-full border border-[#d8d0c8] dark:border-gray-700 px-4 py-2 text-sm font-semibold text-[#2d2a26] dark:text-white transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-800"
                         >
                           Edit
                         </button>
                         <button
                           onClick={handleDelete}
                           disabled={isDeleting}
-                          className="rounded-full border border-[#f2c0bc] px-4 py-2 text-sm font-semibold text-[#b42318] transition hover:bg-[#fff2f1]"
+                          className="rounded-full border border-[#f2c0bc] dark:border-red-900 px-4 py-2 text-sm font-semibold text-[#b42318] dark:text-red-400 transition hover:bg-[#fff2f1] dark:hover:bg-neutral-800"
                         >
                           {isDeleting ? 'Deleting...' : 'Delete'}
                         </button>
@@ -192,16 +192,16 @@ export default function ReportDetailPage() {
                 </div>
 
                 {/* Metadata */}
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-[#e6ddd4]">
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-[#e6ddd4] dark:border-gray-800">
                   <div>
-                    <p className="text-xs text-[#8b8177] mb-1">Program</p>
-                    <p className="text-sm font-semibold text-[#2d2a26]">
+                    <p className="text-xs text-[#8b8177] dark:text-gray-400 mb-1">Program</p>
+                    <p className="text-sm font-semibold text-[#2d2a26] dark:text-white">
                       {report.program?.name || 'Unknown Program'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-[#8b8177] mb-1">Submitted</p>
-                    <p className="text-sm font-semibold text-[#2d2a26]">
+                    <p className="text-xs text-[#8b8177] dark:text-gray-400 mb-1">Submitted</p>
+                    <p className="text-sm font-semibold text-[#2d2a26] dark:text-white">
                       {new Date(report.submitted_at).toLocaleDateString('en-US', {
                         month: 'long',
                         day: 'numeric',
@@ -210,8 +210,8 @@ export default function ReportDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-[#8b8177] mb-1">Bounty</p>
-                    <p className="text-sm font-semibold text-[#2d2a26]">
+                    <p className="text-xs text-[#8b8177] dark:text-gray-400 mb-1">Bounty</p>
+                    <p className="text-sm font-semibold text-[#2d2a26] dark:text-white">
                       {report.bounty_amount ? `${report.bounty_amount.toLocaleString()} ETB` : 'Pending'}
                     </p>
                   </div>
@@ -219,13 +219,13 @@ export default function ReportDetailPage() {
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-4 border-b border-[#e6ddd4]">
+              <div className="flex gap-4 border-b border-[#e6ddd4] dark:border-gray-800">
                 <button
                   onClick={() => setActiveTab('details')}
                   className={`pb-3 px-1 text-sm font-semibold transition ${
                     activeTab === 'details'
                       ? 'border-b-2 border-[#ef2330] text-[#ef2330]'
-                      : 'text-[#6d6760] hover:text-[#2d2a26]'
+                      : 'text-[#6d6760] dark:text-gray-400 hover:text-[#2d2a26] dark:hover:text-white'
                   }`}
                 >
                   Details
@@ -235,7 +235,7 @@ export default function ReportDetailPage() {
                   className={`pb-3 px-1 text-sm font-semibold transition ${
                     activeTab === 'timeline'
                       ? 'border-b-2 border-[#ef2330] text-[#ef2330]'
-                      : 'text-[#6d6760] hover:text-[#2d2a26]'
+                      : 'text-[#6d6760] dark:text-gray-400 hover:text-[#2d2a26] dark:hover:text-white'
                   }`}
                 >
                   Timeline
@@ -245,7 +245,7 @@ export default function ReportDetailPage() {
                   className={`pb-3 px-1 text-sm font-semibold transition ${
                     activeTab === 'comments'
                       ? 'border-b-2 border-[#ef2330] text-[#ef2330]'
-                      : 'text-[#6d6760] hover:text-[#2d2a26]'
+                      : 'text-[#6d6760] dark:text-gray-400 hover:text-[#2d2a26] dark:hover:text-white'
                   }`}
                 >
                   Comments
@@ -256,47 +256,47 @@ export default function ReportDetailPage() {
               {activeTab === 'details' && (
                 <div className="space-y-6">
                   {/* Description */}
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
-                    <h3 className="text-sm font-semibold text-[#2d2a26] mb-3">Description</h3>
-                    <p className="text-sm text-[#6d6760] leading-relaxed whitespace-pre-wrap">
+                  <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
+                    <h3 className="text-sm font-semibold text-[#2d2a26] dark:text-white mb-3">Description</h3>
+                    <p className="text-sm text-[#6d6760] dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                       {report.description}
                     </p>
                   </div>
 
                   {/* Steps to Reproduce */}
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
-                    <h3 className="text-sm font-semibold text-[#2d2a26] mb-3">Steps to Reproduce</h3>
-                    <p className="text-sm text-[#6d6760] leading-relaxed whitespace-pre-wrap">
+                  <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
+                    <h3 className="text-sm font-semibold text-[#2d2a26] dark:text-white mb-3">Steps to Reproduce</h3>
+                    <p className="text-sm text-[#6d6760] dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                       {report.steps_to_reproduce}
                     </p>
                   </div>
 
                   {/* Impact Assessment */}
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
-                    <h3 className="text-sm font-semibold text-[#2d2a26] mb-3">Impact Assessment</h3>
-                    <p className="text-sm text-[#6d6760] leading-relaxed whitespace-pre-wrap">
+                  <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
+                    <h3 className="text-sm font-semibold text-[#2d2a26] dark:text-white mb-3">Impact Assessment</h3>
+                    <p className="text-sm text-[#6d6760] dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                       {report.impact_assessment}
                     </p>
                   </div>
 
                   {/* Affected Asset */}
                   {report.affected_asset && (
-                    <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
-                      <h3 className="text-sm font-semibold text-[#2d2a26] mb-3">Affected Asset</h3>
-                      <p className="text-sm text-[#6d6760]">{report.affected_asset}</p>
+                    <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
+                      <h3 className="text-sm font-semibold text-[#2d2a26] dark:text-white mb-3">Affected Asset</h3>
+                      <p className="text-sm text-[#6d6760] dark:text-gray-300">{report.affected_asset}</p>
                     </div>
                   )}
                 </div>
               )}
 
               {activeTab === 'timeline' && (
-                <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
+                <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
                   <ReportTimeline reportId={reportId} />
                 </div>
               )}
 
               {activeTab === 'comments' && (
-                <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
+                <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-6">
                   <ReportComments reportId={reportId} />
                 </div>
               )}

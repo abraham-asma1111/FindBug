@@ -250,7 +250,7 @@ export default function OrganizationDashboardPage() {
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <Card className="bg-white dark:bg-slate-800 border-[#e6ddd4] dark:border-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-[#111111] border-[#e6ddd4] dark:border-gray-700">
               <div className="mb-6">
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-white">Monthly Trend</h3>
@@ -268,11 +268,11 @@ export default function OrganizationDashboardPage() {
                 ) : twelveMonthsData.length > 0 ? (
                   <div className="space-y-6">
                     {/* Chart Area */}
-                    <div className="relative h-64 bg-slate-50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                    <div className="relative h-64 bg-slate-50 dark:bg-[#111111]/40 rounded-xl p-4 border border-slate-200 dark:border-gray-700">
                       {/* Grid Lines */}
                       <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
                         {[...Array(5)].map((_, i) => (
-                          <div key={i} className="border-t border-slate-200 dark:border-slate-700/50" />
+                          <div key={i} className="border-t border-slate-200 dark:border-gray-700/50" />
                         ))}
                       </div>
                       
@@ -320,13 +320,13 @@ export default function OrganizationDashboardPage() {
                     
                     {/* Stats Row */}
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                      <div className="bg-slate-50 dark:bg-[#111111]/40 rounded-lg p-4 border border-slate-200 dark:border-gray-700">
                         <p className="text-xs text-slate-600 dark:text-slate-400 mb-1 font-medium">Total Reports</p>
                         <p className="text-2xl font-bold text-slate-900 dark:text-white">
                           {twelveMonthsData.reduce((sum: number, entry: any) => sum + (entry.reports || 0), 0)}
                         </p>
                       </div>
-                      <div className="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                      <div className="bg-slate-50 dark:bg-[#111111]/40 rounded-lg p-4 border border-slate-200 dark:border-gray-700">
                         <p className="text-xs text-slate-600 dark:text-slate-400 mb-1 font-medium">Total Spent</p>
                         <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(twelveMonthsData.reduce((sum: number, entry: any) => sum + (entry.spending || 0), 0))}
@@ -342,7 +342,7 @@ export default function OrganizationDashboardPage() {
               </div>
             </Card>
 
-            <Card className="bg-white dark:bg-slate-800 border-[#e6ddd4] dark:border-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-[#111111] border-[#e6ddd4] dark:border-gray-700">
               <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100 mb-6 text-center">Top Programs</h3>
               <div className="space-y-2.5">
                 {isLoading ? (
@@ -375,7 +375,7 @@ export default function OrganizationDashboardPage() {
           </div>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <Card className="bg-white dark:bg-slate-800 border-[#e6ddd4] dark:border-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-[#111111] border-[#e6ddd4] dark:border-gray-700">
               <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100 mb-6 text-center">Reports by Status</h3>
               {isLoading ? (
                 <div className="h-64 animate-pulse rounded-xl bg-[#f3ede6] dark:bg-slate-700" />
@@ -393,18 +393,18 @@ export default function OrganizationDashboardPage() {
               )}
             </Card>
 
-            <Card className="bg-white dark:bg-slate-800 border-[#e6ddd4] dark:border-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-[#111111] border-[#e6ddd4] dark:border-gray-700">
               <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100 mb-6 text-center">Reports by Severity</h3>
               {isLoading ? (
                 <div className="h-64 animate-pulse rounded-xl bg-[#f3ede6] dark:bg-slate-700" />
               ) : (
                 <div className="space-y-4">
                   {/* Bar Chart */}
-                  <div className="relative h-64 bg-slate-50 dark:bg-slate-900/40 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                  <div className="relative h-64 bg-slate-50 dark:bg-[#111111]/40 rounded-xl p-4 border border-slate-200 dark:border-gray-700">
                     {/* Grid Lines */}
                     <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
                       {[...Array(5)].map((_, i) => (
-                        <div key={i} className="border-t border-slate-200 dark:border-slate-700/50" />
+                        <div key={i} className="border-t border-slate-200 dark:border-gray-700/50" />
                       ))}
                     </div>
                     

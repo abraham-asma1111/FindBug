@@ -243,19 +243,19 @@ export default function ReportList() {
   return (
     <div className="space-y-5">
       {/* Filters */}
-      <div className="rounded-2xl bg-[#faf6f1] p-4">
+      <div className="rounded-2xl bg-[#faf6f1] dark:bg-[#111111] p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
             type="text"
             placeholder="Search reports..."
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+            className="rounded-xl border border-[#d8d0c8] dark:border-gray-700 bg-white dark:bg-neutral-900 px-4 py-2 text-sm text-[#2d2a26] dark:text-white placeholder:text-[#8b8177] dark:placeholder:text-gray-500 focus:border-[#c8bfb6] dark:focus:border-gray-600 focus:outline-none"
           />
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+            className="rounded-xl border border-[#d8d0c8] dark:border-gray-700 bg-white dark:bg-neutral-900 px-4 py-2 text-sm text-[#2d2a26] dark:text-white focus:border-[#c8bfb6] dark:focus:border-gray-600 focus:outline-none"
           >
             <option value="">All Statuses</option>
             <option value="new">New</option>
@@ -267,7 +267,7 @@ export default function ReportList() {
           <select
             value={filters.severity}
             onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-            className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+            className="rounded-xl border border-[#d8d0c8] dark:border-gray-700 bg-white dark:bg-neutral-900 px-4 py-2 text-sm text-[#2d2a26] dark:text-white focus:border-[#c8bfb6] dark:focus:border-gray-600 focus:outline-none"
           >
             <option value="">All Severities</option>
             <option value="critical">Critical</option>
@@ -282,24 +282,24 @@ export default function ReportList() {
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-[#e6ddd4]">
-              <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">DATE</th>
-              <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">REPORT TITLE</th>
-              <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">PROGRAM</th>
-              <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">SEVERITY</th>
-              <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">STATUS</th>
-              <th className="pb-3 pr-4 font-semibold text-[#2d2a26]">BOUNTY</th>
-              <th className="pb-3 font-semibold text-[#2d2a26]">ACTION</th>
+            <tr className="border-b border-[#e6ddd4] dark:border-gray-800">
+              <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">DATE</th>
+              <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">REPORT TITLE</th>
+              <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">PROGRAM</th>
+              <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">SEVERITY</th>
+              <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">STATUS</th>
+              <th className="pb-3 pr-4 font-semibold text-[#2d2a26] dark:text-white">BOUNTY</th>
+              <th className="pb-3 font-semibold text-[#2d2a26] dark:text-white">ACTION</th>
             </tr>
           </thead>
           <tbody>
             {filteredReports.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-10 text-center">
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">
                     No results found
                   </p>
-                  <p className="mt-2 text">
+                  <p className="mt-2 text-[#6d6760] dark:text-gray-300">
                     {reports.length === 0
                       ? "You haven't submitted any reports yet. Start by submitting your first vulnerability report."
                       : 'No reports match your current filters.'}
@@ -310,22 +310,22 @@ export default function ReportList() {
               filteredReports.map((report) => (
                 <tr 
                   key={report.id} 
-                  className="border-b border-[#e6ddd4] last:border-0 cursor-pointer hover:bg-[#faf6f1] transition"
+                  className="border-b border-[#e6ddd4] dark:border-gray-800 last:border-0 cursor-pointer hover:bg-[#faf6f1] dark:hover:bg-neutral-800 transition"
                   onClick={() => handleRowClick(report.id)}
                 >
-                  <td className="py-3 pr-4 text-[#6d6760]">
+                  <td className="py-3 pr-4 text-[#6d6760] dark:text-gray-300">
                     {new Date(report.submitted_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',
                     })}
                   </td>
-                  <td className="py-3 pr-4 font-medium text-[#2d2a26]">{report.title}</td>
-                  <td className="py-3 pr-4 text-[#6d6760]">{report.program_name}</td>
+                  <td className="py-3 pr-4 font-medium text-[#2d2a26] dark:text-white">{report.title}</td>
+                  <td className="py-3 pr-4 text-[#6d6760] dark:text-gray-300">{report.program_name}</td>
                   <td className="py-3 pr-4">
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        severityTone[report.severity] || 'bg-[#f3ede6] text-[#5f5851]'
+                        severityTone[report.severity] || 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                       }`}
                     >
                       {report.severity.toUpperCase()}
@@ -334,20 +334,20 @@ export default function ReportList() {
                   <td className="py-3 pr-4">
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        statusTone[report.status] || 'bg-[#f3ede6] text-[#5f5851]'
+                        statusTone[report.status] || 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                       }`}
                     >
                       {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                     </span>
                   </td>
-                  <td className="py-3 pr-4 text-[#6d6760]">
+                  <td className="py-3 pr-4 text-[#6d6760] dark:text-gray-300">
                     {report.bounty_amount ? `${report.bounty_amount} ETB` : '-'}
                   </td>
                   <td className="py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="relative dropdown-menu-container">
                       <button
                         onClick={(e) => toggleMenu(report.id, e)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#6d6760] transition hover:bg-[#f3ede6]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#6d6760] dark:text-gray-300 transition hover:bg-[#f3ede6] dark:hover:bg-neutral-800"
                         aria-label="Actions"
                       >
                         <svg
@@ -362,11 +362,11 @@ export default function ReportList() {
                       </button>
 
                       {openMenuId === report.id && (
-                        <div className="absolute right-0 z-10 mt-1 w-40 rounded-xl border border-[#e6ddd4] bg-white shadow-lg">
+                        <div className="absolute right-0 z-10 mt-1 w-40 rounded-xl border border-[#e6ddd4] dark:border-gray-700 bg-white dark:bg-[#111111] shadow-lg">
                           <div className="py-1">
                             <button
                               onClick={() => handleViewReport(report.id)}
-                              className="flex w-full items-center px-4 py-2 text-left text-sm text-[#2d2a26] transition hover:bg-[#faf6f1]"
+                              className="flex w-full items-center px-4 py-2 text-left text-sm text-[#2d2a26] dark:text-white transition hover:bg-[#faf6f1] dark:hover:bg-neutral-800"
                             >
                               <svg
                                 className="mr-3 h-4 w-4"
@@ -464,7 +464,7 @@ export default function ReportList() {
                 type="text"
                 value={editForm.title}
                 onChange={(event) => handleEditFieldChange('title', event.target.value)}
-    className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+    className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 required
                 minLength={10}
               />
@@ -476,7 +476,7 @@ export default function ReportList() {
                 value={editForm.description}
                 onChange={(event) => handleEditFieldChange('description', event.target.value)}
                 rows={5}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 required
                 minLength={50}
               />
@@ -488,7 +488,7 @@ export default function ReportList() {
                 value={editForm.steps_to_reproduce}
                 onChange={(event) => handleEditFieldChange('steps_to_reproduce', event.target.value)}
                 rows={5}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 required
                 minLength={20}
               />
@@ -500,7 +500,7 @@ export default function ReportList() {
                 value={editForm.impact_assessment}
                 onChange={(event) => handleEditFieldChange('impact_assessment', event.target.value)}
                 rows={4}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 required
                 minLength={20}
               />
@@ -512,7 +512,7 @@ export default function ReportList() {
                 <select
                   value={editForm.suggested_severity}
                   onChange={(event) => handleEditFieldChange('suggested_severity', event.target.value)}
-                  className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                  className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 >
                   <option value="critical">Critical</option>
                   <option value="high">High</option>
@@ -527,7 +527,7 @@ export default function ReportList() {
                   type="text"
                   value={editForm.vulnerability_type}
                   onChange={(event) => handleEditFieldChange('vulnerability_type', event.target.value)}
-                  className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                  className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 />
               </div>
             </div>
@@ -538,7 +538,7 @@ export default function ReportList() {
                 type="text"
                 value={editForm.affected_asset}
                 onChange={(event) => handleEditFieldChange('affected_asset', event.target.value)}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
               />
             </div>
 

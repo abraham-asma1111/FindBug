@@ -64,24 +64,24 @@ export default function Modal({
       <div 
         className={`
           relative w-full ${sizes[size]}
-          bg-white
-          border border-[#e6ddd4]
+          bg-white dark:bg-gray-900
+          border border-[#e6ddd4] dark:border-gray-700
           rounded-2xl shadow-2xl
           max-h-[90vh] overflow-y-auto
         `}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#e6ddd4]">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#e6ddd4] dark:border-gray-700">
             {title && (
-              <h2 className="text-xl font-bold text-[#2d2a26]">
+              <h2 className="text-xl font-bold text-[#2d2a26] dark:text-gray-100">
                 {title}
               </h2>
             )}
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="ml-auto text-[#8b8177] hover:text-[#2d2a26] transition-colors"
+                className="ml-auto text-[#8b8177] dark:text-gray-400 hover:text-[#2d2a26] dark:hover:text-gray-200 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -104,7 +104,7 @@ export default function Modal({
 
 export function ModalFooter({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800 ${className}`}>
+    <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-gray-800 ${className}`}>
       {children}
     </div>
   );

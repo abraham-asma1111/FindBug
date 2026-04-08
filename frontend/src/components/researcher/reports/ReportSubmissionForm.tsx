@@ -269,7 +269,7 @@ export default function ReportSubmissionForm() {
               value={values.program_id}
               onChange={(e) => handleChange('program_id', e.target.value)}
               onBlur={() => handleBlur('program_id')}
-              className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+              className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
             >
               <option value="">Select a program...</option>
               {programs.map((program) => (
@@ -300,7 +300,7 @@ export default function ReportSubmissionForm() {
                 value={values.title}
                 onChange={(e) => handleChange('title', e.target.value)}
                 onBlur={() => handleBlur('title')}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
               />
               {touched.title && errors.title && (
                 <p className="mt-2 text-xs text-[#b42318]">{errors.title}</p>
@@ -316,7 +316,7 @@ export default function ReportSubmissionForm() {
                   value={values.suggested_severity}
                   onChange={(e) => handleChange('suggested_severity', e.target.value)}
                   onBlur={() => handleBlur('suggested_severity')}
-                  className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                  className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 >
                   <option value="">Select severity...</option>
                   <option value="critical">Critical</option>
@@ -337,7 +337,7 @@ export default function ReportSubmissionForm() {
                   value={values.vulnerability_type}
                   onChange={(e) => handleChange('vulnerability_type', e.target.value)}
                   onBlur={() => handleBlur('vulnerability_type')}
-                  className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                  className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
                 >
                   <option value="">Select category...</option>
                   {vrtEntries.map((vrt) => (
@@ -362,7 +362,7 @@ export default function ReportSubmissionForm() {
                 value={values.description}
                 onChange={(e) => handleChange('description', e.target.value)}
                 onBlur={() => handleBlur('description')}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical"
               />
               {touched.description && errors.description && (
                 <p className="mt-2 text-xs text-[#b42318]">{errors.description}</p>
@@ -380,7 +380,7 @@ export default function ReportSubmissionForm() {
                 value={values.steps_to_reproduce}
                 onChange={(e) => handleChange('steps_to_reproduce', e.target.value)}
                 onBlur={() => handleBlur('steps_to_reproduce')}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical"
               />
               {touched.steps_to_reproduce && errors.steps_to_reproduce && (
                 <p className="mt-2 text-xs text-[#b42318]">{errors.steps_to_reproduce}</p>
@@ -408,7 +408,7 @@ export default function ReportSubmissionForm() {
             
             <label
               htmlFor="evidence-upload"
-              className="block border-2 border-dashed border-[#d8d0c8] rounded-xl p-8 text-center bg-white cursor-pointer hover:border-[#c8bfb6] transition"
+              className="block border-2 border-dashed border-[#d8d0c8] rounded-xl p-8 text-center bg-white dark:bg-[#111111] cursor-pointer hover:border-[#c8bfb6] transition"
             >
               <svg
                 className="w-10 h-10 mx-auto text-[#8b8177] mb-3"
@@ -438,7 +438,7 @@ export default function ReportSubmissionForm() {
                   Uploaded Files ({uploadedFiles.length})
                 </p>
                 {uploadedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-[#d8d0c8]">
+                  <div key={index} className="flex items-center justify-between bg-white dark:bg-[#111111] rounded-xl px-4 py-3 border border-[#d8d0c8]">
                     <div className="flex items-center gap-3">
                       <svg className="w-5 h-5 text-[#8b8177]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -483,7 +483,7 @@ export default function ReportSubmissionForm() {
                 value={values.impact_assessment}
                 onChange={(e) => handleChange('impact_assessment', e.target.value)}
                 onBlur={() => handleBlur('impact_assessment')}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical"
               />
               {touched.impact_assessment && errors.impact_assessment && (
                 <p className="mt-2 text-xs text-[#b42318]">{errors.impact_assessment}</p>
@@ -500,7 +500,7 @@ export default function ReportSubmissionForm() {
                 placeholder="e.g., https://example.com/login or Mobile App v2.1"
                 value={values.affected_asset}
                 onChange={(e) => handleChange('affected_asset', e.target.value)}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
               />
               <p className="mt-2 text-xs text-[#6d6760]">Specify which asset or component is affected</p>
             </div>

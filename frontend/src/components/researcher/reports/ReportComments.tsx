@@ -183,7 +183,7 @@ export default function ReportComments({ reportId }: ReportCommentsProps) {
           placeholder="Write your comment here..."
           rows={4}
           disabled={isSubmitting}
-          className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none resize-vertical disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <div className="flex justify-end mt-3">
           <button

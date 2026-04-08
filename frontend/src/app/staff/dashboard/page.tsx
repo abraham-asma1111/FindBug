@@ -159,7 +159,7 @@ export default function StaffDashboardPage() {
             <div className="space-y-3">
               {data?.oldest_pending?.length ? (
                 data.oldest_pending.map((report) => (
-                  <div key={report.id || report.report_number || report.title} className="rounded-3xl border border-[#e6ddd4] bg-white p-4">
+                  <div key={report.id || report.report_number || report.title} className="rounded-3xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-4">
                     <p className="text-sm font-semibold text-[#2d2a26]">
                       {report.report_number ? `${report.report_number} · ` : ''}
                       {report.title}

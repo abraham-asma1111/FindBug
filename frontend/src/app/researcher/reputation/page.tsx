@@ -322,14 +322,14 @@ export default function ResearcherReputationPage() {
               <section className="rounded-[32px] border border-[#d8cfc6] bg-[radial-gradient(circle_at_top_left,_rgba(239,35,48,0.16),_transparent_38%),linear-gradient(135deg,_#fffaf3,_#f5efe7)] p-6 shadow-sm lg:p-8">
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_340px]">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8b8177]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8b8177] dark:text-gray-400">
                       Researcher Standing
                     </p>
-                    <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-[#2d2a26]">
+                    <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-[#2d2a26] dark:text-gray-100">
                       {profile?.username || user.fullName || 'Your'} reputation is the trust signal that
                       unlocks opportunities, payouts, and leaderboard recognition.
                     </h2>
-                    <p className="mt-4 max-w-2xl text-sm leading-6 text-[#5f5851]">
+                    <p className="mt-4 max-w-2xl text-sm leading-6 text-[#5f5851] dark:text-gray-300">
                       This workspace combines your authenticated reputation snapshot, the public leaderboard,
                       and the profile/rank endpoints described in the roadmap so you can understand every
                       angle of your score.
@@ -343,27 +343,27 @@ export default function ResearcherReputationPage() {
                       </Link>
                       <Link
                         href="#leaderboard"
-                        className="inline-flex items-center rounded-full border border-[#d4c9be] bg-white px-5 py-2.5 text-sm font-semibold text-[#4f4943] transition hover:bg-[#faf3ea]"
+                        className="inline-flex items-center rounded-full border border-[#d4c9be] bg-white dark:bg-[#111111] px-5 py-2.5 text-sm font-semibold text-[#4f4943] dark:text-gray-200 transition hover:bg-[#faf3ea] dark:hover:bg-gray-800"
                       >
                         Compare leaderboard
                       </Link>
                       <Link
                         href="#profile"
-                        className="inline-flex items-center rounded-full border border-[#d4c9be] bg-white px-5 py-2.5 text-sm font-semibold text-[#4f4943] transition hover:bg-[#faf3ea]"
+                        className="inline-flex items-center rounded-full border border-[#d4c9be] bg-white dark:bg-[#111111] px-5 py-2.5 text-sm font-semibold text-[#4f4943] dark:text-gray-200 transition hover:bg-[#faf3ea] dark:hover:bg-gray-800"
                       >
                         Public profile preview
                       </Link>
                       <button
                         type="button"
                         onClick={() => void loadWorkspace()}
-                        className="inline-flex items-center rounded-full border border-[#d4c9be] bg-transparent px-5 py-2.5 text-sm font-semibold text-[#4f4943] transition hover:bg-white/80"
+                        className="inline-flex items-center rounded-full border border-[#d4c9be] bg-transparent px-5 py-2.5 text-sm font-semibold text-[#4f4943] dark:text-gray-200 transition hover:bg-white/80 dark:hover:bg-gray-800"
                       >
                         Refresh data
                       </button>
                     </div>
                   </div>
-                  <div className="rounded-[28px] border border-[#eadfd5] bg-white/80 p-5 backdrop-blur">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8b8177]">
+                  <div className="rounded-[28px] border border-[#eadfd5] bg-white/80 p-5 backdrop-blur dark:bg-gray-800/80 dark:border-gray-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8b8177] dark:text-gray-400">
                       Reputation status
                     </p>
                     <div className="mt-4 rounded-[24px] bg-[#2d2a26] p-5 text-white">
@@ -381,22 +381,22 @@ export default function ResearcherReputationPage() {
                         {formatRank(currentRank)} of {formatCompactNumber(totalResearchers || workspace.leaderboard.length)}
                       </p>
                     </div>
-                    <div className="mt-4 space-y-3 rounded-[24px] bg-[#f8f2eb] p-4">
-                      <div className="flex items-center justify-between text-sm text-[#5f5851]">
+                    <div className="mt-4 space-y-3 rounded-[24px] bg-[#f8f2eb] p-4 dark:bg-gray-700">
+                      <div className="flex items-center justify-between text-sm text-[#5f5851] dark:text-gray-300">
                         <span>Distance to leader</span>
-                        <span className="font-semibold text-[#2d2a26]">
+                        <span className="font-semibold text-[#2d2a26] dark:text-gray-100">
                           {leader ? `${distanceToLeader.toFixed(1)} pts` : 'Unavailable'}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-[#5f5851]">
+                      <div className="flex items-center justify-between text-sm text-[#5f5851] dark:text-gray-300">
                         <span>Top 10 cutoff gap</span>
-                        <span className="font-semibold text-[#2d2a26]">
+                        <span className="font-semibold text-[#2d2a26] dark:text-gray-100">
                           {cutoff ? `${distanceToTopTen.toFixed(1)} pts` : 'Unavailable'}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-[#5f5851]">
+                      <div className="flex items-center justify-between text-sm text-[#5f5851] dark:text-gray-300">
                         <span>Percentile</span>
-                        <span className="font-semibold text-[#2d2a26]">
+                        <span className="font-semibold text-[#2d2a26] dark:text-gray-100">
                           {formatPercentile(currentPercentile)}
                         </span>
                       </div>
@@ -436,12 +436,12 @@ export default function ResearcherReputationPage() {
                   {SCORING_RULES.map((rule) => (
                     <div
                       key={rule.label}
-                      className="rounded-[24px] border border-[#efe5dc] bg-[#fcfaf7] p-4"
+                      className="rounded-[24px] border border-[#efe5dc] bg-[#fcfaf7] p-4 dark:bg-gray-800 dark:border-gray-700"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-[#2d2a26]">{rule.label}</p>
-                          <p className="mt-1 text-sm text-[#6d6760]">
+                          <p className="text-sm font-semibold text-[#2d2a26] dark:text-gray-100">{rule.label}</p>
+                          <p className="mt-1 text-sm text-[#6d6760] dark:text-gray-300">
                             Reputation moves when triage outcomes are marked valid, invalid, or duplicate.
                           </p>
                         </div>
@@ -463,16 +463,16 @@ export default function ResearcherReputationPage() {
                     <Link
                       key={page.href}
                       href={page.href}
-                      className={`group rounded-[28px] border border-[#e7ddd3] bg-gradient-to-br ${page.accent} p-5 transition hover:-translate-y-0.5 hover:border-[#d6c9bd] hover:shadow-sm`}
+                      className={`group rounded-[28px] border border-[#e7ddd3] bg-gradient-to-br ${page.accent} p-5 transition hover:-translate-y-0.5 hover:border-[#d6c9bd] hover:shadow-sm dark:bg-gray-800 dark:border-gray-700`}
                     >
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8b8177]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8b8177] dark:text-gray-400">
                         {page.eyebrow}
                       </p>
-                      <h3 className="mt-3 text-xl font-semibold tracking-tight text-[#2d2a26]">
+                      <h3 className="mt-3 text-xl font-semibold tracking-tight text-[#2d2a26] dark:text-gray-100">
                         {page.title}
                       </h3>
-                      <p className="mt-3 text-sm leading-6 text-[#5f5851]">{page.description}</p>
-                      <span className="mt-5 inline-flex items-center text-sm font-semibold text-[#9d1f1f] transition group-hover:translate-x-1">
+                      <p className="mt-3 text-sm leading-6 text-[#5f5851] dark:text-gray-300">{page.description}</p>
+                      <span className="mt-5 inline-flex items-center text-sm font-semibold text-[#9d1f1f] dark:text-red-400 transition group-hover:translate-x-1">
                         Open page
                       </span>
                     </Link>
@@ -492,26 +492,26 @@ export default function ResearcherReputationPage() {
                         <div
                           key={entry.researcher_id}
                           className={`rounded-[24px] p-4 ${
-                            isCurrent ? 'bg-[#fff0ee]' : 'bg-[#faf6f1]'
+                            isCurrent ? 'bg-[#fff0ee] dark:bg-gray-800' : 'bg-[#faf6f1] dark:bg-gray-800'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-[#2d2a26]">
+                                <p className="text-sm font-semibold text-[#2d2a26] dark:text-gray-100">
                                   #{entry.rank} {entry.username}
                                 </p>
                                 {isCurrent ? (
-                                  <span className="rounded-full bg-[#fde9e7] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9d1f1f]">
+                                  <span className="rounded-full bg-[#fde9e7] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9d1f1f] dark:bg-red-900 dark:text-red-200">
                                     You
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#8b8177]">
+                              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                                 Reputation {entry.reputation_score.toFixed(1)}
                               </p>
                             </div>
-                            <p className="text-sm font-semibold text-[#2d2a26]">
+                            <p className="text-sm font-semibold text-[#2d2a26] dark:text-gray-100">
                               {formatCurrency(entry.total_earnings)}
                             </p>
                           </div>
@@ -570,7 +570,7 @@ export default function ResearcherReputationPage() {
                               href={entry.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center rounded-full border border-[#ddd4cb] bg-white px-4 py-2 text-sm font-medium text-[#4f4943] transition hover:bg-[#faf3ea]"
+                              className="inline-flex items-center rounded-full border border-[#ddd4cb] bg-white dark:bg-[#111111] px-4 py-2 text-sm font-medium text-[#4f4943] dark:text-gray-200 transition hover:bg-[#faf3ea] dark:hover:bg-gray-800"
                             >
                               {entry.label}
                             </a>

@@ -65,24 +65,24 @@ interface ResearcherDashboardInsightsSectionProps {
 
 const alertToneStyles: Record<AlertTone, { panel: string; badge: string; action: string }> = {
   critical: {
-    panel: 'border-[#f2c0bc] bg-[#fff2f1]',
+    panel: 'border-[#f2c0bc] dark:border-red-900 bg-[#fff2f1] dark:bg-[#111111]',
     badge: 'bg-[#b42318] text-white',
-    action: 'border-[#e7b4b0] text-[#7a1b12] hover:bg-white/70',
+    action: 'border-[#e7b4b0] dark:border-red-800 text-[#7a1b12] dark:text-red-400 hover:bg-white/70 dark:hover:bg-neutral-800',
   },
   warning: {
-    panel: 'border-[#ead6ac] bg-[#fff8e8]',
+    panel: 'border-[#ead6ac] dark:border-yellow-900 bg-[#fff8e8] dark:bg-[#111111]',
     badge: 'bg-[#9a6412] text-white',
-    action: 'border-[#e7d3a2] text-[#7a5210] hover:bg-white/70',
+    action: 'border-[#e7d3a2] dark:border-yellow-800 text-[#7a5210] dark:text-yellow-400 hover:bg-white/70 dark:hover:bg-neutral-800',
   },
   info: {
-    panel: 'border-[#c9dceb] bg-[#f1f7fb]',
+    panel: 'border-[#c9dceb] dark:border-blue-900 bg-[#f1f7fb] dark:bg-[#111111]',
     badge: 'bg-[#2d78a8] text-white',
-    action: 'border-[#c2d7e7] text-[#225f84] hover:bg-white/70',
+    action: 'border-[#c2d7e7] dark:border-blue-800 text-[#225f84] dark:text-blue-400 hover:bg-white/70 dark:hover:bg-neutral-800',
   },
   success: {
-    panel: 'border-[#c9dfcf] bg-[#f1f8f2]',
+    panel: 'border-[#c9dfcf] dark:border-green-900 bg-[#f1f8f2] dark:bg-[#111111]',
     badge: 'bg-[#24613a] text-white',
-    action: 'border-[#c3dcc9] text-[#1f5232] hover:bg-white/70',
+    action: 'border-[#c3dcc9] dark:border-green-800 text-[#1f5232] dark:text-green-400 hover:bg-white/70 dark:hover:bg-neutral-800',
   },
 };
 
@@ -263,16 +263,16 @@ export function ResearcherDashboardAlertsSection({
                     {alert.actionText}
                   </Link>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-[#2d2a26]">{alert.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#5f5851]">{alert.description}</p>
+                <h3 className="mt-4 text-lg font-semibold text-[#2d2a26] dark:text-white">{alert.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-[#5f5851] dark:text-gray-300">{alert.description}</p>
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="rounded-[28px] border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-6 text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">All Clear</p>
-          <p className="mt-3 text-sm leading-6 text-[#6d6760]">
+        <div className="rounded-[28px] border border-dashed border-[#d8d0c8] dark:border-gray-700 bg-[#fcfaf7] dark:bg-[#111111] p-6 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">All Clear</p>
+          <p className="mt-3 text-sm leading-6 text-[#6d6760] dark:text-gray-300">
             {isLoading
               ? 'Loading alert state...'
               : 'No urgent workflow alerts are blocking you right now. Continue with reports, reputation, or simulation.'}
@@ -298,24 +298,24 @@ export function ResearcherDashboardJumpboardSection({
             key={item.module}
             className={`rounded-[30px] bg-gradient-to-br ${item.accent} p-[1px] shadow-[0_18px_34px_rgba(45,42,38,0.08)]`}
           >
-            <div className="h-full rounded-[29px] bg-white/95 p-5">
+            <div className="h-full rounded-[29px] bg-white/95 dark:bg-[#111111] p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 dark:text-gray-400">
                     {item.module}
                   </p>
-                  <p className="mt-3 text-2xl font-semibold tracking-tight text-[#2d2a26]">
+                  <p className="mt-3 text-2xl font-semibold tracking-tight text-[#2d2a26] dark:text-white dark:text-white">
                     {item.signal}
                   </p>
                 </div>
-                <span className="rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#5f5851]">
+                <span className="rounded-full bg-[#f3ede6] dark:bg-neutral-800 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#5f5851] dark:text-gray-300 dark:text-gray-300">
                   Live signal
                 </span>
               </div>
-              <p className="mt-4 text-sm leading-6 text-[#6d6760]">{item.workflow}</p>
+              <p className="mt-4 text-sm leading-6 text-[#6d6760] dark:text-gray-300 dark:text-gray-400">{item.workflow}</p>
               <Link
                 href={item.href}
-                className="mt-5 inline-flex rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-[#fcfaf7]"
+                className="mt-5 inline-flex rounded-full border border-[#d8d0c8] dark:border-gray-700 px-4 py-2 text-xs font-semibold text-[#2d2a26] dark:text-white dark:text-white transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-800"
               >
                 {item.actionText}
               </Link>
@@ -359,11 +359,11 @@ export function ResearcherDashboardInsightsSection({
       >
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl bg-[#faf6f1] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+            <div className="rounded-2xl bg-[#faf6f1] dark:bg-[#111111] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                 Success Rate
               </p>
-              <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
+              <p className="mt-2 text-2xl font-semibold text-[#2d2a26] dark:text-white">
                 {isLoading
                   ? '...'
                   : performanceUnavailable
@@ -371,21 +371,21 @@ export function ResearcherDashboardInsightsSection({
                     : `${Math.round(performance?.metrics.success_rate ?? 0)}%`}
               </p>
             </div>
-            <div className="rounded-2xl bg-[#faf6f1] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+            <div className="rounded-2xl bg-[#faf6f1] dark:bg-[#111111] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                 Paid Earnings
               </p>
-              <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
+              <p className="mt-2 text-2xl font-semibold text-[#2d2a26] dark:text-white">
                 {isLoading
                   ? '...'
                   : formatCurrency(performance?.metrics.earnings ?? earnings?.paid_earnings ?? 0)}
               </p>
             </div>
-            <div className="rounded-2xl bg-[#faf6f1] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+            <div className="rounded-2xl bg-[#faf6f1] dark:bg-[#111111] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                 Reputation Score
               </p>
-              <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">
+              <p className="mt-2 text-2xl font-semibold text-[#2d2a26] dark:text-white">
                 {isLoading
                   ? '...'
                   : formatCompactNumber(
@@ -396,7 +396,7 @@ export function ResearcherDashboardInsightsSection({
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
               Severity Distribution
             </p>
             <div className="mt-4 space-y-3">
@@ -406,10 +406,10 @@ export function ResearcherDashboardInsightsSection({
 
                   return (
                     <div key={severity} className="grid grid-cols-[88px_minmax(0,1fr)_36px] items-center gap-3">
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                         {formatDashboardMetricLabel(severity)}
                       </span>
-                      <div className="h-3 overflow-hidden rounded-full bg-[#f3ede6]">
+                      <div className="h-3 overflow-hidden rounded-full bg-[#f3ede6] dark:bg-neutral-800">
                         <div
                           className={`h-full rounded-full ${
                             severityTone[severity]?.split(' ')[0] || 'bg-[#c96d3a]'
@@ -417,12 +417,12 @@ export function ResearcherDashboardInsightsSection({
                           style={{ width: `${Math.max(width, count ? 10 : 0)}%` }}
                         />
                       </div>
-                      <span className="text-right text-sm font-semibold text-[#2d2a26]">{count}</span>
+                      <span className="text-right text-sm font-semibold text-[#2d2a26] dark:text-white">{count}</span>
                     </div>
                   );
                 })
               ) : (
-                <div className="rounded-2xl border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-4 text-sm text-[#6d6760]">
+                <div className="rounded-2xl border border-dashed border-[#d8d0c8] dark:border-gray-700 bg-[#fcfaf7] dark:bg-[#111111] p-4 text-sm text-[#6d6760] dark:text-gray-300">
                   {isLoading
                     ? 'Loading severity data...'
                     : performanceUnavailable
@@ -433,8 +433,8 @@ export function ResearcherDashboardInsightsSection({
             </div>
           </div>
 
-          <div className="border-t border-[#e6ddd4] pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+          <div className="border-t border-[#e6ddd4] dark:border-gray-800 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
               Top Vulnerability Types
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -442,13 +442,13 @@ export function ResearcherDashboardInsightsSection({
                 performance?.top_vulnerability_types.map((entry) => (
                   <span
                     key={`${entry.type}-${entry.count}`}
-                    className="rounded-full bg-[#edf5fb] px-3 py-2 text-xs font-semibold text-[#2d78a8]"
+                    className="rounded-full bg-[#edf5fb] dark:bg-blue-900/30 px-3 py-2 text-xs font-semibold text-[#2d78a8] dark:text-blue-400"
                   >
                     {entry.type || 'Unspecified'} · {entry.count}
                   </span>
                 ))
               ) : (
-                <p className="text-sm text-[#6d6760]">
+                <p className="text-sm text-[#6d6760] dark:text-gray-300">
                   {isLoading
                     ? 'Loading specialization data...'
                     : performanceUnavailable
@@ -468,19 +468,19 @@ export function ResearcherDashboardInsightsSection({
           headerAlign="center"
         >
           {monthlyTrend.length ? (
-            <div className="rounded-[28px] bg-[#faf6f1] p-5">
+            <div className="rounded-[28px] bg-[#faf6f1] dark:bg-[#111111] p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">
                     Submission trend
                   </p>
-                  <p className="mt-1 text-sm text-[#6d6760]">
+                  <p className="mt-1 text-sm text-[#6d6760] dark:text-gray-300">
                     Each bar shows how many reports you submitted in that month.
                   </p>
                 </div>
-                <p className="text-right text-xs text-[#8b8177]">
+                <p className="text-right text-xs text-[#8b8177] dark:text-gray-400">
                   Peak month:{' '}
-                  <span className="font-semibold text-[#2d2a26]">{maxMonthlySubmissions}</span>
+                  <span className="font-semibold text-[#2d2a26] dark:text-white">{maxMonthlySubmissions}</span>
                 </p>
               </div>
 
@@ -490,11 +490,11 @@ export function ResearcherDashboardInsightsSection({
 
                   return (
                     <div key={entry.month} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-                      <p className="mb-2 text-center text-xs font-semibold text-[#2d2a26]">
+                      <p className="mb-2 text-center text-xs font-semibold text-[#2d2a26] dark:text-white">
                         {entry.submissions}
                       </p>
                       <div className="flex h-44 items-end justify-center">
-                        <div className="flex h-full w-full max-w-[42px] items-end rounded-[18px] bg-white/75 px-1 pb-1 shadow-inner">
+                        <div className="flex h-full w-full max-w-[42px] items-end rounded-[18px] bg-white/75 dark:bg-neutral-800 px-1 pb-1 shadow-inner">
                           <div
                             className="w-full rounded-[14px] bg-gradient-to-t from-[#c96d3a] via-[#df8a53] to-[#f4c38b] shadow-[0_14px_30px_rgba(201,109,58,0.18)]"
                             style={{
@@ -504,7 +504,7 @@ export function ResearcherDashboardInsightsSection({
                           />
                         </div>
                       </div>
-                      <p className="mt-3 truncate text-center text-xs font-semibold uppercase tracking-[0.16em] text-[#8b8177]">
+                      <p className="mt-3 truncate text-center text-xs font-semibold uppercase tracking-[0.16em] text-[#8b8177] dark:text-gray-400">
                         {formatTrendLabel(entry.month, entry.label)}
                       </p>
                     </div>
@@ -513,7 +513,7 @@ export function ResearcherDashboardInsightsSection({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-[#6d6760]">
+            <p className="text-sm text-[#6d6760] dark:text-gray-300">
               {isLoading ? 'Loading trend data...' : 'No trend data available yet.'}
             </p>
           )}
@@ -525,11 +525,11 @@ export function ResearcherDashboardInsightsSection({
           headerAlign="center"
         >
           <div className="space-y-4">
-            <div className="rounded-3xl bg-[#faf6f1] p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+            <div className="rounded-3xl bg-[#faf6f1] dark:bg-[#111111] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                 Privacy Note
               </p>
-              <p className="mt-3 text-sm leading-6 text-[#6d6760]">
+              <p className="mt-3 text-sm leading-6 text-[#6d6760] dark:text-gray-300">
                 {simulation?.privacy_note ||
                   'Simulation scores stay private and surface here only as personal progress signals.'}
               </p>
@@ -538,15 +538,15 @@ export function ResearcherDashboardInsightsSection({
             <div className="grid gap-3 sm:grid-cols-2">
               {simulationStatEntries.length ? (
                 simulationStatEntries.map((entry) => (
-                  <div key={entry.key} className="rounded-2xl border border-[#e6ddd4] bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">
+                  <div key={entry.key} className="rounded-2xl border border-[#e6ddd4] dark:border-gray-800 bg-white dark:bg-[#111111] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400">
                       {entry.label}
                     </p>
-                    <p className="mt-2 text-2xl font-semibold text-[#2d2a26]">{entry.value}</p>
+                    <p className="mt-2 text-2xl font-semibold text-[#2d2a26] dark:text-white">{entry.value}</p>
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-[#d8d0c8] bg-[#fcfaf7] p-5 text-sm leading-6 text-[#6d6760] sm:col-span-2">
+                <div className="rounded-2xl border border-dashed border-[#d8d0c8] dark:border-gray-700 bg-[#fcfaf7] dark:bg-[#111111] p-5 text-sm leading-6 text-[#6d6760] dark:text-gray-300 sm:col-span-2">
                   {isLoading
                     ? 'Loading private simulation metrics...'
                     : simulationUnavailable

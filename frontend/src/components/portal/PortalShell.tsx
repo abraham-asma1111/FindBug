@@ -87,9 +87,9 @@ export default function PortalShell({
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f1ec] dark:bg-slate-900 text-[#2d2a26] dark:text-slate-100">
+    <div className="min-h-screen bg-[#f5f1ec] dark:bg-black text-[#2d2a26] dark:text-white">
       <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="border-b border-[#ddd4cb] dark:border-slate-700 bg-[#faf6f1] dark:bg-slate-800 px-6 py-8 text-[#2d2a26] dark:text-slate-100 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <aside className="border-b border-[#ddd4cb] dark:border-gray-800 bg-[#faf6f1] dark:bg-neutral-900 px-6 py-8 text-[#2d2a26] dark:text-white lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="space-y-8">
             <div>
               <Link
@@ -104,7 +104,7 @@ export default function PortalShell({
             </div>
 
             <div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[#8b8177] dark:text-slate-400">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[#8b8177] dark:text-gray-400">
                 {getPortalName(user.role)}
               </p>
               <nav className="space-y-2">
@@ -120,7 +120,7 @@ export default function PortalShell({
                         <div className={`flex items-center rounded-2xl transition ${
                           isActive
                             ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
-                            : 'text-[#4f4943] dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
+                            : 'text-[#4f4943] dark:text-gray-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-[#2d2a26] dark:hover:text-white'
                         }`}>
                           <Link
                             href={item.href}
@@ -142,7 +142,7 @@ export default function PortalShell({
                             </svg>
                           </button>
                         </div>
-                        {isExpanded && (
+                        {isExpanded && item.children && (
                           <div className="mt-1 ml-4 space-y-1">
                             {item.children.map((child) => {
                               const isChildActive = isActiveRoute(child.href);
@@ -153,14 +153,14 @@ export default function PortalShell({
                                   className={`flex items-center justify-between rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
                                     isChildActive
                                       ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
-                                      : 'text-[#6d6760] dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
+                                      : 'text-[#6d6760] dark:text-gray-400 hover:bg-white dark:hover:bg-neutral-800 hover:text-[#2d2a26] dark:hover:text-white'
                                   }`}
                                 >
                                   <span>{child.label}</span>
                                   {child.badge !== undefined ? (
                                     <span
                                       className={`rounded-full px-2 py-0.5 text-xs ${
-                                        isChildActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-slate-700 text-[#6d6760] dark:text-slate-300'
+                                        isChildActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#6d6760] dark:text-gray-300'
                                       }`}
                                     >
                                       {child.badge}
@@ -178,14 +178,14 @@ export default function PortalShell({
                         className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition ${
                           isActive
                             ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
-                            : 'text-[#4f4943] dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-[#2d2a26] dark:hover:text-slate-100'
+                            : 'text-[#4f4943] dark:text-gray-300 hover:bg-white dark:hover:bg-neutral-800 hover:text-[#2d2a26] dark:hover:text-white'
                         }`}
                       >
                         <span>{item.label}</span>
                         {item.badge !== undefined ? (
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs ${
-                              isActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-slate-700 text-[#6d6760] dark:text-slate-300'
+                              isActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#6d6760] dark:text-gray-300'
                             }`}
                           >
                             {item.badge}
@@ -202,7 +202,7 @@ export default function PortalShell({
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-col">
-          <header className="sticky top-0 z-20 border-b border-[#ddd4cb] dark:border-slate-700 bg-[#fcfaf7]/95 dark:bg-slate-800/95 backdrop-blur">
+          <header className="sticky top-0 z-20 border-b border-[#ddd4cb] dark:border-gray-800 bg-[#fcfaf7]/95 dark:bg-neutral-900/95 backdrop-blur">
             <div className="px-4 py-5 sm:px-6 lg:px-6">
               {headerAlign === 'center' ? (
                 <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
@@ -218,7 +218,7 @@ export default function PortalShell({
                   <div className="flex items-center justify-center gap-3 lg:justify-end">
                     <button
                       onClick={toggleDarkMode}
-                      className="rounded-full border border-[#d5ccc3] dark:border-slate-600 bg-white dark:bg-slate-700 p-2 text-[#4f4943] dark:text-slate-300 transition hover:border-[#c8bfb6] dark:hover:border-slate-500 hover:bg-[#fcfaf7] dark:hover:bg-slate-600"
+                      className="rounded-full border border-[#d5ccc3] dark:border-gray-700 bg-white dark:bg-[#111111] dark:bg-neutral-800 p-2 text-[#4f4943] dark:text-gray-300 transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-700"
                       title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                     >
                       {isDarkMode ? (
@@ -233,7 +233,7 @@ export default function PortalShell({
                     </button>
                     <Link
                       href="/dashboard/mfa"
-                      className="rounded-full border border-[#d5ccc3] dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2 text-sm font-medium text-[#4f4943] dark:text-slate-300 transition hover:border-[#c8bfb6] dark:hover:border-slate-500 hover:bg-[#fcfaf7] dark:hover:bg-slate-600"
+                      className="rounded-full border border-[#d5ccc3] dark:border-gray-700 bg-white dark:bg-[#111111] dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-[#4f4943] dark:text-gray-300 transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-700"
                     >
                       Security
                     </Link>
@@ -248,17 +248,17 @@ export default function PortalShell({
               ) : (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className={`font-semibold uppercase text-[#8b8177] dark:text-slate-400 ${eyebrowClassName || 'text-xs tracking-[0.25em]'}`}>
+                    <p className={`font-semibold uppercase text-[#8b8177] dark:text-gray-400 ${eyebrowClassName || 'text-xs tracking-[0.25em]'}`}>
                       {eyebrowText || getPortalName(user.role)}
                     </p>
-                    {!hideTitle ? <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26] dark:text-slate-100">{title}</h1> : null}
-                    {!hideSubtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760] dark:text-slate-300">{subtitle}</p> : null}
+                    {!hideTitle ? <h1 className="mt-2 text-3xl font-semibold text-[#2d2a26] dark:text-white">{title}</h1> : null}
+                    {!hideSubtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[#6d6760] dark:text-gray-300">{subtitle}</p> : null}
                   </div>
 
                   <div className="flex items-center gap-3">
                     <button
                       onClick={toggleDarkMode}
-                      className="rounded-full border border-[#d5ccc3] dark:border-slate-600 bg-white dark:bg-slate-700 p-2 text-[#4f4943] dark:text-slate-300 transition hover:border-[#c8bfb6] dark:hover:border-slate-500 hover:bg-[#fcfaf7] dark:hover:bg-slate-600"
+                      className="rounded-full border border-[#d5ccc3] dark:border-gray-700 bg-white dark:bg-[#111111] dark:bg-neutral-800 p-2 text-[#4f4943] dark:text-gray-300 transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-700"
                       title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                     >
                       {isDarkMode ? (
@@ -273,7 +273,7 @@ export default function PortalShell({
                     </button>
                     <Link
                       href="/dashboard/mfa"
-                      className="rounded-full border border-[#d5ccc3] dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2 text-sm font-medium text-[#4f4943] dark:text-slate-300 transition hover:border-[#c8bfb6] dark:hover:border-slate-500 hover:bg-[#fcfaf7] dark:hover:bg-slate-600"
+                      className="rounded-full border border-[#d5ccc3] dark:border-gray-700 bg-white dark:bg-[#111111] dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-[#4f4943] dark:text-gray-300 transition hover:border-[#c8bfb6] dark:hover:border-gray-600 hover:bg-[#fcfaf7] dark:hover:bg-neutral-700"
                     >
                       Security
                     </Link>
@@ -289,7 +289,7 @@ export default function PortalShell({
             </div>
 
             {moduleTabs?.length ? (
-              <nav className="border-t border-[#ddd4cb] dark:border-slate-700 bg-[#faf6f1] dark:bg-slate-800 px-4 py-3 sm:px-6 lg:px-6">
+              <nav className="border-t border-[#ddd4cb] dark:border-gray-800 bg-[#faf6f1] dark:bg-neutral-900 px-4 py-3 sm:px-6 lg:px-6">
                 <div className="flex flex-wrap gap-3">
                   {moduleTabs.map((item) => {
                     const isActive = isActiveRoute(item.href);
@@ -301,14 +301,14 @@ export default function PortalShell({
                         className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
                           isActive
                             ? 'bg-[#fde9e7] dark:bg-red-900/30 text-[#9d1f1f] dark:text-red-400'
-                            : 'bg-white dark:bg-slate-700 text-[#4f4943] dark:text-slate-300 hover:bg-[#f7efe8] dark:hover:bg-slate-600 hover:text-[#2d2a26] dark:hover:text-slate-100'
+                            : 'bg-white dark:bg-neutral-800 text-[#4f4943] dark:text-gray-300 hover:bg-[#f7efe8] dark:hover:bg-neutral-700 hover:text-[#2d2a26] dark:hover:text-white'
                         }`}
                       >
                         <span>{item.label}</span>
                         {item.badge !== undefined ? (
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs ${
-                              isActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-slate-600 text-[#6d6760] dark:text-slate-300'
+                              isActive ? 'bg-[#f9c6c2] dark:bg-red-800/50 text-[#8e1b22] dark:text-red-300' : 'bg-[#f3ede6] dark:bg-neutral-700 text-[#6d6760] dark:text-gray-300'
                             }`}
                           >
                             {item.badge}

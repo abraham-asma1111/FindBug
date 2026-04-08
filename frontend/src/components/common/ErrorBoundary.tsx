@@ -40,7 +40,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
-          <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-lg shadow-lg p-6 border border-slate-200 dark:border-slate-800">
+          <div className="max-w-md w-full bg-white dark:bg-[#111111] dark:bg-[#111111] rounded-lg shadow-lg p-6 border border-slate-200 dark:border-gray-800">
             <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/20 rounded-full">
               <svg
                 className="w-6 h-6 text-red-600 dark:text-red-400"
@@ -66,7 +66,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </p>
             
             {process.env.NODE_ENV === 'development' && (
-              <details className="mb-4 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs">
+              <details className="mb-4 p-3 bg-slate-100 dark:bg-[#111111] rounded text-xs">
                 <summary className="cursor-pointer text-slate-700 dark:text-slate-300 font-medium mb-2">
                   Error Details
                 </summary>

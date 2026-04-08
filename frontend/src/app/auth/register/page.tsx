@@ -86,7 +86,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-start justify-center p-8 bg-white overflow-y-auto min-h-screen pt-24">
+        <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-start justify-center p-8 bg-white dark:bg-[#111111] overflow-y-auto min-h-screen pt-24">
           <div className="max-w-2xl w-full py-4">
             <div className="mb-8 text-center">
               <h2 className="text-3xl font-bold text-black mb-4 mt-8">CREATE ACCOUNT</h2>

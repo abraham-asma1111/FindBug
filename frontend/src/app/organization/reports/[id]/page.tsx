@@ -63,7 +63,7 @@ export default function OrganizationReportDetailPage() {
             eyebrowClassName="text-xl tracking-[0.18em]"
           >
             <div className="flex items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-gray-900 dark:border-slate-700 dark:border-t-slate-100"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-gray-900 dark:border-gray-700 dark:border-t-slate-100"></div>
             </div>
           </PortalShell>
         )}
@@ -128,7 +128,7 @@ export default function OrganizationReportDetailPage() {
           {/* Single Page Content - No Cards */}
           <div className="space-y-12">
             {/* Report Header Section */}
-            <section className="border-b border-gray-200 pb-8 dark:border-slate-700">
+            <section className="border-b border-gray-200 pb-8 dark:border-gray-700">
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-bold uppercase ${
                   (report.assigned_severity || report.suggested_severity)?.toLowerCase() === 'critical'
@@ -267,7 +267,7 @@ export default function OrganizationReportDetailPage() {
                   {report.attachments.map((attachment: any) => (
                     <div
                       key={attachment.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-800"
+                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-[#111111]"
                     >
                       <div className="flex items-center gap-3">
                         <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -292,13 +292,13 @@ export default function OrganizationReportDetailPage() {
             )}
 
             {/* Discussion Section */}
-            <section className="border-t border-gray-200 pt-8 dark:border-slate-700">
+            <section className="border-t border-gray-200 pt-8 dark:border-gray-700">
               <h2 className="mb-6 text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-slate-100">
                 Discussion ({comments.length})
               </h2>
 
               {/* Add Comment Form */}
-              <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50 p-6 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-[#111111]">
                 <Textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -321,7 +321,7 @@ export default function OrganizationReportDetailPage() {
                   comments.map((comment: any) => (
                     <div
                       key={comment.id}
-                      className="border-l-4 border-gray-300 bg-white pl-6 py-4 dark:border-slate-600 dark:bg-slate-800"
+                      className="border-l-4 border-gray-300 bg-white dark:bg-[#111111] pl-6 py-4 dark:border-slate-600 dark:bg-[#111111]"
                     >
                       <div className="mb-2 flex items-center gap-3">
                         <p className="text-sm font-bold text-gray-900 dark:text-slate-100">

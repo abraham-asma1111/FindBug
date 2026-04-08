@@ -190,7 +190,7 @@ export default function ResearcherAnalyticsPage() {
             <select
               value={timePeriod}
               onChange={(e) => setTimePeriod(e.target.value)}
-              className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+              className="rounded-xl border border-[#d8d0c8] dark:border-gray-700 bg-white dark:bg-[#111111] px-4 py-2 text-sm text-[#2d2a26] dark:text-gray-200 focus:border-[#c8bfb6] focus:outline-none"
             >
               {timePeriodOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -215,50 +215,50 @@ export default function ResearcherAnalyticsPage() {
             <div className="space-y-12">
               {/* Key Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="rounded-2xl bg-[#faf6f1] p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] mb-2">
+                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
                     Total Reports
                   </p>
-                  <p className="text-2xl font-bold text-[#2d2a26]">
+                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
                     {Math.floor(analyticsData.metrics.total_reports)}
                   </p>
-                  <p className="text-xs text-[#6d6760] mt-1">
+                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
                     {Math.floor(analyticsData.metrics.valid_reports)} valid, {Math.floor(analyticsData.metrics.invalid_reports)} invalid
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-[#faf6f1] p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] mb-2">
+                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
                     Success Rate
                   </p>
                   <p className={`text-2xl font-bold ${getSuccessRateColor(analyticsData.metrics.success_rate)}`}>
                     {analyticsData.metrics.success_rate}%
                   </p>
-                  <p className="text-xs text-[#6d6760] mt-1">
+                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
                     Valid reports ratio
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-[#faf6f1] p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] mb-2">
+                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
                     Total Earnings
                   </p>
-                  <p className="text-2xl font-bold text-[#2d2a26]">
+                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
                     {formatCurrency(analyticsData.metrics.earnings)}
                   </p>
-                  <p className="text-xs text-[#6d6760] mt-1">
+                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
                     In selected period
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-[#faf6f1] p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] mb-2">
+                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
                     Current Rank
                   </p>
-                  <p className="text-2xl font-bold text-[#2d2a26]">
+                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
                     #{analyticsData.metrics.rank || 'Unranked'}
                   </p>
-                  <p className="text-xs text-[#6d6760] mt-1">
+                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
                     {analyticsData.metrics.reputation_score.toFixed(1)} reputation
                   </p>
                 </div>
@@ -275,8 +275,8 @@ export default function ResearcherAnalyticsPage() {
                 {/* Overview Tab */}
                 <div data-tab="overview" className="space-y-6">
                   {/* Severity Distribution */}
-                  <div className="rounded-2xl bg-[#faf6f1] p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] mb-6 text-center">Severity Distribution</h3>
+                  <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                    <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-6 text-center">Severity Distribution</h3>
                     <div className="flex justify-center">
                       <PieChart
                         data={pieChartData}
@@ -287,8 +287,8 @@ export default function ResearcherAnalyticsPage() {
                   </div>
 
                   {/* Top Vulnerability Types */}
-                  <div className="rounded-2xl bg-[#faf6f1] p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] mb-4">Top Vulnerability Types</h3>
+                  <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                    <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Top Vulnerability Types</h3>
                     {analyticsData.top_vulnerability_types.length > 0 ? (
                       <div className="space-y-3">
                         {analyticsData.top_vulnerability_types.map((vuln, index) => (
@@ -297,14 +297,14 @@ export default function ResearcherAnalyticsPage() {
                               <div className="w-8 h-8 rounded-full bg-[#ef2330] text-white flex items-center justify-center text-sm font-bold">
                                 {index + 1}
                               </div>
-                              <span className="text-sm font-medium text-[#2d2a26]">{vuln.type}</span>
+                              <span className="text-sm font-medium text-[#2d2a26] dark:text-gray-200">{vuln.type}</span>
                             </div>
-                            <span className="text-sm font-bold text-[#2d2a26]">{Math.floor(vuln.count)} reports</span>
+                            <span className="text-sm font-bold text-[#2d2a26] dark:text-gray-200">{Math.floor(vuln.count)} reports</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-[#6d6760]">No vulnerability data available for this period.</p>
+                      <p className="text-sm text-[#6d6760] dark:text-gray-300">No vulnerability data available for this period.</p>
                     )}
                   </div>
                 </div>
@@ -314,8 +314,8 @@ export default function ResearcherAnalyticsPage() {
                   {analyticsData.monthly_trend.length > 0 ? (
                     <>
                       {/* Total Reports Chart */}
-                      <div className="rounded-2xl bg-[#faf6f1] p-6">
-                        <h3 className="text-lg font-bold text-[#2d2a26] mb-4">Total Reports per Month</h3>
+                      <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                        <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Total Reports per Month</h3>
                         <BarChart
                           data={totalReportsChartData}
                           height={250}
@@ -324,8 +324,8 @@ export default function ResearcherAnalyticsPage() {
                       </div>
 
                       {/* Valid Reports Chart */}
-                      <div className="rounded-2xl bg-[#faf6f1] p-6">
-                        <h3 className="text-lg font-bold text-[#2d2a26] mb-4">Valid Reports per Month</h3>
+                      <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                        <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Valid Reports per Month</h3>
                         <BarChart
                           data={validReportsChartData}
                           height={250}
@@ -334,8 +334,8 @@ export default function ResearcherAnalyticsPage() {
                       </div>
 
                       {/* Earnings Chart */}
-                      <div className="rounded-2xl bg-[#faf6f1] p-6">
-                        <h3 className="text-lg font-bold text-[#2d2a26] mb-4">Earnings per Month (ETB)</h3>
+                      <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                        <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Earnings per Month (ETB)</h3>
                         <BarChart
                           data={earningsChartData}
                           height={250}
@@ -346,16 +346,16 @@ export default function ResearcherAnalyticsPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="rounded-2xl bg-[#faf6f1] p-6">
-                      <p className="text-sm text-[#6d6760]">No trend data available for this period.</p>
+                    <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                      <p className="text-sm text-[#6d6760] dark:text-gray-300">No trend data available for this period.</p>
                     </div>
                   )}
                 </div>
 
                 {/* Specialization Tab */}
                 <div data-tab="specialization" className="space-y-6">
-                  <div className="rounded-2xl bg-[#faf6f1] p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] mb-4">Your Specializations</h3>
+                  <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                    <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Your Specializations</h3>
                     {analyticsData.top_vulnerability_types.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {analyticsData.top_vulnerability_types.map((vuln) => {
@@ -364,35 +364,35 @@ export default function ResearcherAnalyticsPage() {
                             : '0';
                           
                           return (
-                            <div key={vuln.type} className="rounded-xl bg-white p-4 border border-[#e6ddd4]">
+                            <div key={vuln.type} className="rounded-xl bg-white dark:bg-gray-900 p-4 border border-[#e6ddd4] dark:border-gray-700">
                               <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-semibold text-[#2d2a26]">{vuln.type}</h4>
+                                <h4 className="font-semibold text-[#2d2a26] dark:text-gray-200">{vuln.type}</h4>
                                 <span className="text-sm font-bold text-[#ef2330]">{percentage}%</span>
                               </div>
-                              <div className="w-full bg-[#f3f0eb] rounded-full h-2">
+                              <div className="w-full bg-[#f3f0eb] dark:bg-gray-700 rounded-full h-2">
                                 <div 
                                   className="bg-[#ef2330] h-2 rounded-full transition-all duration-300"
                                   style={{ width: `${percentage}%` }}
                                 ></div>
                               </div>
-                              <p className="text-xs text-[#6d6760] mt-2">{vuln.count} reports submitted</p>
+                              <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-2">{vuln.count} reports submitted</p>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <p className="text-sm text-[#6d6760]">No specialization data available. Submit more reports to see your areas of expertise.</p>
+                      <p className="text-sm text-[#6d6760] dark:text-gray-300">No specialization data available. Submit more reports to see your areas of expertise.</p>
                     )}
                   </div>
                 </div>
               </Tabs>
             </div>
           ) : (
-            <div className="rounded-2xl bg-[#faf6f1] p-8 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
+            <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-8 text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">
                 No Analytics Data
               </p>
-              <p className="mt-2 text-sm text-[#6d6760]">
+              <p className="mt-2 text-sm text-[#6d6760] dark:text-gray-300">
                 Submit some reports to start seeing your performance analytics
               </p>
             </div>

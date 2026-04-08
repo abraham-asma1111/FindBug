@@ -95,7 +95,7 @@ export default function ProgramDetailPage() {
             eyebrowClassName="text-xl tracking-[0.18em]"
           >
             <div className="flex items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-gray-900 dark:border-slate-700 dark:border-t-slate-100"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-gray-900 dark:border-gray-700 dark:border-t-slate-100"></div>
             </div>
           </PortalShell>
         )}
@@ -165,7 +165,7 @@ export default function ProgramDetailPage() {
           </div>
 
           {/* Professional Tab Navigation */}
-          <div className="mb-8 border-b border-gray-200 dark:border-slate-700">
+          <div className="mb-8 border-b border-gray-200 dark:border-gray-700">
             <nav className="-mb-px flex space-x-8">
               {tabs.map((tab) => (
                 <button
@@ -244,7 +244,7 @@ export default function ProgramDetailPage() {
                 </section>
 
                 {/* Description */}
-                <section className="border-t border-gray-200 pt-8 dark:border-slate-700">
+                <section className="border-t border-gray-200 pt-8 dark:border-gray-700">
                   <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-slate-100">
                     Description
                   </h2>
@@ -257,7 +257,7 @@ export default function ProgramDetailPage() {
 
                 {/* Program Rules */}
                 {program.rules && (
-                  <section className="border-t border-gray-200 pt-8 dark:border-slate-700">
+                  <section className="border-t border-gray-200 pt-8 dark:border-gray-700">
                     <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-slate-100">
                       Program Rules
                     </h2>
@@ -292,7 +292,7 @@ export default function ProgramDetailPage() {
                     {scopes.map((scope: any) => (
                       <div
                         key={scope.id}
-                        className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+                        className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-white dark:bg-[#111111] p-6 dark:border-gray-700 dark:bg-[#111111]"
                       >
                         <div className="flex-1">
                           <p className="text-sm font-bold uppercase text-gray-900 dark:text-slate-100">{scope.asset_type}</p>
@@ -312,7 +312,7 @@ export default function ProgramDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-12 text-center dark:border-slate-700 dark:bg-slate-800">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-[#111111]">
                     <p className="text-sm text-gray-500 dark:text-slate-400">
                       {program.scope || 'No scope defined yet. Click "+ Add Scope" to add assets.'}
                     </p>
@@ -342,7 +342,7 @@ export default function ProgramDetailPage() {
                     {rewards.map((reward: any) => (
                       <div
                         key={reward.id}
-                        className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+                        className="flex items-center justify-between rounded-lg border border-gray-200 bg-white dark:bg-[#111111] p-6 dark:border-gray-700 dark:bg-[#111111]"
                       >
                         <div>
                           <p className="text-sm font-bold uppercase text-gray-900 dark:text-slate-100">
@@ -361,7 +361,7 @@ export default function ProgramDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-12 text-center dark:border-slate-700 dark:bg-slate-800">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-12 text-center dark:border-gray-700 dark:bg-[#111111]">
                     <p className="text-sm text-gray-500 dark:text-slate-400">
                       No reward tiers configured yet
                     </p>

@@ -15,7 +15,7 @@ interface SimpleTabsProps {
 
 export default function SimpleTabs({ tabs, activeTab, onChange, className = '' }: SimpleTabsProps) {
   return (
-    <div className={`border-b border-[#e6ddd4] dark:border-slate-700 ${className}`}>
+    <div className={`border-b border-[#e6ddd4] dark:border-gray-700 ${className}`}>
       <nav className="flex justify-center space-x-12">
         {tabs.map((tab) => (
           <button

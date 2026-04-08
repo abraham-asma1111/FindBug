@@ -203,7 +203,7 @@ function VerifyOTPPageFallback() {
     <>
       <Header />
       <div className="flex min-h-screen items-center justify-center bg-[#f5f1ec] pt-16">
-        <div className="rounded-3xl border border-[#ddd4cb] bg-white px-6 py-5 text-sm text-[#6d6760] shadow-sm">
+        <div className="rounded-3xl border border-[#ddd4cb] bg-white dark:bg-[#111111] px-6 py-5 text-sm text-[#6d6760] shadow-sm">
           Loading verification flow...
         </div>
       </div>

@@ -196,11 +196,11 @@ export default function ResearcherMessagesPage() {
           eyebrowText="Researcher Portal"
           eyebrowClassName="text-xl tracking-[0.18em]"
         >
-          <div className="flex h-[600px] rounded-2xl bg-[#faf6f1] border border-[#e6ddd4] overflow-hidden">
+          <div className="flex h-[600px] rounded-2xl bg-[#faf6f1] dark:bg-gray-800 border border-[#e6ddd4] dark:border-gray-700 overflow-hidden">
             {/* Conversations List */}
-            <div className="w-1/3 border-r border-[#e6ddd4] flex flex-col">
-              <div className="p-4 border-b border-[#e6ddd4] flex items-center justify-between">
-                <h3 className="font-semibold text-[#2d2a26]">Conversations</h3>
+            <div className="w-1/3 border-r border-[#e6ddd4] dark:border-gray-700 flex flex-col">
+              <div className="p-4 border-b border-[#e6ddd4] dark:border-gray-700 flex items-center justify-between">
+                <h3 className="font-semibold text-[#2d2a26] dark:text-gray-100">Conversations</h3>
                 <Button
                   onClick={() => setShowNewMessageModal(true)}
                   className="text-xs px-3 py-1"
@@ -216,8 +216,8 @@ export default function ResearcherMessagesPage() {
                   </div>
                 ) : conversations.length === 0 ? (
                   <div className="p-4 text-center">
-                    <p className="text-sm text-[#6d6760]">No conversations yet</p>
-                    <p className="text-xs text-[#8b8177] mt-1">
+                    <p className="text-sm text-[#6d6760] dark:text-gray-300">No conversations yet</p>
+                    <p className="text-xs text-[#8b8177] dark:text-gray-400 mt-1">
                       Messages will appear here when you communicate with organizations or staff
                     </p>
                   </div>
@@ -229,8 +229,8 @@ export default function ResearcherMessagesPage() {
                         onClick={() => handleConversationSelect(conversation.conversation_id)}
                         className={`w-full text-left p-3 rounded-xl transition-colors ${
                           selectedConversation === conversation.conversation_id
-                            ? 'bg-white border border-[#d8d0c8]'
-                            : 'hover:bg-[#f3f0eb]'
+                            ? 'bg-white dark:bg-gray-900 border border-[#d8d0c8] dark:border-gray-600'
+                            : 'hover:bg-[#f3f0eb] dark:hover:bg-gray-700'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -240,7 +240,7 @@ export default function ResearcherMessagesPage() {
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="text-sm font-medium text-[#2d2a26] truncate">
+                              <p className="text-sm font-medium text-[#2d2a26] dark:text-gray-200 truncate">
                                 {conversation.other_user?.email || 'Unknown User'}
                               </p>
                               {conversation.unread_count > 0 && (
@@ -258,10 +258,10 @@ export default function ResearcherMessagesPage() {
                             
                             {conversation.last_message && (
                               <div className="flex items-center justify-between">
-                                <p className="text-xs text-[#6d6760] truncate">
+                                <p className="text-xs text-[#6d6760] dark:text-gray-300 truncate">
                                   {conversation.last_message.text}
                                 </p>
-                                <span className="text-xs text-[#8b8177] ml-2">
+                                <span className="text-xs text-[#8b8177] dark:text-gray-400 ml-2">
                                   {formatTime(conversation.last_message.created_at)}
                                 </span>
                               </div>
@@ -280,14 +280,14 @@ export default function ResearcherMessagesPage() {
               {selectedConversation ? (
                 <>
                   {/* Thread Header */}
-                  <div className="p-4 border-b border-[#e6ddd4] bg-white">
+                  <div className="p-4 border-b border-[#e6ddd4] dark:border-gray-700 bg-white dark:bg-gray-900">
                     <div className="flex items-center gap-3">
                       <Avatar 
                         fallback={selectedConv?.other_user?.email || 'Unknown'} 
                         size="sm" 
                       />
                       <div>
-                        <p className="font-medium text-[#2d2a26]">
+                        <p className="font-medium text-[#2d2a26] dark:text-gray-200">
                           {selectedConv?.other_user?.email || 'Unknown User'}
                         </p>
                         {selectedConv?.other_user && (
@@ -307,8 +307,8 @@ export default function ResearcherMessagesPage() {
                       </div>
                     ) : messages.length === 0 ? (
                       <div className="text-center py-8">
-                        <p className="text-sm text-[#6d6760]">No messages yet</p>
-                        <p className="text-xs text-[#8b8177] mt-1">Start the conversation below</p>
+                        <p className="text-sm text-[#6d6760] dark:text-gray-300">No messages yet</p>
+                        <p className="text-xs text-[#8b8177] dark:text-gray-400 mt-1">Start the conversation below</p>
                       </div>
                     ) : (
                       messages.map((message) => {
@@ -323,7 +323,7 @@ export default function ResearcherMessagesPage() {
                                 className={`rounded-2xl px-4 py-2 ${
                                   isFromMe
                                     ? 'bg-[#ef2330] text-white'
-                                    : 'bg-white border border-[#e6ddd4] text-[#2d2a26]'
+                                    : 'bg-white dark:bg-gray-900 border border-[#e6ddd4] dark:border-gray-600 text-[#2d2a26] dark:text-gray-200'
                                 }`}
                               >
                                 <p className="text-sm whitespace-pre-wrap">{message.message_text}</p>
@@ -331,7 +331,7 @@ export default function ResearcherMessagesPage() {
                                   <p className="text-xs opacity-70 mt-1">(edited)</p>
                                 )}
                               </div>
-                              <div className={`flex items-center gap-2 mt-1 text-xs text-[#8b8177] ${isFromMe ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`flex items-center gap-2 mt-1 text-xs text-[#8b8177] dark:text-gray-400 ${isFromMe ? 'justify-end' : 'justify-start'}`}>
                                 <span>{formatTime(message.created_at)}</span>
                                 {isFromMe && message.is_read && (
                                   <span>• Read</span>
@@ -345,7 +345,7 @@ export default function ResearcherMessagesPage() {
                   </div>
 
                   {/* Message Input */}
-                  <div className="p-4 border-t border-[#e6ddd4] bg-white">
+                  <div className="p-4 border-t border-[#e6ddd4] dark:border-gray-700 bg-white dark:bg-gray-900">
                     <div className="flex gap-3">
                       <Textarea
                         value={newMessage}
@@ -368,7 +368,7 @@ export default function ResearcherMessagesPage() {
                         {sendMessageMutation.isLoading ? <Spinner size="sm" /> : 'Send'}
                       </Button>
                     </div>
-                    <p className="text-xs text-[#8b8177] mt-2">
+                    <p className="text-xs text-[#8b8177] dark:text-gray-400 mt-2">
                       Press Enter to send, Shift+Enter for new line
                     </p>
                   </div>
@@ -401,7 +401,7 @@ export default function ResearcherMessagesPage() {
                 {!selectedUser ? (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-[#2d2a26] mb-1">
+                      <label className="block text-sm font-medium text-[#2d2a26] dark:text-gray-200 mb-1">
                         Search for a user
                       </label>
                       <Input
@@ -410,32 +410,32 @@ export default function ResearcherMessagesPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Type email or name..."
                       />
-                      <p className="text-xs text-[#8b8177] mt-1">
+                      <p className="text-xs text-[#8b8177] dark:text-gray-400 mt-1">
                         Search for organizations, staff, or other researchers
                       </p>
                     </div>
 
                     {/* Search Results */}
                     {searchQuery.length >= 2 && (
-                      <div className="border border-[#e6ddd4] rounded-xl max-h-60 overflow-y-auto">
+                      <div className="border border-[#e6ddd4] dark:border-gray-700 rounded-xl max-h-60 overflow-y-auto">
                         {searchLoading ? (
                           <div className="flex justify-center items-center py-8">
                             <Spinner size="sm" />
                           </div>
                         ) : searchResults && searchResults.users.length > 0 ? (
-                          <div className="divide-y divide-[#e6ddd4]">
+                          <div className="divide-y divide-[#e6ddd4] dark:divide-gray-700">
                             {searchResults.users.map((user) => (
                               <button
                                 key={user.id}
                                 onClick={() => setSelectedUser(user)}
-                                className="w-full text-left p-3 hover:bg-[#f3f0eb] transition-colors flex items-center gap-3"
+                                className="w-full text-left p-3 hover:bg-[#f3f0eb] dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
                               >
                                 <Avatar fallback={user.email} size="sm" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-[#2d2a26] truncate">
+                                  <p className="text-sm font-medium text-[#2d2a26] dark:text-gray-200 truncate">
                                     {user.full_name || user.email}
                                   </p>
-                                  <p className="text-xs text-[#6d6760] truncate">{user.email}</p>
+                                  <p className="text-xs text-[#6d6760] dark:text-gray-300 truncate">{user.email}</p>
                                   <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${getRoleColor(user.role)}`}>
                                     {getRoleLabel(user.role)}
                                   </span>
@@ -444,7 +444,7 @@ export default function ResearcherMessagesPage() {
                             ))}
                           </div>
                         ) : (
-                          <div className="p-4 text-center text-sm text-[#6d6760]">
+                          <div className="p-4 text-center text-sm text-[#6d6760] dark:text-gray-300">
                             No users found
                           </div>
                         )}
@@ -453,13 +453,13 @@ export default function ResearcherMessagesPage() {
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-3 p-3 bg-[#f3f0eb] rounded-xl">
+                    <div className="flex items-center gap-3 p-3 bg-[#f3f0eb] dark:bg-gray-700 rounded-xl">
                       <Avatar fallback={selectedUser.email} size="sm" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-[#2d2a26]">
+                        <p className="text-sm font-medium text-[#2d2a26] dark:text-gray-200">
                           {selectedUser.full_name || selectedUser.email}
                         </p>
-                        <p className="text-xs text-[#6d6760]">{selectedUser.email}</p>
+                        <p className="text-xs text-[#6d6760] dark:text-gray-300">{selectedUser.email}</p>
                       </div>
                       <button
                         onClick={() => setSelectedUser(null)}
@@ -470,7 +470,7 @@ export default function ResearcherMessagesPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-[#2d2a26] mb-1">
+                      <label className="block text-sm font-medium text-[#2d2a26] dark:text-gray-200 mb-1">
                         Message
                       </label>
                       <Textarea

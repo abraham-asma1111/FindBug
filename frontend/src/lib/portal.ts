@@ -86,28 +86,11 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   if (role === 'organization') {
     return [
       { href: '/organization/dashboard', label: 'Dashboard' },
-      { 
-        href: '/organization/programs', 
-        label: 'Programs',
-        children: [
-          { href: '/organization/programs', label: 'Bug Bounty' },
-          { href: '/organization/programs/ai-red-teaming', label: 'AI Red Teaming' },
-          { href: '/organization/programs/ptaas', label: 'PTaaS' },
-          { href: '/organization/programs/code-review', label: 'Code Review' },
-        ]
-      },
-      { 
-        href: '/organization/reports', 
-        label: 'Reports',
-        children: [
-          { href: '/organization/reports', label: 'Bug Bounty Reports' },
-          { href: '/organization/reports/ai-red-teaming', label: 'AI Red Teaming Reports' },
-          { href: '/organization/reports/ptaas', label: 'PTaaS Reports' },
-          { href: '/organization/reports/code-review', label: 'Code Review Reports' },
-        ]
-      },
+      { href: '/organization/programs', label: 'Programs' },
+      { href: '/organization/reports', label: 'Reports' },
+      { href: '/organization/ai-red-teaming', label: 'AI Red Teaming' },
+      { href: '/organization/researchers', label: 'Researchers' },
       { href: '/organization/analytics', label: 'Analytics' },
-      { href: '/organization/events', label: 'Events' },
       { href: '/organization/billing', label: 'Billing' },
       { href: '/organization/integrations', label: 'Integrations' },
       { href: '/organization/messages', label: 'Messages' },

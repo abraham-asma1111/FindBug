@@ -137,7 +137,7 @@ export default function SpecializedTracks({
                       {formatStatusLabel(opportunity.source)}
                     </span>
                     {opportunity.matchScore !== null && opportunity.matchScore !== undefined ? (
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#2d2a26]">
+                      <span className="rounded-full bg-white dark:bg-[#111111] px-3 py-1 text-xs font-semibold text-[#2d2a26]">
                         {Math.round(opportunity.matchScore * 100)}% fit
                       </span>
                     ) : null}

@@ -148,7 +148,7 @@ export default function ResearcherSettingsPage() {
                   type="text"
                   value={form.fullName}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                 />
               </div>
 
@@ -162,7 +162,7 @@ export default function ResearcherSettingsPage() {
                   rows={5}
                   value={form.bio}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                   placeholder="Share the domains and testing areas you are strongest in."
                 />
               </div>
@@ -178,7 +178,7 @@ export default function ResearcherSettingsPage() {
                     type="url"
                     value={form.website}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                   />
                 </div>
 
@@ -192,7 +192,7 @@ export default function ResearcherSettingsPage() {
                     type="text"
                     value={form.github}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                   />
                 </div>
               </div>
@@ -207,7 +207,7 @@ export default function ResearcherSettingsPage() {
                   type="text"
                   value={form.twitter}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                 />
               </div>
 

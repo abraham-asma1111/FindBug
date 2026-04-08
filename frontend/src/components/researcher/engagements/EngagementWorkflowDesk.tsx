@@ -240,7 +240,7 @@ export default function EngagementWorkflowDesk({
 
             <div className="grid gap-3 sm:grid-cols-2">
               {item.metrics.map((metric) => (
-                <div key={`${item.key}-${metric.label}`} className="rounded-2xl border border-[#e6ddd4] bg-white px-4 py-3">
+                <div key={`${item.key}-${metric.label}`} className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">{metric.label}</p>
                   <p className="mt-2 text-sm font-semibold text-[#2d2a26]">{metric.value}</p>
                 </div>
@@ -275,7 +275,7 @@ export default function EngagementWorkflowDesk({
                   type="button"
                   onClick={() => onRespondProgramInvitation(item.entityId, false)}
                   disabled={pendingAction === `program-invitation-${item.entityId}`}
-                  className="rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-white dark:bg-[#111111] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Decline
                 </button>
@@ -286,7 +286,7 @@ export default function EngagementWorkflowDesk({
                   type="button"
                   onClick={() => onRespondMatchingInvitation(item.entityId, false)}
                   disabled={pendingAction === `matching-invitation-${item.entityId}`}
-                  className="rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-[#d8d0c8] px-4 py-2 text-xs font-semibold text-[#2d2a26] transition hover:border-[#c8bfb6] hover:bg-white dark:bg-[#111111] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Decline
                 </button>
@@ -305,7 +305,7 @@ export default function EngagementWorkflowDesk({
 
           <div className="space-y-5">
             {selectedProgramId ? (
-              <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-5">
+              <div className="rounded-[28px] border border-[#e6ddd4] bg-white dark:bg-[#111111] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Scope Coverage</p>
@@ -397,7 +397,7 @@ export default function EngagementWorkflowDesk({
               </div>
             ) : null}
 
-            <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-5">
+            <div className="rounded-[28px] border border-[#e6ddd4] bg-white dark:bg-[#111111] p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Workflow Path</p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {getWorkflowStages(item).map((stage) => (
@@ -416,7 +416,7 @@ export default function EngagementWorkflowDesk({
                 reportHref={item.reportHref}
               />
             ) : (
-              <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-5">
+              <div className="rounded-[28px] border border-[#e6ddd4] bg-white dark:bg-[#111111] p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Operational Note</p>
                 <p className="mt-3 text-sm leading-7 text-[#5b534c]">
                   {item.kind === 'live-event'

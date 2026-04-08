@@ -67,6 +67,7 @@ export default function OrganizationAnalyticsPage() {
         <PortalShell
           user={user}
           title="Analytics"
+          subtitle=""
           navItems={getPortalNavItems(user.role)}
           headerAlign="center"
           eyebrowText="Organization Portal"
@@ -185,7 +186,7 @@ export default function OrganizationAnalyticsPage() {
           {/* Distribution Charts */}
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             {/* Severity Distribution */}
-            <Card className="bg-white dark:bg-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-slate-700">
               <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">
                 Severity Distribution
               </h3>
@@ -215,7 +216,7 @@ export default function OrganizationAnalyticsPage() {
             </Card>
 
             {/* Status Distribution */}
-            <Card className="bg-white dark:bg-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-slate-700">
               <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">
                 Status Distribution
               </h3>
@@ -247,7 +248,7 @@ export default function OrganizationAnalyticsPage() {
 
           {/* Top Vulnerability Types */}
           <div className="mt-6">
-            <Card className="bg-white dark:bg-slate-700">
+            <Card className="bg-white dark:bg-[#111111] dark:bg-slate-700">
               <h3 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">
                 Top Vulnerability Types
               </h3>

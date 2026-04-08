@@ -33,7 +33,7 @@ export default function ReportsPage() {
                 className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
                   activeTab === 'my-reports'
                     ? 'bg-[#ef2330] text-white'
-                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                    : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300 hover:bg-[#eadfd3] dark:hover:bg-neutral-700'
                 }`}
               >
                 My Reports
@@ -43,7 +43,7 @@ export default function ReportsPage() {
                 className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
                   activeTab === 'submit-new'
                     ? 'bg-[#ef2330] text-white'
-                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                    : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300 hover:bg-[#eadfd3] dark:hover:bg-neutral-700'
                 }`}
               >
                 Submit New
@@ -53,7 +53,7 @@ export default function ReportsPage() {
                 className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
                   activeTab === 'drafts'
                     ? 'bg-[#ef2330] text-white'
-                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                    : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300 hover:bg-[#eadfd3] dark:hover:bg-neutral-700'
                 }`}
               >
                 Drafts
@@ -63,7 +63,7 @@ export default function ReportsPage() {
                 className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${
                   activeTab === 'templates'
                     ? 'bg-[#ef2330] text-white'
-                    : 'bg-[#f3ede6] text-[#5f5851] hover:bg-[#eadfd3]'
+                    : 'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300 hover:bg-[#eadfd3] dark:hover:bg-neutral-700'
                 }`}
               >
                 Templates

@@ -192,14 +192,14 @@ export default function ProgramDetailModal({
 
       {/* Metadata Grid */}
       <div className="grid grid-cols-2 gap-4">
-        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+        <Card className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
           <p className="text-xs text-[#8b8177] dark:text-slate-400 mb-1">Budget</p>
           <p className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100">
             {program.budget ? formatCurrency(program.budget) : 'Not set'}
           </p>
         </Card>
 
-        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+        <Card className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
           <p className="text-xs text-[#8b8177] dark:text-slate-400 mb-1">Created</p>
           <p className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100">
             {formatDateTime(program.created_at)}
@@ -211,7 +211,7 @@ export default function ProgramDetailModal({
       {program.rules && (
         <div>
           <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-2">Program Rules</h4>
-          <div className="rounded-xl bg-[#faf6f1] dark:bg-slate-800 border border-[#e6ddd4] dark:border-slate-700 p-4">
+          <div className="rounded-xl bg-[#faf6f1] dark:bg-[#111111] border border-[#e6ddd4] dark:border-gray-700 p-4">
             <p className="text-sm text-[#6d6760] dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
               {program.rules}
             </p>
@@ -237,7 +237,7 @@ export default function ProgramDetailModal({
       {scopes && scopes.length > 0 ? (
         <div className="space-y-3">
           {scopes.map((scope: any) => (
-            <Card key={scope.id} className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+            <Card key={scope.id} className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">{scope.asset_type}</p>
@@ -258,7 +258,7 @@ export default function ProgramDetailModal({
           ))}
         </div>
       ) : (
-        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+        <Card className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
           <p className="text-sm text-[#6d6760] dark:text-slate-300 text-center py-8">
             {program.scope || 'No scope defined yet. Click "+ Add Scope" to add assets.'}
           </p>
@@ -283,7 +283,7 @@ export default function ProgramDetailModal({
       {rewards && rewards.length > 0 ? (
         <div className="space-y-3">
           {rewards.map((reward: any) => (
-            <Card key={reward.id} className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+            <Card key={reward.id} className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 capitalize">
@@ -303,7 +303,7 @@ export default function ProgramDetailModal({
           ))}
         </div>
       ) : (
-        <Card className="bg-[#faf6f1] dark:bg-slate-800 dark:border-slate-700">
+        <Card className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
           <p className="text-sm text-[#6d6760] dark:text-slate-300 text-center py-8">
             No reward tiers configured yet
           </p>

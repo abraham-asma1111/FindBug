@@ -1139,25 +1139,25 @@ export default function ResearcherReportsWorkspace() {
                         </p>
 
                         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <div className="rounded-2xl bg-white p-4">
+                          <div className="rounded-2xl bg-white dark:bg-[#111111] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Submitted</p>
                             <p className="mt-2 text-sm font-semibold text-[#2d2a26]">
                               {formatDateTime(selectedReport.submitted_at)}
                             </p>
                           </div>
-                          <div className="rounded-2xl bg-white p-4">
+                          <div className="rounded-2xl bg-white dark:bg-[#111111] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Last Activity</p>
                             <p className="mt-2 text-sm font-semibold text-[#2d2a26]">
                               {formatDateTime(selectedReport.last_activity_at)}
                             </p>
                           </div>
-                          <div className="rounded-2xl bg-white p-4">
+                          <div className="rounded-2xl bg-white dark:bg-[#111111] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">CVSS</p>
                             <p className="mt-2 text-sm font-semibold text-[#2d2a26]">
                               {selectedReport.cvss_score ?? '-'}
                             </p>
                           </div>
-                          <div className="rounded-2xl bg-white p-4">
+                          <div className="rounded-2xl bg-white dark:bg-[#111111] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">Bounty</p>
                             <p className="mt-2 text-sm font-semibold text-[#2d2a26]">
                               {selectedReport.bounty_amount != null
@@ -1284,7 +1284,7 @@ export default function ResearcherReportsWorkspace() {
                                 <div className="space-y-3 border-t border-[#eee6de] pt-4">
                                   {(tracking?.status_history || []).length ? (
                                     tracking?.status_history.map((entry, index) => (
-                                      <div key={`${entry.to_status}-${entry.changed_at}-${index}`} className="rounded-2xl bg-white p-4">
+                                      <div key={`${entry.to_status}-${entry.changed_at}-${index}`} className="rounded-2xl bg-white dark:bg-[#111111] p-4">
                                         <div className="flex items-center justify-between gap-3">
                                           <p className="text-sm font-semibold text-[#2d2a26]">
                                             {formatStatusLabel(entry.from_status || 'new')} to {formatStatusLabel(entry.to_status)}
@@ -1328,7 +1328,7 @@ export default function ResearcherReportsWorkspace() {
                                       {formatStatusLabel(entry.type)}
                                     </span>
                                     {entry.author_role ? (
-                                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#6d6760]">
+                                      <span className="rounded-full bg-white dark:bg-[#111111] px-3 py-1 text-xs font-semibold text-[#6d6760]">
                                         {formatStatusLabel(entry.author_role)}
                                       </span>
                                     ) : null}
@@ -1386,7 +1386,7 @@ export default function ResearcherReportsWorkspace() {
                                       <span className="rounded-full bg-[#edf5fb] px-3 py-1 text-xs font-semibold text-[#2d78a8]">
                                         {formatStatusLabel(entry.author_role)}
                                       </span>
-                                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#6d6760]">
+                                      <span className="rounded-full bg-white dark:bg-[#111111] px-3 py-1 text-xs font-semibold text-[#6d6760]">
                                         {formatStatusLabel(entry.comment_type)}
                                       </span>
                                       {entry.edited ? (
@@ -1450,7 +1450,7 @@ export default function ResearcherReportsWorkspace() {
                                         </p>
                                         <p className="mt-1 text-sm text-[#6d6760]">{entry.file_type || 'Attachment'}</p>
                                         <div className="mt-3 flex flex-wrap gap-2">
-                                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#6d6760]">
+                                          <span className="rounded-full bg-white dark:bg-[#111111] px-3 py-1 text-xs font-semibold text-[#6d6760]">
                                             {formatFileSize(entry.file_size)}
                                           </span>
                                           <span

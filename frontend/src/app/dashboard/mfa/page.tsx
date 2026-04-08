@@ -86,7 +86,7 @@ function MFASetupContent() {
         <Header />
         <div className="min-h-screen bg-[#f5f1ec] pt-24">
           <div className="max-w-2xl mx-auto px-4 py-8">
-            <div className="rounded-[2rem] border border-[#ddd4cb] bg-white p-8 shadow-sm">
+            <div className="rounded-[2rem] border border-[#ddd4cb] bg-white dark:bg-[#111111] p-8 shadow-sm">
               <h1 className="mb-8 text-3xl font-bold text-[#2d2a26]">
                 Multi-Factor Authentication
               </h1>
@@ -164,7 +164,7 @@ function MFASetupContent() {
                           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
                             Manual setup key
                           </p>
-                          <code className="mt-2 block rounded-2xl border border-[#ddd4cb] bg-white px-4 py-3 text-sm text-[#2d2a26]">
+                          <code className="mt-2 block rounded-2xl border border-[#ddd4cb] bg-white dark:bg-[#111111] px-4 py-3 text-sm text-[#2d2a26]">
                             {setupSecret || 'Secret unavailable'}
                           </code>
                         </div>
@@ -172,7 +172,7 @@ function MFASetupContent() {
                           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177]">
                             Setup URI
                           </p>
-                          <code className="mt-2 block max-h-32 overflow-auto rounded-2xl border border-[#ddd4cb] bg-white px-4 py-3 text-sm text-[#2d2a26]">
+                          <code className="mt-2 block max-h-32 overflow-auto rounded-2xl border border-[#ddd4cb] bg-white dark:bg-[#111111] px-4 py-3 text-sm text-[#2d2a26]">
                             {setupUri || 'URI unavailable'}
                           </code>
                         </div>
@@ -187,7 +187,7 @@ function MFASetupContent() {
                         </p>
                         <div className="grid grid-cols-2 gap-2 font-mono text-sm">
                           {backupCodes.map((code, index) => (
-                            <div key={index} className="bg-white p-2 rounded border">
+                            <div key={index} className="bg-white dark:bg-[#111111] p-2 rounded border">
                               {code}
                             </div>
                           ))}

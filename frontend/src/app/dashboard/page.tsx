@@ -47,7 +47,7 @@ export default function DashboardPage() {
         </PortalShell>
       ) : (
         <div className="flex min-h-screen items-center justify-center bg-[#faf6f1]">
-          <div className="rounded-3xl border border-[#e6ddd4] bg-white px-6 py-5 text-sm text-[#6d6760] shadow-sm">
+          <div className="rounded-3xl border border-[#e6ddd4] bg-white dark:bg-[#111111] px-6 py-5 text-sm text-[#6d6760] shadow-sm">
             Loading...
           </div>
         </div>

@@ -36,7 +36,7 @@ export default function TriageDashboardPage() {
             </div>
           </section>
 
-          <div className="mt-6 rounded-2xl border border-[#e6ddd4] bg-white p-6 text-center">
+          <div className="mt-6 rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 text-center">
             <p className="text-sm text-[#6d6760]">
               Triage dashboard content coming soon
             </p>

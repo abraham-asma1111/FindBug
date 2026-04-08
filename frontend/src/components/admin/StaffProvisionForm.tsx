@@ -83,7 +83,7 @@ export default function StaffProvisionForm() {
             required
             value={formData.fullName}
             onChange={handleChange}
-            className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+            className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
             placeholder="Security Operations Lead"
           />
         </div>
@@ -99,7 +99,7 @@ export default function StaffProvisionForm() {
             required
             value={formData.email}
             onChange={handleChange}
-            className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+            className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
             placeholder="person@company.com"
           />
         </div>
@@ -117,7 +117,7 @@ export default function StaffProvisionForm() {
             required
             value={formData.department}
             onChange={handleChange}
-            className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+            className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
             placeholder="Security Operations"
           />
         </div>
@@ -131,7 +131,7 @@ export default function StaffProvisionForm() {
             name="role"
             value={formData.role}
             onChange={handleChange}
-            className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+            className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
           >
             {roleOptions.map((option) => (
               <option key={option.value} value={option.value}>

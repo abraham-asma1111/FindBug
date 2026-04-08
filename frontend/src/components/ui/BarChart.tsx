@@ -74,7 +74,7 @@ const BarChart = memo(function BarChart({
   if (data.length === 0) {
     return (
       <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <span className="text-sm text-[#8b8177]">No data available</span>
+        <span className="text-sm text-[#8b8177] dark:text-gray-400">No data available</span>
       </div>
     );
   }
@@ -86,18 +86,18 @@ const BarChart = memo(function BarChart({
     <div className={className}>
       <div className="relative" style={{ height }}>
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-[#8b8177] pr-2">
+        <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-[#8b8177] dark:text-gray-400 pr-2">
           {yAxisLabels.map((label, index) => (
             <span key={index} className="text-right">{valueFormatter(label)}</span>
           ))}
         </div>
 
         {/* Chart area */}
-        <div className="absolute left-12 right-0 top-0 bottom-12 border-l border-b border-[#e6ddd4]">
+        <div className="absolute left-12 right-0 top-0 bottom-12 border-l-2 border-b-2 border-[#e6ddd4] dark:border-gray-600">
           {/* Horizontal grid lines */}
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
             {yAxisLabels.map((_, index) => (
-              <div key={index} className="border-t border-[#f3f0eb]" />
+              <div key={index} className="border-t-2 border-[#f3f0eb] dark:border-gray-700" />
             ))}
           </div>
           
@@ -110,7 +110,7 @@ const BarChart = memo(function BarChart({
               >
                 {/* Value label on top of bar */}
                 {showValues && bar.value > 0 && (
-                  <div className="mb-1 text-xs font-semibold text-[#2d2a26]">
+                  <div className="mb-1 text-xs font-semibold text-[#2d2a26] dark:text-gray-200">
                     {valueFormatter(bar.value)}
                   </div>
                 )}
@@ -135,7 +135,7 @@ const BarChart = memo(function BarChart({
           {bars.map((bar, index) => (
             <div
               key={`${bar.label}-label-${index}`}
-              className="text-[10px] font-medium text-[#2d2a26] text-center leading-tight"
+              className="text-[10px] font-medium text-[#2d2a26] dark:text-gray-300 text-center leading-tight"
               style={{ 
                 width: `${barWidth - barGap}%`, 
                 minWidth: '30px',

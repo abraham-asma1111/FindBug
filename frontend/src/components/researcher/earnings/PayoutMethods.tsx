@@ -202,7 +202,7 @@ export default function PayoutMethods() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
                     {/* Icon */}
-                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-white flex items-center justify-center border border-[#e6ddd4] text-[#8b8177]">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-white dark:bg-[#111111] flex items-center justify-center border border-[#e6ddd4] text-[#8b8177]">
                       {getMethodIcon(method.method_type)}
                     </div>
 
@@ -297,7 +297,7 @@ export default function PayoutMethods() {
               <select
                 value={formData.method_type}
                 onChange={(e) => setFormData({ ...formData, method_type: e.target.value })}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none"
               >
                 <option value="bank_account">Bank Account</option>
                 <option value="mobile_money">Mobile Money</option>
@@ -315,7 +315,7 @@ export default function PayoutMethods() {
                 placeholder="Full name as on account"
                 value={formData.account_holder_name}
                 onChange={(e) => setFormData({ ...formData, account_holder_name: e.target.value })}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
               />
             </div>
 
@@ -330,7 +330,7 @@ export default function PayoutMethods() {
                   placeholder="e.g., Commercial Bank of Ethiopia"
                   value={formData.bank_name}
                   onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                  className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+                  className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
                 />
               </div>
             )}
@@ -351,7 +351,7 @@ export default function PayoutMethods() {
                 }
                 value={formData.account_number}
                 onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
-                className="w-full rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
+                className="w-full rounded-xl border border-[#d8d0c8] bg-white dark:bg-[#111111] px-4 py-2.5 text-sm text-[#2d2a26] placeholder:text-[#8b8177] focus:border-[#c8bfb6] focus:outline-none"
               />
             </div>
           </div>

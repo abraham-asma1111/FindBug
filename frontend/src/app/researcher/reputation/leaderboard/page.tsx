@@ -94,7 +94,7 @@ export default function ResearcherLeaderboardPage() {
     } else {
       return (
         <div className="flex items-center justify-center w-12 h-12">
-          <span className="text-base font-semibold text-[#6d6760]">{rank}th</span>
+          <span className="text-base font-semibold text-[#6d6760] dark:text-[#6d6760]">{rank}th</span>
         </div>
       );
     }
@@ -124,17 +124,17 @@ export default function ResearcherLeaderboardPage() {
 
           {/* Header with Period Selector */}
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-[#2d2a26]">LEADERBOARD</h2>
+            <h2 className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100" style={{marginLeft:'350px'}}>LEADERBOARD</h2>
             <div className="flex items-center gap-3">
-              <button className="p-2 rounded-full hover:bg-[#f5f5f5] transition">
-                <svg className="w-5 h-5 text-[#6d6760]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="p-2 rounded-full hover:bg-[#f5f5f5] dark:hover:bg-gray-800 transition">
+                <svg className="w-5 h-5 text-[#6d6760] dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
               <select
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-4 py-2 rounded-lg border border-[#e6ddd4] bg-white text-sm font-medium text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#2d2a26] focus:border-transparent"
+                className="px-4 py-2 rounded-lg border border-[#e6ddd4] bg-white dark:bg-[#111111] dark:border-gray-700 text-sm font-medium text-[#2d2a26] dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2d2a26] focus:border-transparent"
               >
                 <option value="2026 - Q2">2026 - Q2</option>
                 <option value="2026 - Q1">2026 - Q1</option>
@@ -142,8 +142,8 @@ export default function ResearcherLeaderboardPage() {
                 <option value="2025 - Q3">2025 - Q3</option>
                 <option value="All Time">All Time</option>
               </select>
-              <button className="p-2 rounded-full hover:bg-[#f5f5f5] transition">
-                <svg className="w-5 h-5 text-[#6d6760]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="p-2 rounded-full hover:bg-[#f5f5f5] dark:hover:bg-gray-800 transition">
+                <svg className="w-5 h-5 text-[#6d6760] dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
@@ -151,30 +151,30 @@ export default function ResearcherLeaderboardPage() {
           </div>
 
           {/* Leaderboard Table */}
-          <div className="rounded-2xl border border-[#e6ddd4] overflow-hidden bg-white shadow-sm">
+          <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-700 overflow-hidden bg-white dark:bg-white shadow-sm">
             {/* Table Header */}
-            <div className="grid grid-cols-[120px_1fr_120px] gap-4 px-6 py-4 bg-[#faf6f1] border-b border-[#e6ddd4]">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760]">RANK</div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760]">HUNTER</div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] text-right">POINTS</div>
+            <div className="grid grid-cols-[120px_1fr_120px] gap-4 px-6 py-4 bg-[#faf6f1] dark:bg-[#faf6f1] border-b border-[#e6ddd4] dark:border-[#e6ddd4]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-[#6d6760]">RANK</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-[#6d6760]">HUNTER</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-[#6d6760] text-right">POINTS</div>
             </div>
 
             {/* Table Body */}
             <div>
               {isLoading ? (
                 <div className="px-6 py-12 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2d2a26]"></div>
-                  <p className="mt-4 text-sm text-[#6d6760]">Loading leaderboard...</p>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2d2a26] dark:border-[#2d2a26]"></div>
+                  <p className="mt-4 text-sm text-[#6d6760] dark:text-[#6d6760]">Loading leaderboard...</p>
                 </div>
               ) : leaderboard.length === 0 ? (
                 <div className="px-6 py-12 text-center">
-                  <p className="text-sm text-[#6d6760]">No leaderboard data available.</p>
+                  <p className="text-sm text-[#6d6760] dark:text-[#6d6760]">No leaderboard data available.</p>
                 </div>
               ) : (
                 leaderboard.map((entry) => (
                   <div
                     key={entry.researcher_id}
-                    className={`grid grid-cols-[120px_1fr_120px] gap-4 px-6 py-4 border-b border-[#e6ddd4] last:border-b-0 transition hover:bg-[#fcfaf7] ${getRowBackground(entry.rank)}`}
+                    className={`grid grid-cols-[120px_1fr_120px] gap-4 px-6 py-4 border-b border-[#e6ddd4] dark:border-[#e6ddd4] last:border-b-0 transition hover:bg-[#fcfaf7] dark:hover:bg-[#fcfaf7] ${getRowBackground(entry.rank)}`}
                   >
                     {/* Rank Badge */}
                     <div className="flex items-center">
@@ -187,7 +187,7 @@ export default function ResearcherLeaderboardPage() {
                         {entry.username.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-[#2d2a26] hover:underline cursor-pointer">
+                        <span className="font-semibold text-[#2d2a26] dark:text-[#2d2a26] hover:underline cursor-pointer">
                           {entry.username}
                         </span>
                         <svg className="w-4 h-4 text-[#0ea5e9]" fill="currentColor" viewBox="0 0 20 20">
@@ -198,7 +198,7 @@ export default function ResearcherLeaderboardPage() {
 
                     {/* Points */}
                     <div className="flex items-center justify-end">
-                      <span className="text-xl font-bold text-[#2d2a26]">
+                      <span className="text-xl font-bold text-[#2d2a26] dark:text-[#2d2a26]">
                         {Math.round(entry.reputation_score)}
                       </span>
                     </div>
@@ -210,22 +210,22 @@ export default function ResearcherLeaderboardPage() {
 
           {/* Your Position Card */}
           {user.researcher && (
-            <div className="mt-6 rounded-2xl border-2 border-[#2d2a26] bg-[#fcfaf7] p-6">
+            <div className="mt-6 rounded-2xl border-2 border-[#2d2a26] dark:border-gray-600 bg-[#fcfaf7] dark:bg-gray-800 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2d2a26] to-[#6d6760] flex items-center justify-center text-white font-bold text-lg">
                     {user.email.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-wider text-[#8b8177]">Your Position</p>
-                    <p className="text-lg font-bold text-[#2d2a26]">
+                    <p className="text-sm font-semibold uppercase tracking-wider text-[#8b8177] dark:text-gray-400">Your Position</p>
+                    <p className="text-lg font-bold text-[#2d2a26] dark:text-gray-100">
                       {user.researcher.rank ? `#${user.researcher.rank}` : 'Unranked'}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold uppercase tracking-wider text-[#8b8177]">Your Points</p>
-                  <p className="text-2xl font-bold text-[#2d2a26]">
+                  <p className="text-sm font-semibold uppercase tracking-wider text-[#8b8177] dark:text-gray-400">Your Points</p>
+                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
                     {Math.round(user.researcher.reputation_score || 0)}
                   </p>
                 </div>

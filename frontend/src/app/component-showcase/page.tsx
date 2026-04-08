@@ -242,7 +242,7 @@ function ShowcaseContent() {
               This is an example modal dialog. It supports keyboard navigation (Escape to close),
               click outside to close, and has multiple size options.
             </p>
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-gray-800">
               <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
                 Cancel
               </Button>

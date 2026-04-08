@@ -131,18 +131,18 @@ export default function ResearcherProgramDetailPage() {
             ) : null}
 
             {isLoadingProgram ? (
-              <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
+              <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6">
                 <div className="flex items-center justify-center py-16">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#e6ddd4] border-t-[#2d2a26]"></div>
                 </div>
               </div>
             ) : !program ? (
-              <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 text-center">
+              <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 text-center">
                 <p className="text-sm text-[#8b8177]">Program not found</p>
               </div>
             ) : (
               <>
-                <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 space-y-6">
+                <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 space-y-6">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex-1 space-y-3">
                       <div className="flex flex-wrap gap-2">
@@ -221,7 +221,7 @@ export default function ResearcherProgramDetailPage() {
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-2">
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 space-y-4">
+                  <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h2 className="text-lg font-semibold text-[#2d2a26]">In-Scope Assets</h2>
@@ -260,7 +260,7 @@ export default function ResearcherProgramDetailPage() {
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 space-y-4">
+                  <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h2 className="text-lg font-semibold text-[#2d2a26]">Out-of-Scope Assets</h2>
@@ -301,7 +301,7 @@ export default function ResearcherProgramDetailPage() {
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 space-y-5">
+                  <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 space-y-5">
                     <h2 className="text-lg font-semibold text-[#2d2a26]">Program Policy</h2>
                     <div className="space-y-5">
                       <div>
@@ -325,7 +325,7 @@ export default function ResearcherProgramDetailPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 space-y-4">
+                  <div className="rounded-2xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-6 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <h2 className="text-lg font-semibold text-[#2d2a26]">Reward Tiers</h2>
                       <span className="rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-semibold text-[#5f5851]">

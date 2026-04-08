@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <>
       <Header variant="dark" />
-      <main className="min-h-screen bg-white pt-16">
+      <main className="min-h-screen bg-white dark:bg-[#111111] pt-16">
 
       <div className="max-w-7xl mx-auto px-4 py-20">
         <div className="text-center mb-20">
