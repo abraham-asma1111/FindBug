@@ -52,7 +52,7 @@ def create_engagement(
     
     Requires organization admin role
     """
-    if not current_user.organization_id:
+    if not current_user.organization:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User must belong to an organization"
@@ -69,7 +69,7 @@ def create_engagement(
         )
     
     engagement = service.create_engagement(
-        organization_id=current_user.organization_id,
+        organization_id=current_user.organization.id,
         name=data.name,
         target_ai_system=data.target_ai_system,
         model_type=model_type,
@@ -101,9 +101,9 @@ def list_engagements(
                 detail=f"Invalid status: {status_filter}"
             )
     
-    if current_user.organization_id:
+    if current_user.organization:
         engagements = service.list_engagements(
-            organization_id=current_user.organization_id,
+            organization_id=current_user.organization.id,
             status=status_enum
         )
     else:
@@ -131,8 +131,8 @@ def get_engagement(
         )
     
     # Check access
-    if current_user.organization_id:
-        if engagement.organization_id != current_user.organization_id:
+    if current_user.organization:
+        if engagement.organization_id != current_user.organization.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -158,7 +158,7 @@ def update_engagement_status(
             detail="Engagement not found"
         )
     
-    if engagement.organization_id != current_user.organization_id:
+    if not current_user.organization or engagement.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -192,7 +192,7 @@ def assign_experts(
             detail="Engagement not found"
         )
     
-    if engagement.organization_id != current_user.organization_id:
+    if not current_user.organization or engagement.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -233,7 +233,7 @@ def setup_testing_environment(
             detail="Engagement not found"
         )
     
-    if engagement.organization_id != current_user.organization_id:
+    if not current_user.organization or engagement.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -484,7 +484,7 @@ def generate_security_report(
             detail="Engagement not found"
         )
     
-    if engagement.organization_id != current_user.organization_id:
+    if not current_user.organization or engagement.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -517,3 +517,227 @@ def list_security_reports(
     reports = service.get_security_reports(engagement_id)
     
     return reports
+
+
+# ============================================
+# RESEARCHER INVITATIONS & ASSIGNED ENGAGEMENTS
+# ============================================
+
+@router.get("/my-invitations", response_model=List[dict])
+def get_my_invitations(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get AI Red Teaming invitations for current researcher"""
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not a researcher"
+        )
+    
+    # TODO: Implement invitation model and service
+    # For now, return empty list
+    return []
+
+
+@router.post("/invitations/{invitation_id}/respond", response_model=dict)
+def respond_to_invitation(
+    invitation_id: UUID,
+    accept: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Accept or decline AI Red Teaming invitation"""
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not a researcher"
+        )
+    
+    # TODO: Implement invitation response logic
+    return {"status": "accepted" if accept else "declined"}
+
+
+@router.get("/researcher/engagements", response_model=List[EngagementResponse])
+def list_researcher_engagements(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """List AI Red Teaming engagements assigned to current researcher"""
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not a researcher"
+        )
+    
+    service = AIRedTeamingService(db)
+    
+    # Get all active engagements where researcher is assigned
+    engagements = service.list_engagements(status=EngagementStatus.ACTIVE)
+    
+    # Filter by assigned researcher
+    researcher_id_str = str(current_user.researcher.id)
+    assigned_engagements = [
+        eng for eng in engagements
+        if eng.assigned_experts and researcher_id_str in eng.assigned_experts
+    ]
+    
+    return assigned_engagements
+
+
+@router.post("/engagements/{engagement_id}/match-researchers", response_model=List[dict])
+def match_researchers_for_engagement(
+    engagement_id: UUID,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    AI-powered researcher matching for AI Red Teaming engagement.
+    
+    Returns top researchers ranked by:
+    - AI/ML security expertise
+    - Reputation and past performance
+    - Specialization match with model type
+    - Availability
+    """
+    service = AIRedTeamingService(db)
+    engagement = service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    if not current_user.organization or engagement.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Get AI/ML security skills based on model type
+    model_type_skills = {
+        AIModelType.LLM: ['llm_security', 'prompt_injection', 'ai_safety', 'nlp'],
+        AIModelType.AI_AGENT: ['agent_security', 'ai_safety', 'autonomous_systems'],
+        AIModelType.ML_MODEL: ['ml_security', 'adversarial_ml', 'model_security'],
+        AIModelType.CHATBOT: ['chatbot_security', 'conversation_ai', 'prompt_injection'],
+        AIModelType.RECOMMENDATION_SYSTEM: ['recommendation_security', 'bias_detection'],
+        AIModelType.COMPUTER_VISION: ['cv_security', 'adversarial_images', 'model_security'],
+    }
+    
+    required_skills = model_type_skills.get(engagement.model_type, ['ai_security', 'ml_security'])
+    
+    # Get all researchers
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.matching import ResearcherProfile
+    
+    researchers = db.query(Researcher).join(
+        ResearcherProfile,
+        Researcher.id == ResearcherProfile.researcher_id,
+        isouter=True
+    ).filter(
+        Researcher.is_active == True
+    ).all()
+    
+    # Calculate match scores
+    recommendations = []
+    for researcher in researchers:
+        match_data = _calculate_ai_red_teaming_match_score(
+            db,
+            researcher,
+            engagement.model_type,
+            required_skills
+        )
+        
+        if match_data['match_score'] > 30:  # Minimum threshold
+            recommendations.append({
+                'researcher': {
+                    'id': str(researcher.id),
+                    'user': {
+                        'username': researcher.user.username,
+                        'email': researcher.user.email
+                    },
+                    'reputation_score': researcher.reputation_score,
+                    'total_reports': researcher.total_reports,
+                    'verified_reports': researcher.verified_reports
+                },
+                'match_score': match_data['match_score'],
+                'skill_score': match_data['skill_score'],
+                'reputation_score': match_data['reputation_score'],
+                'ai_expertise_score': match_data['ai_expertise_score'],
+                'reasons': match_data['reasons']
+            })
+    
+    # Sort by match score
+    recommendations.sort(key=lambda x: x['match_score'], reverse=True)
+    
+    return recommendations[:limit]
+
+
+def _calculate_ai_red_teaming_match_score(
+    db: Session,
+    researcher,
+    model_type: AIModelType,
+    required_skills: List[str]
+) -> dict:
+    """Calculate AI Red Teaming specific match score"""
+    from src.domain.models.matching import ResearcherSkill, SkillTag
+    
+    # 1. AI/ML Expertise Score (40%)
+    ai_skills = db.query(ResearcherSkill).join(SkillTag).filter(
+        ResearcherSkill.researcher_id == researcher.id,
+        SkillTag.name.in_(['ai_security', 'ml_security', 'llm_security', 'prompt_injection', 'adversarial_ml'])
+    ).all()
+    
+    ai_expertise_score = min(len(ai_skills) * 20, 100)
+    
+    # 2. Skill Match Score (30%)
+    researcher_skills = db.query(ResearcherSkill).join(SkillTag).filter(
+        ResearcherSkill.researcher_id == researcher.id,
+        SkillTag.name.in_(required_skills)
+    ).all()
+    
+    if required_skills:
+        skill_match_percentage = (len(researcher_skills) / len(required_skills)) * 100
+    else:
+        skill_match_percentage = 50
+    
+    skill_score = min(skill_match_percentage, 100)
+    
+    # 3. Reputation Score (20%)
+    reputation_score = min(researcher.reputation_score, 100)
+    
+    # 4. Past AI Red Teaming Performance (10%)
+    # TODO: Track AI Red Teaming specific reports
+    performance_score = 50  # Neutral for now
+    
+    # Calculate weighted match score
+    match_score = (
+        (ai_expertise_score * 0.40) +
+        (skill_score * 0.30) +
+        (reputation_score * 0.20) +
+        (performance_score * 0.10)
+    )
+    
+    # Generate reasons
+    reasons = []
+    if ai_expertise_score >= 60:
+        reasons.append(f"Strong AI/ML security expertise ({len(ai_skills)} relevant skills)")
+    if skill_score >= 70:
+        reasons.append(f"Excellent match for {model_type.value} testing")
+    if reputation_score >= 80:
+        reasons.append(f"High reputation score ({reputation_score})")
+    if researcher.verified_reports >= 10:
+        reasons.append(f"{researcher.verified_reports} verified findings")
+    
+    if not reasons:
+        reasons.append("Meets basic requirements for AI Red Teaming")
+    
+    return {
+        'match_score': round(match_score, 1),
+        'skill_score': round(skill_score, 1),
+        'reputation_score': round(reputation_score, 1),
+        'ai_expertise_score': round(ai_expertise_score, 1),
+        'reasons': reasons
+    }
