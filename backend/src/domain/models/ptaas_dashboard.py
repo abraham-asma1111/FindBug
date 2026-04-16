@@ -3,7 +3,9 @@ PTaaS Dashboard Models - FREQ-34
 Real-time progress tracking for PTaaS engagements
 """
 from datetime import datetime
+from uuid import uuid4
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from src.core.database import Base
 
@@ -12,8 +14,8 @@ class PTaaSTestingPhase(Base):
     """Testing Phase model - FREQ-34"""
     __tablename__ = "ptaas_testing_phases"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False)
     
     phase_name = Column(String(100), nullable=False)
     phase_order = Column(Integer, nullable=False)
@@ -26,7 +28,7 @@ class PTaaSTestingPhase(Base):
     completed_at = Column(DateTime)
     estimated_completion = Column(DateTime)
     
-    assigned_to = Column(Integer, ForeignKey("users.id"))
+    assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -40,9 +42,9 @@ class PTaaSChecklistItem(Base):
     """Methodology Checklist Item - FREQ-34"""
     __tablename__ = "ptaas_checklist_items"
 
-    id = Column(Integer, primary_key=True, index=True)
-    phase_id = Column(Integer, ForeignKey("ptaas_testing_phases.id"), nullable=False)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    phase_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_testing_phases.id"), nullable=False)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False)
     
     item_name = Column(String(255), nullable=False)
     description = Column(Text)
@@ -51,7 +53,7 @@ class PTaaSChecklistItem(Base):
     is_completed = Column(Boolean, default=False)
     is_required = Column(Boolean, default=True)
     
-    completed_by = Column(Integer, ForeignKey("users.id"))
+    completed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     completed_at = Column(DateTime)
     notes = Column(Text)
     
@@ -68,14 +70,14 @@ class PTaaSCollaborationUpdate(Base):
     """Collaboration Update - FREQ-34"""
     __tablename__ = "ptaas_collaboration_updates"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False)
     
     update_type = Column(String(50), nullable=False)  # MESSAGE, FINDING, PHASE_CHANGE, MILESTONE, QUESTION
     title = Column(String(255))
     content = Column(Text, nullable=False)
     
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Mentions and visibility
@@ -84,8 +86,8 @@ class PTaaSCollaborationUpdate(Base):
     priority = Column(String(20), default="NORMAL")  # LOW, NORMAL, HIGH, URGENT
     
     # Related entities
-    related_finding_id = Column(Integer, ForeignKey("ptaas_findings.id"))
-    related_phase_id = Column(Integer, ForeignKey("ptaas_testing_phases.id"))
+    related_finding_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_findings.id"))
+    related_phase_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_testing_phases.id"))
     
     # Attachments
     attachments = Column(JSON)  # List of file URLs
@@ -98,8 +100,8 @@ class PTaaSMilestone(Base):
     """Milestone tracking - FREQ-34"""
     __tablename__ = "ptaas_milestones"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False)
     
     milestone_name = Column(String(255), nullable=False)
     description = Column(Text)

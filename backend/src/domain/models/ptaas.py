@@ -3,8 +3,10 @@ PTaaS (Penetration Testing as a Service) Domain Models
 Implements FREQ-29, FREQ-30, FREQ-31
 """
 from sqlalchemy import Column, Integer, String, Text, DateTime, Numeric, Boolean, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import uuid
 
 from src.core.database import Base
 
@@ -13,8 +15,8 @@ class PTaaSEngagement(Base):
     """PTaaS engagement model"""
     __tablename__ = "ptaas_engagements"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
     
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -56,7 +58,7 @@ class PTaaSEngagement(Base):
     # Metadata
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Relationships
     findings = relationship("PTaaSFinding", back_populates="engagement", cascade="all, delete-orphan")
@@ -68,8 +70,8 @@ class PTaaSFinding(Base):
     """PTaaS finding model"""
     __tablename__ = "ptaas_findings"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
     
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
@@ -82,7 +84,7 @@ class PTaaSFinding(Base):
     references = Column(JSON, nullable=True)
     
     status = Column(String(50), nullable=True)
-    discovered_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    discovered_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     discovered_at = Column(DateTime, nullable=True)
     
     # Relationships
@@ -93,8 +95,8 @@ class PTaaSDeliverable(Base):
     """PTaaS deliverable model"""
     __tablename__ = "ptaas_deliverables"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
     
     deliverable_type = Column(String(100), nullable=False)
     title = Column(String(255), nullable=False)
@@ -104,11 +106,11 @@ class PTaaSDeliverable(Base):
     file_url = Column(String(500), nullable=True)
     version = Column(String(50), nullable=True)
     
-    submitted_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    submitted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     submitted_at = Column(DateTime, nullable=True)
     
     approved = Column(Boolean, nullable=True)
-    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     
     # Relationships
@@ -119,13 +121,13 @@ class PTaaSProgressUpdate(Base):
     """PTaaS progress update model"""
     __tablename__ = "ptaas_progress_updates"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
     
     update_text = Column(Text, nullable=False)
     progress_percentage = Column(Integer, nullable=True)
     
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, nullable=True, default=datetime.utcnow)
     
     # Relationships

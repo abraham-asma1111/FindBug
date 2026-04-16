@@ -3,6 +3,7 @@ PTaaS Dashboard Service - FREQ-34
 Real-time progress tracking and collaboration
 """
 from typing import List, Dict, Optional
+from uuid import UUID
 from sqlalchemy.orm import Session
 from datetime import datetime
 from src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding, PTaaSProgressUpdate
@@ -17,12 +18,13 @@ class PTaaSDashboardService:
     def __init__(self, db: Session):
         self.db = db
     
-    def get_engagement_dashboard(self, engagement_id: int) -> Dict:
+    def get_engagement_dashboard(self, engagement_id: UUID) -> Dict:
         """
-        Get comprehensive dashboard data for engagement - FREQ-34
+        Get comprehensive dashboard data for engagement - FREQ-34 + Step 7 Enhancement
         
         Returns:
         - Engagement overview
+        - KPI metrics (active researchers, findings by severity, asset coverage)
         - Testing phases with progress
         - Methodology checklists
         - Emerging findings
@@ -57,6 +59,7 @@ class PTaaSDashboardService:
             'high': len([f for f in findings if f.severity == 'High']),
             'medium': len([f for f in findings if f.severity == 'Medium']),
             'low': len([f for f in findings if f.severity == 'Low']),
+            'info': len([f for f in findings if f.severity == 'Info']),
             'recent': [
                 {
                     'id': f.id,
@@ -73,6 +76,47 @@ class PTaaSDashboardService:
             PTaaSCollaborationUpdate.engagement_id == engagement_id
         ).order_by(PTaaSCollaborationUpdate.created_at.desc()).limit(10).all()
         
+        # Calculate KPI metrics for Step 7
+        # Active researchers count
+        assigned_researchers = engagement.assigned_researchers or []
+        active_researchers_count = len(assigned_researchers)
+        
+        # Asset coverage calculation
+        in_scope_targets = []
+        if engagement.scope and isinstance(engagement.scope, dict):
+            in_scope_targets = engagement.scope.get('in_scope_targets', [])
+        
+        # Get unique assets tested (from findings)
+        tested_assets = set()
+        for finding in findings:
+            if finding.affected_asset:
+                tested_assets.add(finding.affected_asset)
+        
+        total_assets = len(in_scope_targets) if in_scope_targets else 0
+        tested_assets_count = len(tested_assets)
+        asset_coverage_percentage = (tested_assets_count / total_assets * 100) if total_assets > 0 else 0
+        
+        # KPI Metrics
+        kpi_metrics = {
+            'active_researchers': active_researchers_count,
+            'total_findings': len(findings),
+            'findings_by_severity': {
+                'critical': findings_summary['critical'],
+                'high': findings_summary['high'],
+                'medium': findings_summary['medium'],
+                'low': findings_summary['low'],
+                'info': findings_summary['info']
+            },
+            'asset_coverage': {
+                'in_scope_assets': in_scope_targets,
+                'tested_assets': list(tested_assets),
+                'tested': tested_assets_count,
+                'total': total_assets,
+                'percentage': round(asset_coverage_percentage, 2)
+            },
+            'overall_progress': round(overall_progress, 2)
+        }
+        
         return {
             'engagement': {
                 'id': engagement.id,
@@ -84,6 +128,7 @@ class PTaaSDashboardService:
                 'duration_days': engagement.duration_days,
                 'overall_progress': round(overall_progress, 2)
             },
+            'kpi_metrics': kpi_metrics,
             'phases': [
                 {
                     'id': p.id,
@@ -111,7 +156,7 @@ class PTaaSDashboardService:
             ],
             'team': {
                 'size': engagement.team_size,
-                'assigned_researchers': engagement.assigned_researchers or []
+                'assigned_researchers': assigned_researchers
             }
         }
     
@@ -124,7 +169,7 @@ class PTaaSDashboardService:
         self.db.refresh(phase)
         return phase
     
-    def update_phase_progress(self, phase_id: int, progress: int, status: Optional[str] = None) -> PTaaSTestingPhase:
+    def update_phase_progress(self, phase_id: UUID, progress: int, status: Optional[str] = None) -> PTaaSTestingPhase:
         """Update phase progress - FREQ-34"""
         phase = self.db.query(PTaaSTestingPhase).filter(PTaaSTestingPhase.id == phase_id).first()
         if phase:
@@ -147,7 +192,7 @@ class PTaaSDashboardService:
         self.db.refresh(item)
         return item
     
-    def complete_checklist_item(self, item_id: int, completed_by: int, notes: Optional[str] = None) -> PTaaSChecklistItem:
+    def complete_checklist_item(self, item_id: UUID, completed_by: UUID, notes: Optional[str] = None) -> PTaaSChecklistItem:
         """Mark checklist item as complete - FREQ-34"""
         item = self.db.query(PTaaSChecklistItem).filter(PTaaSChecklistItem.id == item_id).first()
         if item:
@@ -163,7 +208,7 @@ class PTaaSDashboardService:
             self._update_phase_progress_from_checklist(item.phase_id)
         return item
     
-    def _update_phase_progress_from_checklist(self, phase_id: int):
+    def _update_phase_progress_from_checklist(self, phase_id: UUID):
         """Auto-update phase progress based on checklist completion"""
         items = self.db.query(PTaaSChecklistItem).filter(
             PTaaSChecklistItem.phase_id == phase_id
@@ -174,7 +219,7 @@ class PTaaSDashboardService:
             progress = int((completed / len(items)) * 100)
             self.update_phase_progress(phase_id, progress)
     
-    def get_phase_checklist(self, phase_id: int) -> List[PTaaSChecklistItem]:
+    def get_phase_checklist(self, phase_id: UUID) -> List[PTaaSChecklistItem]:
         """Get checklist for phase - FREQ-34"""
         return self.db.query(PTaaSChecklistItem).filter(
             PTaaSChecklistItem.phase_id == phase_id
@@ -191,7 +236,7 @@ class PTaaSDashboardService:
     
     def get_collaboration_updates(
         self, 
-        engagement_id: int, 
+        engagement_id: UUID, 
         update_type: Optional[str] = None,
         limit: int = 50
     ) -> List[PTaaSCollaborationUpdate]:
@@ -208,7 +253,7 @@ class PTaaSDashboardService:
             PTaaSCollaborationUpdate.created_at.desc()
         ).limit(limit).all()
     
-    def pin_update(self, update_id: int) -> PTaaSCollaborationUpdate:
+    def pin_update(self, update_id: UUID) -> PTaaSCollaborationUpdate:
         """Pin collaboration update - FREQ-34"""
         update = self.db.query(PTaaSCollaborationUpdate).filter(
             PTaaSCollaborationUpdate.id == update_id
@@ -228,7 +273,7 @@ class PTaaSDashboardService:
         self.db.refresh(milestone)
         return milestone
     
-    def complete_milestone(self, milestone_id: int) -> PTaaSMilestone:
+    def complete_milestone(self, milestone_id: UUID) -> PTaaSMilestone:
         """Mark milestone as complete - FREQ-34"""
         milestone = self.db.query(PTaaSMilestone).filter(
             PTaaSMilestone.id == milestone_id
@@ -240,14 +285,14 @@ class PTaaSDashboardService:
             self.db.refresh(milestone)
         return milestone
     
-    def get_engagement_milestones(self, engagement_id: int) -> List[PTaaSMilestone]:
+    def get_engagement_milestones(self, engagement_id: UUID) -> List[PTaaSMilestone]:
         """Get milestones for engagement - FREQ-34"""
         return self.db.query(PTaaSMilestone).filter(
             PTaaSMilestone.engagement_id == engagement_id
         ).order_by(PTaaSMilestone.target_date).all()
     
     # Initialize engagement with default phases
-    def initialize_engagement_phases(self, engagement_id: int, methodology: str) -> List[PTaaSTestingPhase]:
+    def initialize_engagement_phases(self, engagement_id: UUID, methodology: str) -> List[PTaaSTestingPhase]:
         """Initialize testing phases based on methodology - FREQ-34"""
         phase_templates = {
             'OWASP': [

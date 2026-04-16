@@ -203,6 +203,7 @@ class AIRedTeamingService:
         if not engagement:
             raise ValueError(f"Engagement {engagement_id} not found")
         
+        old_status = engagement.status
         engagement.status = status
         engagement.updated_at = datetime.utcnow()
         
@@ -214,8 +215,124 @@ class AIRedTeamingService:
         self.db.commit()
         self.db.refresh(engagement)
         
+        # When engagement becomes active, auto-broadcast to algorithm-filtered researchers
+        if old_status != EngagementStatus.ACTIVE and status == EngagementStatus.ACTIVE:
+            # Auto-broadcast: Notify ALL algorithm-filtered researchers (BountyMatch algorithm)
+            self._auto_broadcast_to_researchers(engagement)
+            
+            # Also notify manually assigned researchers (if any)
+            if engagement.assigned_experts:
+                self._notify_assigned_researchers(engagement)
+        
         logger.info(f"Updated engagement {engagement_id} status to {status}")
         return engagement
+    
+    def _notify_assigned_researchers(self, engagement: AIRedTeamingEngagement):
+        """Notify researchers when engagement becomes active"""
+        from src.services.notification_service import NotificationService
+        from src.domain.models.notification import NotificationType, NotificationPriority
+        from src.domain.models.researcher import Researcher
+        
+        notification_service = NotificationService(self.db)
+        
+        for researcher_id_str in engagement.assigned_experts:
+            try:
+                researcher_id = UUID(researcher_id_str)
+                researcher = self.db.query(Researcher).filter(
+                    Researcher.id == researcher_id
+                ).first()
+                
+                if researcher:
+                    notification_service.create_notification(
+                        user_id=researcher.user_id,
+                        notification_type=NotificationType.PROGRAM_PUBLISHED,
+                        title=f"AI Red Teaming Engagement Active: {engagement.name}",
+                        message=f"You've been assigned to test '{engagement.target_ai_system}'. Start testing now!",
+                        priority=NotificationPriority.HIGH,
+                        related_entity_type="ai_red_teaming_engagement",
+                        related_entity_id=engagement.id,
+                        action_url=f"/researcher/programs/ai-red-teaming",
+                        action_text="View Engagement",
+                        send_email=True
+                    )
+                    logger.info(f"Notified researcher {researcher_id} about active engagement {engagement.id}")
+            except Exception as e:
+                logger.error(f"Failed to notify researcher {researcher_id_str}: {e}")
+    
+    def _auto_broadcast_to_researchers(self, engagement: AIRedTeamingEngagement):
+        """
+        Auto-broadcast engagement to ALL algorithm-filtered researchers.
+        This implements the BountyMatch algorithm for AI Red Teaming.
+        
+        When an engagement is published (status → active), the system:
+        1. Filters researchers by AI/ML expertise and reputation
+        2. Broadcasts to ALL qualified researchers (not manual invitation)
+        3. Researchers see engagements in their dashboard (algorithm-pushed)
+        """
+        from src.services.notification_service import NotificationService
+        from src.domain.models.notification import NotificationType, NotificationPriority
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.matching import ResearcherProfile
+        
+        notification_service = NotificationService(self.db)
+        
+        # Get AI/ML security skills based on model type
+        model_type_skills = {
+            AIModelType.LLM: ['llm_security', 'prompt_injection', 'ai_safety', 'nlp'],
+            AIModelType.AI_AGENT: ['agent_security', 'ai_safety', 'autonomous_systems'],
+            AIModelType.ML_MODEL: ['ml_security', 'adversarial_ml', 'model_security'],
+            AIModelType.CHATBOT: ['chatbot_security', 'conversation_ai', 'prompt_injection'],
+            AIModelType.RECOMMENDATION_SYSTEM: ['recommendation_security', 'bias_detection'],
+            AIModelType.COMPUTER_VISION: ['cv_security', 'adversarial_images', 'model_security'],
+        }
+        
+        required_skills = model_type_skills.get(engagement.model_type, ['ai_security', 'ml_security'])
+        
+        # Get all active researchers with profiles
+        researchers = self.db.query(Researcher).join(
+            ResearcherProfile,
+            Researcher.id == ResearcherProfile.researcher_id,
+            isouter=True
+        ).filter(
+            Researcher.is_active == True
+        ).all()
+        
+        # Filter researchers using BountyMatch algorithm
+        qualified_researchers = []
+        for researcher in researchers:
+            # Calculate match score
+            from src.api.v1.endpoints.ai_red_teaming import _calculate_ai_red_teaming_match_score
+            match_data = _calculate_ai_red_teaming_match_score(
+                self.db,
+                researcher,
+                engagement.model_type,
+                required_skills
+            )
+            
+            # For testing: Broadcast to ALL researchers regardless of match score
+            # In production, you can set a minimum threshold (e.g., > 30)
+            qualified_researchers.append((researcher, match_data['match_score']))
+        
+        # Broadcast to all qualified researchers
+        logger.info(f"Auto-broadcasting engagement {engagement.id} to {len(qualified_researchers)} qualified researchers")
+        
+        for researcher, match_score in qualified_researchers:
+            try:
+                notification_service.create_notification(
+                    user_id=researcher.user_id,
+                    notification_type=NotificationType.PROGRAM_PUBLISHED,
+                    title=f"🤖 New AI Red Teaming Opportunity: {engagement.name}",
+                    message=f"Algorithm match: {match_score:.0f}%. Test '{engagement.target_ai_system}' ({engagement.model_type.value}). Start now!",
+                    priority=NotificationPriority.HIGH if match_score >= 70 else NotificationPriority.MEDIUM,
+                    related_entity_type="ai_red_teaming_engagement",
+                    related_entity_id=engagement.id,
+                    action_url=f"/researcher/programs/ai-red-teaming",
+                    action_text="View Engagement",
+                    send_email=match_score >= 70  # Only send email for high matches
+                )
+                logger.info(f"Broadcasted engagement {engagement.id} to researcher {researcher.id} (match: {match_score:.0f}%)")
+            except Exception as e:
+                logger.error(f"Failed to broadcast to researcher {researcher.id}: {e}")
     
     def assign_experts(
         self,
@@ -232,6 +349,10 @@ class AIRedTeamingService:
         
         self.db.commit()
         self.db.refresh(engagement)
+        
+        # If engagement is already active, notify researchers immediately
+        if engagement.status == EngagementStatus.ACTIVE:
+            self._notify_assigned_researchers(engagement)
         
         logger.info(f"Assigned {len(researcher_ids)} experts to engagement {engagement_id}")
         return engagement

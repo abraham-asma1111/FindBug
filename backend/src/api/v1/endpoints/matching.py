@@ -1271,3 +1271,93 @@ def get_matching_dashboard(
             'total_assignments_this_month': last_month['overview']['total_assignments']
         }
     }
+
+
+# ============================================
+# ORGANIZATION RESEARCHER LISTING
+# ============================================
+
+@router.get("/organization/researchers")
+def get_researchers_for_organization(
+    search: Optional[str] = None,
+    min_reputation: Optional[int] = None,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all researchers for organization to browse and invite.
+    
+    This endpoint is used by the researcher management page.
+    Organizations can search, filter, and view all active researchers.
+    """
+    if current_user.role != "organization":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations can access this endpoint"
+        )
+    
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.user import User as UserModel
+    from src.domain.models.matching import ResearcherProfile
+    from sqlalchemy import func, or_
+    
+    # Query all active researchers
+    query = db.query(Researcher).join(
+        UserModel,
+        Researcher.user_id == UserModel.id
+    ).outerjoin(
+        ResearcherProfile,
+        Researcher.id == ResearcherProfile.researcher_id
+    ).filter(
+        Researcher.is_active == True
+    )
+    
+    # Apply search filter
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.filter(
+            func.lower(UserModel.email).like(search_term)
+        )
+    
+    # Apply reputation filter
+    if min_reputation:
+        query = query.filter(Researcher.reputation_score >= min_reputation)
+    
+    researchers = query.limit(limit).all()
+    
+    # Format response
+    result = []
+    for researcher in researchers:
+        profile_data = None
+        # Check if researcher has a profile (backref creates a single object, not a list)
+        if hasattr(researcher, 'profile') and researcher.profile:
+            profile = researcher.profile
+            profile_data = {
+                'experience_years': profile.experience_years if hasattr(profile, 'experience_years') else 0,
+                'skills': profile.skills if hasattr(profile, 'skills') and profile.skills else [],
+                'specializations': profile.specializations if hasattr(profile, 'specializations') and profile.specializations else [],
+                'bio': researcher.bio  # Bio is on Researcher model, not profile
+            }
+        else:
+            # If no profile, use researcher's own fields
+            profile_data = {
+                'experience_years': 0,
+                'skills': [],
+                'specializations': [],
+                'bio': researcher.bio
+            }
+        
+        result.append({
+            'id': str(researcher.id),
+            'user': {
+                'username': researcher.user.email.split('@')[0],  # Use email prefix as username
+                'email': researcher.user.email
+            },
+            'reputation_score': researcher.reputation_score,
+            'total_reports': researcher.total_reports,
+            'verified_reports': researcher.verified_reports,
+            'profile': profile_data
+        })
+    
+    return result

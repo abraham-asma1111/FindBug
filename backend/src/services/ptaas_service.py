@@ -3,6 +3,7 @@ PTaaS Service - Business Logic
 Implements FREQ-29, FREQ-30, FREQ-31
 """
 from typing import List, Optional, Dict, Any
+from uuid import UUID
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -21,9 +22,9 @@ class PTaaSService:
     
     def create_engagement(
         self, 
-        organization_id: int, 
+        organization_id: UUID, 
         engagement_data: dict, 
-        created_by: int
+        created_by: UUID
     ) -> PTaaSEngagement:
         """Create new PTaaS engagement - FREQ-29"""
         # Calculate duration
@@ -33,7 +34,7 @@ class PTaaSService:
         
         # Calculate pricing - FREQ-31
         base_price = Decimal(str(engagement_data.get('base_price', 0)))
-        commission_rate = Decimal(str(engagement_data.get('platform_commission_rate', 15.00)))
+        commission_rate = Decimal(str(engagement_data.get('platform_commission_rate', 30.00)))
         commission_amount = (base_price * commission_rate) / Decimal('100')
         total_price = base_price + commission_amount
         
@@ -71,28 +72,30 @@ class PTaaSService:
         
         # Audit log
         self.audit_service.log_action(
-            user_id=created_by,
-            action="CREATE_PTAAS_ENGAGEMENT",
-            resource_type="PTaaSEngagement",
-            resource_id=engagement.id,
-            details={"engagement_name": engagement.name}
+            action_type="CREATE_PTAAS_ENGAGEMENT",
+            action_category="ptaas",
+            target_type="PTaaSEngagement",
+            description=f"PTaaS engagement created: {engagement.name}",
+            actor_id=created_by,
+            target_id=engagement.id,
+            metadata={"engagement_name": engagement.name}
         )
         
         return engagement
     
-    def get_engagement(self, engagement_id: int) -> Optional[PTaaSEngagement]:
+    def get_engagement(self, engagement_id: UUID) -> Optional[PTaaSEngagement]:
         """Get engagement by ID"""
         return self.repository.get_engagement_by_id(engagement_id)
     
-    def get_organization_engagements(self, organization_id: int) -> List[PTaaSEngagement]:
+    def get_organization_engagements(self, organization_id: UUID) -> List[PTaaSEngagement]:
         """Get all engagements for an organization"""
         return self.repository.get_engagements_by_organization(organization_id)
     
     def update_engagement(
         self, 
-        engagement_id: int, 
+        engagement_id: UUID, 
         update_data: dict, 
-        updated_by: int
+        updated_by: UUID
     ) -> Optional[PTaaSEngagement]:
         """Update engagement - FREQ-30"""
         # Recalculate pricing if base_price or commission_rate changed
@@ -119,29 +122,68 @@ class PTaaSService:
         
         if updated_engagement:
             self.audit_service.log_action(
-                user_id=updated_by,
-                action="UPDATE_PTAAS_ENGAGEMENT",
-                resource_type="PTaaSEngagement",
-                resource_id=engagement_id,
-                details={"updated_fields": list(update_data.keys())}
+                action_type="UPDATE_PTAAS_ENGAGEMENT",
+                action_category="ptaas",
+                target_type="PTaaSEngagement",
+                description=f"PTaaS engagement updated",
+                actor_id=updated_by,
+                target_id=engagement_id,
+                metadata={"updated_fields": list(update_data.keys())}
             )
         
         return updated_engagement
     
     def assign_researchers(
         self, 
-        engagement_id: int, 
-        researcher_ids: List[int], 
-        assigned_by: int
+        engagement_id: UUID, 
+        researcher_ids: List[UUID], 
+        assigned_by: UUID
     ) -> Optional[PTaaSEngagement]:
-        """Assign researchers to engagement"""
+        """
+        Assign researchers to engagement
+        ADDS to existing team (not replacing)
+        """
+        # Get current engagement
+        engagement = self.repository.get_engagement_by_id(engagement_id)
+        if not engagement:
+            return None
+        
+        # Get existing researchers
+        existing_researchers = engagement.assigned_researchers or []
+        
+        # Convert new researcher IDs to strings
+        new_researcher_ids = [str(rid) for rid in researcher_ids]
+        
+        # Combine existing and new researchers (remove duplicates)
+        all_researchers = list(set(existing_researchers + new_researcher_ids))
+        
+        # Update with combined list
         update_data = {
-            'assigned_researchers': researcher_ids,
-            'team_size': len(researcher_ids)
+            'assigned_researchers': all_researchers,
+            'team_size': len(all_researchers)
         }
-        return self.update_engagement(engagement_id, update_data, assigned_by)
+        
+        updated_engagement = self.update_engagement(engagement_id, update_data, assigned_by)
+        
+        # Log the addition
+        if updated_engagement:
+            self.audit_service.log_action(
+                action_type="ASSIGN_PTAAS_RESEARCHERS",
+                action_category="ptaas",
+                target_type="PTaaSEngagement",
+                description=f"Researchers added to team: {len(new_researcher_ids)} new, {len(all_researchers)} total",
+                actor_id=assigned_by,
+                target_id=engagement_id,
+                metadata={
+                    "new_researchers": len(new_researcher_ids),
+                    "total_researchers": len(all_researchers),
+                    "researcher_ids": all_researchers
+                }
+            )
+        
+        return updated_engagement
     
-    def start_engagement(self, engagement_id: int, started_by: int) -> Optional[PTaaSEngagement]:
+    def start_engagement(self, engagement_id: UUID, started_by: UUID) -> Optional[PTaaSEngagement]:
         """Start an engagement"""
         return self.update_engagement(
             engagement_id, 
@@ -149,7 +191,7 @@ class PTaaSService:
             started_by
         )
     
-    def complete_engagement(self, engagement_id: int, completed_by: int) -> Optional[PTaaSEngagement]:
+    def complete_engagement(self, engagement_id: UUID, completed_by: UUID) -> Optional[PTaaSEngagement]:
         """Complete an engagement"""
         return self.update_engagement(
             engagement_id, 
@@ -161,7 +203,7 @@ class PTaaSService:
     def create_finding(
         self, 
         finding_data: dict, 
-        discovered_by: int
+        discovered_by: UUID
     ) -> PTaaSFinding:
         """Create a new finding with mandatory field validation - FREQ-35"""
         # Check if mandatory fields are complete
@@ -178,39 +220,43 @@ class PTaaSService:
         finding = self.repository.create_finding(finding_dict)
         
         self.audit_service.log_action(
-            user_id=discovered_by,
-            action="CREATE_PTAAS_FINDING",
-            resource_type="PTaaSFinding",
-            resource_id=finding.id,
-            details={
+            action_type="CREATE_PTAAS_FINDING",
+            action_category="ptaas",
+            target_type="PTaaSFinding",
+            description=f"PTaaS finding created: {finding.severity}",
+            actor_id=discovered_by,
+            target_id=finding.id,
+            metadata={
                 "severity": finding.severity,
-                "engagement_id": finding.engagement_id,
+                "engagement_id": str(finding.engagement_id),
                 "mandatory_complete": mandatory_complete
             }
         )
         
         return finding
     
-    def get_engagement_findings(self, engagement_id: int) -> List[PTaaSFinding]:
+    def get_engagement_findings(self, engagement_id: UUID) -> List[PTaaSFinding]:
         """Get all findings for an engagement"""
         return self.repository.get_findings_by_engagement(engagement_id)
     
     def update_finding(
         self, 
-        finding_id: int, 
+        finding_id: UUID, 
         update_data: dict, 
-        updated_by: int
+        updated_by: UUID
     ) -> Optional[PTaaSFinding]:
         """Update a finding"""
         finding = self.repository.update_finding(finding_id, update_data)
         
         if finding:
             self.audit_service.log_action(
-                user_id=updated_by,
-                action="UPDATE_PTAAS_FINDING",
-                resource_type="PTaaSFinding",
-                resource_id=finding_id,
-                details={"updated_fields": list(update_data.keys())}
+                action_type="UPDATE_PTAAS_FINDING",
+                action_category="ptaas",
+                target_type="PTaaSFinding",
+                description=f"PTaaS finding updated",
+                actor_id=updated_by,
+                target_id=finding_id,
+                metadata={"updated_fields": list(update_data.keys())}
             )
         
         return finding
@@ -219,41 +265,45 @@ class PTaaSService:
     def submit_deliverable(
         self, 
         deliverable_data: dict, 
-        submitted_by: int
+        submitted_by: UUID
     ) -> PTaaSDeliverable:
         """Submit a deliverable"""
         deliverable_dict = {**deliverable_data, 'submitted_by': submitted_by}
         deliverable = self.repository.create_deliverable(deliverable_dict)
         
         self.audit_service.log_action(
-            user_id=submitted_by,
-            action="SUBMIT_PTAAS_DELIVERABLE",
-            resource_type="PTaaSDeliverable",
-            resource_id=deliverable.id,
-            details={"type": deliverable.deliverable_type, "engagement_id": deliverable.engagement_id}
+            action_type="SUBMIT_PTAAS_DELIVERABLE",
+            action_category="ptaas",
+            target_type="PTaaSDeliverable",
+            description=f"PTaaS deliverable submitted: {deliverable.deliverable_type}",
+            actor_id=submitted_by,
+            target_id=deliverable.id,
+            metadata={"type": deliverable.deliverable_type, "engagement_id": str(deliverable.engagement_id)}
         )
         
         return deliverable
     
-    def get_engagement_deliverables(self, engagement_id: int) -> List[PTaaSDeliverable]:
+    def get_engagement_deliverables(self, engagement_id: UUID) -> List[PTaaSDeliverable]:
         """Get all deliverables for an engagement"""
         return self.repository.get_deliverables_by_engagement(engagement_id)
     
     def approve_deliverable(
         self, 
-        deliverable_id: int, 
-        approved_by: int
+        deliverable_id: UUID, 
+        approved_by: UUID
     ) -> Optional[PTaaSDeliverable]:
         """Approve a deliverable"""
         deliverable = self.repository.approve_deliverable(deliverable_id, approved_by)
         
         if deliverable:
             self.audit_service.log_action(
-                user_id=approved_by,
-                action="APPROVE_PTAAS_DELIVERABLE",
-                resource_type="PTaaSDeliverable",
-                resource_id=deliverable_id,
-                details={"engagement_id": deliverable.engagement_id}
+                action_type="APPROVE_PTAAS_DELIVERABLE",
+                action_category="ptaas",
+                target_type="PTaaSDeliverable",
+                description=f"PTaaS deliverable approved",
+                actor_id=approved_by,
+                target_id=deliverable_id,
+                metadata={"engagement_id": str(deliverable.engagement_id)}
             )
         
         return deliverable
@@ -262,13 +312,13 @@ class PTaaSService:
     def add_progress_update(
         self, 
         update_data: dict, 
-        created_by: int
+        created_by: UUID
     ) -> Any:
         """Add progress update"""
         update_dict = {**update_data, 'created_by': created_by}
         return self.repository.create_progress_update(update_dict)
     
-    def get_engagement_progress(self, engagement_id: int) -> List[Any]:
+    def get_engagement_progress(self, engagement_id: UUID) -> List[Any]:
         """Get progress updates for engagement"""
         return self.repository.get_progress_updates_by_engagement(engagement_id)
     
@@ -299,8 +349,8 @@ class PTaaSService:
     # Finding Validation - FREQ-35
     def validate_finding(
         self,
-        finding_id: int,
-        validated_by: int,
+        finding_id: UUID,
+        validated_by: UUID,
         validated: bool,
         retest_required: bool = False,
         retest_notes: Optional[str] = None
@@ -321,20 +371,22 @@ class PTaaSService:
         
         if finding:
             self.audit_service.log_action(
-                user_id=validated_by,
-                action="VALIDATE_PTAAS_FINDING",
-                resource_type="PTaaSFinding",
-                resource_id=finding_id,
-                details={
+                action_type="VALIDATE_PTAAS_FINDING",
+                action_category="ptaas",
+                target_type="PTaaSFinding",
+                description=f"PTaaS finding validated: {validated}",
+                actor_id=validated_by,
+                target_id=finding_id,
+                metadata={
                     "validated": validated,
                     "retest_required": retest_required,
-                    "engagement_id": finding.engagement_id
+                    "engagement_id": str(finding.engagement_id)
                 }
             )
         
         return finding
     
-    def get_finding(self, finding_id: int) -> Optional[PTaaSFinding]:
+    def get_finding(self, finding_id: UUID) -> Optional[PTaaSFinding]:
         """Get finding by ID"""
         return self.repository.get_finding_by_id(finding_id)
     

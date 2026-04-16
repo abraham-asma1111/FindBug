@@ -2,6 +2,7 @@
 PTaaS Repository
 """
 from typing import List, Optional
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from datetime import datetime
@@ -24,10 +25,10 @@ class PTaaSRepository:
         self.db.refresh(engagement)
         return engagement
     
-    def get_engagement_by_id(self, engagement_id: int) -> Optional[PTaaSEngagement]:
+    def get_engagement_by_id(self, engagement_id: UUID) -> Optional[PTaaSEngagement]:
         return self.db.query(PTaaSEngagement).filter(PTaaSEngagement.id == engagement_id).first()
     
-    def get_engagements_by_organization(self, organization_id: int) -> List[PTaaSEngagement]:
+    def get_engagements_by_organization(self, organization_id: UUID) -> List[PTaaSEngagement]:
         return self.db.query(PTaaSEngagement).filter(
             PTaaSEngagement.organization_id == organization_id
         ).all()
@@ -37,7 +38,7 @@ class PTaaSRepository:
             PTaaSEngagement.status.in_(["ACTIVE", "IN_PROGRESS"])
         ).all()
     
-    def update_engagement(self, engagement_id: int, update_data: dict) -> Optional[PTaaSEngagement]:
+    def update_engagement(self, engagement_id: UUID, update_data: dict) -> Optional[PTaaSEngagement]:
         engagement = self.get_engagement_by_id(engagement_id)
         if engagement:
             for key, value in update_data.items():
@@ -47,7 +48,7 @@ class PTaaSRepository:
             self.db.refresh(engagement)
         return engagement
     
-    def delete_engagement(self, engagement_id: int) -> bool:
+    def delete_engagement(self, engagement_id: UUID) -> bool:
         engagement = self.get_engagement_by_id(engagement_id)
         if engagement:
             self.db.delete(engagement)
@@ -63,15 +64,15 @@ class PTaaSRepository:
         self.db.refresh(finding)
         return finding
     
-    def get_findings_by_engagement(self, engagement_id: int) -> List[PTaaSFinding]:
+    def get_findings_by_engagement(self, engagement_id: UUID) -> List[PTaaSFinding]:
         return self.db.query(PTaaSFinding).filter(
             PTaaSFinding.engagement_id == engagement_id
         ).all()
     
-    def get_finding_by_id(self, finding_id: int) -> Optional[PTaaSFinding]:
+    def get_finding_by_id(self, finding_id: UUID) -> Optional[PTaaSFinding]:
         return self.db.query(PTaaSFinding).filter(PTaaSFinding.id == finding_id).first()
     
-    def update_finding(self, finding_id: int, update_data: dict) -> Optional[PTaaSFinding]:
+    def update_finding(self, finding_id: UUID, update_data: dict) -> Optional[PTaaSFinding]:
         finding = self.get_finding_by_id(finding_id)
         if finding:
             for key, value in update_data.items():
@@ -88,12 +89,12 @@ class PTaaSRepository:
         self.db.refresh(deliverable)
         return deliverable
     
-    def get_deliverables_by_engagement(self, engagement_id: int) -> List[PTaaSDeliverable]:
+    def get_deliverables_by_engagement(self, engagement_id: UUID) -> List[PTaaSDeliverable]:
         return self.db.query(PTaaSDeliverable).filter(
             PTaaSDeliverable.engagement_id == engagement_id
         ).all()
     
-    def approve_deliverable(self, deliverable_id: int, approved_by: int) -> Optional[PTaaSDeliverable]:
+    def approve_deliverable(self, deliverable_id: UUID, approved_by: UUID) -> Optional[PTaaSDeliverable]:
         deliverable = self.db.query(PTaaSDeliverable).filter(
             PTaaSDeliverable.id == deliverable_id
         ).first()
@@ -113,7 +114,7 @@ class PTaaSRepository:
         self.db.refresh(progress_update)
         return progress_update
     
-    def get_progress_updates_by_engagement(self, engagement_id: int) -> List[PTaaSProgressUpdate]:
+    def get_progress_updates_by_engagement(self, engagement_id: UUID) -> List[PTaaSProgressUpdate]:
         return self.db.query(PTaaSProgressUpdate).filter(
             PTaaSProgressUpdate.engagement_id == engagement_id
         ).order_by(PTaaSProgressUpdate.created_at.desc()).all()

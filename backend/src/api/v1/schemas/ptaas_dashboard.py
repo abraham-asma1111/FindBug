@@ -4,15 +4,16 @@ PTaaS Dashboard Schemas - FREQ-34
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 
 
 # Testing Phase Schemas
 class PTaaSTestingPhaseCreate(BaseModel):
-    engagement_id: int
+    engagement_id: UUID
     phase_name: str = Field(..., max_length=100)
     phase_order: int
     description: Optional[str] = None
-    assigned_to: Optional[int] = None
+    assigned_to: Optional[UUID] = None
     estimated_completion: Optional[datetime] = None
 
 
@@ -21,13 +22,13 @@ class PTaaSTestingPhaseUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
     progress_percentage: Optional[int] = Field(None, ge=0, le=100)
-    assigned_to: Optional[int] = None
+    assigned_to: Optional[UUID] = None
     estimated_completion: Optional[datetime] = None
 
 
 class PTaaSTestingPhaseResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     phase_name: str
     phase_order: int
     description: Optional[str]
@@ -36,7 +37,7 @@ class PTaaSTestingPhaseResponse(BaseModel):
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     estimated_completion: Optional[datetime]
-    assigned_to: Optional[int]
+    assigned_to: Optional[UUID]
     created_at: datetime
     updated_at: datetime
 
@@ -46,8 +47,8 @@ class PTaaSTestingPhaseResponse(BaseModel):
 
 # Checklist Item Schemas
 class PTaaSChecklistItemCreate(BaseModel):
-    phase_id: int
-    engagement_id: int
+    phase_id: UUID
+    engagement_id: UUID
     item_name: str = Field(..., max_length=255)
     description: Optional[str] = None
     category: Optional[str] = Field(None, max_length=100)
@@ -60,15 +61,15 @@ class PTaaSChecklistItemComplete(BaseModel):
 
 
 class PTaaSChecklistItemResponse(BaseModel):
-    id: int
-    phase_id: int
-    engagement_id: int
+    id: UUID
+    phase_id: UUID
+    engagement_id: UUID
     item_name: str
     description: Optional[str]
     category: Optional[str]
     is_completed: bool
     is_required: bool
-    completed_by: Optional[int]
+    completed_by: Optional[UUID]
     completed_at: Optional[datetime]
     notes: Optional[str]
     evidence_url: Optional[str]
@@ -81,30 +82,30 @@ class PTaaSChecklistItemResponse(BaseModel):
 
 # Collaboration Update Schemas
 class PTaaSCollaborationUpdateCreate(BaseModel):
-    engagement_id: int
+    engagement_id: UUID
     update_type: str = Field(..., max_length=50)
     title: Optional[str] = Field(None, max_length=255)
     content: str
-    mentioned_users: Optional[List[int]] = None
+    mentioned_users: Optional[List[UUID]] = None
     priority: str = Field(default="NORMAL", max_length=20)
-    related_finding_id: Optional[int] = None
-    related_phase_id: Optional[int] = None
+    related_finding_id: Optional[UUID] = None
+    related_phase_id: Optional[UUID] = None
     attachments: Optional[List[str]] = None
 
 
 class PTaaSCollaborationUpdateResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     update_type: str
     title: Optional[str]
     content: str
-    created_by: int
+    created_by: UUID
     created_at: datetime
-    mentioned_users: Optional[List[int]]
+    mentioned_users: Optional[List[UUID]]
     is_pinned: bool
     priority: str
-    related_finding_id: Optional[int]
-    related_phase_id: Optional[int]
+    related_finding_id: Optional[UUID]
+    related_phase_id: Optional[UUID]
     attachments: Optional[List[str]]
 
     class Config:
@@ -113,7 +114,7 @@ class PTaaSCollaborationUpdateResponse(BaseModel):
 
 # Milestone Schemas
 class PTaaSMilestoneCreate(BaseModel):
-    engagement_id: int
+    engagement_id: UUID
     milestone_name: str = Field(..., max_length=255)
     description: Optional[str] = None
     target_date: datetime
@@ -129,8 +130,8 @@ class PTaaSMilestoneUpdate(BaseModel):
 
 
 class PTaaSMilestoneResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     milestone_name: str
     description: Optional[str]
     target_date: datetime
@@ -147,6 +148,7 @@ class PTaaSMilestoneResponse(BaseModel):
 # Dashboard Response
 class PTaaSDashboardResponse(BaseModel):
     engagement: dict
+    kpi_metrics: Optional[dict] = None
     phases: List[dict]
     findings: dict
     collaboration: List[dict]

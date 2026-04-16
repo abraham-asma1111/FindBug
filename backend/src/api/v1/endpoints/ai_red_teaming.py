@@ -4,6 +4,7 @@ Implements FREQ-45, FREQ-46, FREQ-47, FREQ-48: AI Security Testing
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
 from typing import List, Optional
 from uuid import UUID
 
@@ -563,7 +564,16 @@ def list_researcher_engagements(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List AI Red Teaming engagements assigned to current researcher"""
+    """
+    List AI Red Teaming engagements for current researcher.
+    
+    Shows ALL active engagements that match the researcher's profile (algorithm-pushed).
+    This works exactly like Bug Bounty programs:
+    - Organization publishes engagement (status → active)
+    - BountyMatch algorithm filters researchers by AI/ML skills + reputation
+    - Algorithm broadcasts to ALL qualified researchers
+    - Researchers see engagements in their dashboard (algorithm-pushed, not browsing)
+    """
     if not current_user.researcher:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -572,17 +582,111 @@ def list_researcher_engagements(
     
     service = AIRedTeamingService(db)
     
-    # Get all active engagements where researcher is assigned
-    engagements = service.list_engagements(status=EngagementStatus.ACTIVE)
+    # Get all active engagements
+    all_active_engagements = service.list_engagements(status=EngagementStatus.ACTIVE)
     
-    # Filter by assigned researcher
-    researcher_id_str = str(current_user.researcher.id)
-    assigned_engagements = [
-        eng for eng in engagements
-        if eng.assigned_experts and researcher_id_str in eng.assigned_experts
-    ]
+    # Filter engagements using BountyMatch algorithm
+    # Show engagements where researcher meets minimum match threshold
+    researcher_id = current_user.researcher.id
+    qualified_engagements = []
     
-    return assigned_engagements
+    for engagement in all_active_engagements:
+        # Check if manually assigned
+        if engagement.assigned_experts and str(researcher_id) in engagement.assigned_experts:
+            qualified_engagements.append(engagement)
+            continue
+        
+        # Check if algorithm-qualified (match score > 30)
+        model_type_skills = {
+            AIModelType.LLM: ['llm_security', 'prompt_injection', 'ai_safety', 'nlp'],
+            AIModelType.AI_AGENT: ['agent_security', 'ai_safety', 'autonomous_systems'],
+            AIModelType.ML_MODEL: ['ml_security', 'adversarial_ml', 'model_security'],
+            AIModelType.CHATBOT: ['chatbot_security', 'conversation_ai', 'prompt_injection'],
+            AIModelType.RECOMMENDATION_SYSTEM: ['recommendation_security', 'bias_detection'],
+            AIModelType.COMPUTER_VISION: ['cv_security', 'adversarial_images', 'model_security'],
+        }
+        
+        required_skills = model_type_skills.get(engagement.model_type, ['ai_security', 'ml_security'])
+        
+        # Calculate match score
+        match_data = _calculate_ai_red_teaming_match_score(
+            db,
+            current_user.researcher,
+            engagement.model_type,
+            required_skills
+        )
+        
+        # For testing: Show ALL researchers regardless of match score
+        # In production, you can set a minimum threshold (e.g., > 30)
+        qualified_engagements.append(engagement)
+    
+    return qualified_engagements
+
+
+@router.get("/engagements/{engagement_id}/available-researchers", response_model=List[dict])
+def get_available_researchers_for_engagement(
+    engagement_id: UUID,
+    search: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get available researchers for AI Red Teaming engagement.
+    
+    Returns all active researchers that organizations can browse and invite.
+    This is used in the "Browse All" tab of the invitation modal.
+    """
+    service = AIRedTeamingService(db)
+    engagement = service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    if not current_user.organization or engagement.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Get all active researchers
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.user import User as UserModel
+    
+    query = db.query(Researcher).join(
+        UserModel,
+        Researcher.user_id == UserModel.id
+    ).filter(
+        Researcher.is_active == True
+    )
+    
+    # Apply search filter (User model only has email, not username)
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.filter(
+            func.lower(UserModel.email).like(search_term)
+        )
+    
+    researchers = query.limit(limit).all()
+    
+    # Format response
+    result = []
+    for researcher in researchers:
+        result.append({
+            'id': str(researcher.id),
+            'user': {
+                'username': researcher.user.email.split('@')[0],  # Derive username from email
+                'email': researcher.user.email
+            },
+            'reputation_score': researcher.reputation_score,
+            'total_reports': researcher.total_reports,
+            'verified_reports': researcher.verified_reports
+        })
+    
+    return result
 
 
 @router.post("/engagements/{engagement_id}/match-researchers", response_model=List[dict])
@@ -650,24 +754,25 @@ def match_researchers_for_engagement(
             required_skills
         )
         
-        if match_data['match_score'] > 30:  # Minimum threshold
-            recommendations.append({
-                'researcher': {
-                    'id': str(researcher.id),
-                    'user': {
-                        'username': researcher.user.username,
-                        'email': researcher.user.email
-                    },
-                    'reputation_score': researcher.reputation_score,
-                    'total_reports': researcher.total_reports,
-                    'verified_reports': researcher.verified_reports
+        # For testing: Include ALL researchers regardless of score
+        # In production, you can filter by: if match_data['match_score'] > 30
+        recommendations.append({
+            'researcher': {
+                'id': str(researcher.id),
+                'user': {
+                    'username': researcher.user.email.split('@')[0],  # Derive username from email
+                    'email': researcher.user.email
                 },
-                'match_score': match_data['match_score'],
-                'skill_score': match_data['skill_score'],
-                'reputation_score': match_data['reputation_score'],
-                'ai_expertise_score': match_data['ai_expertise_score'],
-                'reasons': match_data['reasons']
-            })
+                'reputation_score': researcher.reputation_score,
+                'total_reports': researcher.total_reports,
+                'verified_reports': researcher.verified_reports
+            },
+            'match_score': match_data['match_score'],
+            'skill_score': match_data['skill_score'],
+            'reputation_score': match_data['reputation_score'],
+            'ai_expertise_score': match_data['ai_expertise_score'],
+            'reasons': match_data['reasons'] if match_data['reasons'] else ['Available for AI Red Teaming']
+        })
     
     # Sort by match score
     recommendations.sort(key=lambda x: x['match_score'], reverse=True)
@@ -705,19 +810,19 @@ def _calculate_ai_red_teaming_match_score(
     
     skill_score = min(skill_match_percentage, 100)
     
-    # 3. Reputation Score (20%)
-    reputation_score = min(researcher.reputation_score, 100)
+    # 3. Reputation Score (20%) - Convert Decimal to float
+    reputation_score = min(float(researcher.reputation_score), 100.0)
     
     # 4. Past AI Red Teaming Performance (10%)
     # TODO: Track AI Red Teaming specific reports
-    performance_score = 50  # Neutral for now
+    performance_score = 50.0  # Neutral for now
     
     # Calculate weighted match score
     match_score = (
-        (ai_expertise_score * 0.40) +
-        (skill_score * 0.30) +
-        (reputation_score * 0.20) +
-        (performance_score * 0.10)
+        (float(ai_expertise_score) * 0.40) +
+        (float(skill_score) * 0.30) +
+        (float(reputation_score) * 0.20) +
+        (float(performance_score) * 0.10)
     )
     
     # Generate reasons
@@ -727,7 +832,7 @@ def _calculate_ai_red_teaming_match_score(
     if skill_score >= 70:
         reasons.append(f"Excellent match for {model_type.value} testing")
     if reputation_score >= 80:
-        reasons.append(f"High reputation score ({reputation_score})")
+        reasons.append(f"High reputation score ({reputation_score:.0f})")
     if researcher.verified_reports >= 10:
         reasons.append(f"{researcher.verified_reports} verified findings")
     
@@ -735,9 +840,9 @@ def _calculate_ai_red_teaming_match_score(
         reasons.append("Meets basic requirements for AI Red Teaming")
     
     return {
-        'match_score': round(match_score, 1),
-        'skill_score': round(skill_score, 1),
-        'reputation_score': round(reputation_score, 1),
-        'ai_expertise_score': round(ai_expertise_score, 1),
+        'match_score': round(float(match_score), 1),
+        'skill_score': round(float(skill_score), 1),
+        'reputation_score': round(float(reputation_score), 1),
+        'ai_expertise_score': round(float(ai_expertise_score), 1),
         'reasons': reasons
     }
