@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 
 export interface UseApiQueryOptions<T> {
+  endpoint: string;
+  queryKey?: string[];
   enabled?: boolean;
   refetchInterval?: number;
   onSuccess?: (data: T) => void;
@@ -21,10 +23,11 @@ export interface UseApiQueryResult<T> {
 }
 
 export function useApiQuery<T = any>(
-  endpoint: string,
-  options: UseApiQueryOptions<T> = {}
+  options: UseApiQueryOptions<T>
 ): UseApiQueryResult<T> {
   const {
+    endpoint,
+    queryKey = [],
     enabled = true,
     refetchInterval,
     onSuccess,

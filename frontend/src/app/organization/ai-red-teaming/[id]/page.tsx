@@ -10,7 +10,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Tabs from '@/components/ui/Tabs';
+import Tabs, { TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import Alert from '@/components/ui/Alert';
 import AIRedTeamingEnvironmentSetupModal from '@/components/organization/ai-red-teaming/AIRedTeamingEnvironmentSetupModal';
 import AIRedTeamingExpertInvitationModal from '@/components/organization/ai-red-teaming/AIRedTeamingExpertInvitationModal';
@@ -20,7 +20,6 @@ export default function AIRedTeamingEngagementDetailPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const engagementId = params.id as string;
-  const [activeTab, setActiveTab] = useState('overview');
   const [showEnvironmentModal, setShowEnvironmentModal] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
 
@@ -37,7 +36,7 @@ export default function AIRedTeamingEngagementDetailPage() {
   );
 
   // Fetch vulnerability reports
-  const { data: reports } = useApiQuery(
+  const { data: reports, isLoading: isLoadingReports, error: reportsError, refetch: refetchReports } = useApiQuery(
     `/ai-red-teaming/engagements/${engagementId}/reports`,
     { enabled: !!user && !!engagementId }
   );
@@ -79,14 +78,6 @@ export default function AIRedTeamingEngagementDetailPage() {
     recommendation_system: 'Recommendation System',
     computer_vision: 'Computer Vision',
   };
-
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'environment', label: 'Testing Environment' },
-    { id: 'experts', label: 'Assigned Experts' },
-    { id: 'reports', label: `Vulnerability Reports (${reports?.length || 0})` },
-    { id: 'security', label: 'Security Reports' },
-  ];
 
   if (isLoading) {
     return (
@@ -142,6 +133,16 @@ export default function AIRedTeamingEngagementDetailPage() {
         >
           {/* Header Section */}
           <div className="mb-6">
+            {engagement.status === 'draft' && (
+              <Alert variant="info" className="mb-4">
+                <strong>Auto-Broadcast Workflow:</strong> When you publish this engagement, the BountyMatch algorithm automatically filters researchers by AI/ML expertise and reputation, then broadcasts to ALL qualified researchers—just like bug bounty programs. You can also manually invite specific researchers before publishing.
+              </Alert>
+            )}
+            {engagement.status === 'active' && (
+              <Alert variant="success" className="mb-4">
+                <strong>Engagement Active:</strong> This engagement has been broadcasted to {engagement.assigned_experts?.length || 'algorithm-filtered'} researchers. Reports will appear in the Vulnerability Reports tab.
+              </Alert>
+            )}
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
@@ -179,13 +180,14 @@ export default function AIRedTeamingEngagementDetailPage() {
                       variant="secondary"
                       onClick={() => setShowInvitationModal(true)}
                     >
-                      Invite Experts
+                      Invite Experts (Optional)
                     </Button>
                     <Button
                       onClick={() => handleStatusChange('active')}
                       disabled={isUpdatingStatus}
+                      title="Publishes engagement and auto-broadcasts to algorithm-filtered researchers"
                     >
-                      Start Engagement
+                      Publish & Broadcast
                     </Button>
                   </>
                 )}
@@ -230,11 +232,17 @@ export default function AIRedTeamingEngagementDetailPage() {
           </div>
 
           {/* Tabs */}
-          <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+          <Tabs defaultTab="overview">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="environment">Testing Environment</TabsTrigger>
+              <TabsTrigger value="experts">Assigned Experts ({engagement.assigned_experts?.length || 0})</TabsTrigger>
+              <TabsTrigger value="reports">Vulnerability Reports ({reports?.length || 0})</TabsTrigger>
+              <TabsTrigger value="security">Security Reports</TabsTrigger>
+            </TabsList>
 
-          {/* Tab Content */}
-          <div className="mt-6">
-            {activeTab === 'overview' && (
+            {/* Overview Tab */}
+            <TabsContent value="overview">
               <div className="space-y-6">
                 <Card className="p-6">
                   <h3 className="text-lg font-bold text-[#2d2a26] dark:text-slate-100 mb-4">
@@ -327,9 +335,10 @@ export default function AIRedTeamingEngagementDetailPage() {
                   </Card>
                 )}
               </div>
-            )}
+            </TabsContent>
 
-            {activeTab === 'environment' && (
+            {/* Testing Environment Tab */}
+            <TabsContent value="environment">
               <Card className="p-6">
                 <h3 className="text-lg font-bold text-[#2d2a26] dark:text-slate-100 mb-4">
                   Testing Environment Configuration
@@ -372,9 +381,10 @@ export default function AIRedTeamingEngagementDetailPage() {
                   </div>
                 )}
               </Card>
-            )}
+            </TabsContent>
 
-            {activeTab === 'experts' && (
+            {/* Assigned Experts Tab */}
+            <TabsContent value="experts">
               <Card className="p-6">
                 <h3 className="text-lg font-bold text-[#2d2a26] dark:text-slate-100 mb-4">
                   Assigned AI Security Experts
@@ -403,45 +413,75 @@ export default function AIRedTeamingEngagementDetailPage() {
                   </div>
                 )}
               </Card>
-            )}
+            </TabsContent>
 
-            {activeTab === 'reports' && (
+            {/* Vulnerability Reports Tab */}
+            <TabsContent value="reports">
               <Card className="p-6">
-                <h3 className="text-lg font-bold text-[#2d2a26] dark:text-slate-100 mb-4">
-                  Vulnerability Reports
-                </h3>
-                {reports && reports.length > 0 ? (
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-[#2d2a26] dark:text-slate-100">
+                    Vulnerability Reports
+                  </h3>
+                  <Button
+                    variant="secondary"
+                    onClick={() => refetchReports()}
+                    disabled={isLoadingReports}
+                  >
+                    {isLoadingReports ? 'Loading...' : 'Refresh'}
+                  </Button>
+                </div>
+                
+                {isLoadingReports ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-6 w-6 animate-spin rounded-full border-3 border-[#e6ddd4] border-t-[#2d2a26]"></div>
+                  </div>
+                ) : reportsError ? (
+                  <Alert variant="error">
+                    Failed to load reports: {reportsError.message}
+                  </Alert>
+                ) : reports && reports.length > 0 ? (
                   <div className="space-y-3">
                     {reports.map((report: any) => (
-                      <div
+                      <button
                         key={report.id}
-                        className="p-4 rounded-lg border border-[#e6ddd4] dark:border-gray-700 hover:border-[#d8d0c8] transition-colors"
+                        onClick={() => router.push(`/organization/ai-red-teaming/reports/${report.id}`)}
+                        className="w-full p-4 rounded-lg border border-[#e6ddd4] dark:border-gray-700 hover:border-[#7d39c2] hover:bg-[#fcfaf7] dark:hover:bg-gray-800 transition-all text-left"
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-medium text-[#2d2a26] dark:text-slate-100">
                             {report.title}
                           </h4>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
-                              report.severity === 'critical'
-                                ? 'bg-[#fff2f1] text-[#9d1f1f]'
-                                : report.severity === 'high'
-                                  ? 'bg-[#fff5ed] text-[#d6561c]'
-                                  : report.severity === 'medium'
-                                    ? 'bg-[#faf1e1] text-[#9a6412]'
-                                    : 'bg-[#f3ede6] text-[#5f5851]'
-                            }`}
-                          >
-                            {report.severity}
-                          </span>
+                          <div className="flex gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
+                                report.severity === 'critical'
+                                  ? 'bg-[#fff2f1] text-[#9d1f1f]'
+                                  : report.severity === 'high'
+                                    ? 'bg-[#fff5ed] text-[#d6561c]'
+                                    : report.severity === 'medium'
+                                      ? 'bg-[#faf1e1] text-[#9a6412]'
+                                      : 'bg-[#f3ede6] text-[#5f5851]'
+                              }`}
+                            >
+                              {report.severity}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-[#eef5fb] px-2 py-1 text-xs font-semibold text-[#2d78a8]">
+                              {report.status}
+                            </span>
+                          </div>
                         </div>
                         <div className="text-sm text-[#6d6760] dark:text-slate-400 mb-2">
                           Attack Type: {report.attack_type.replace(/_/g, ' ')}
                         </div>
-                        <div className="text-xs text-[#8b8177] dark:text-slate-500">
-                          Submitted: {new Date(report.submitted_at).toLocaleDateString()}
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-[#8b8177] dark:text-slate-500">
+                            Submitted: {new Date(report.submitted_at).toLocaleDateString()}
+                          </div>
+                          <div className="text-xs text-[#7d39c2] font-semibold">
+                            View Details →
+                          </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : (
@@ -452,9 +492,10 @@ export default function AIRedTeamingEngagementDetailPage() {
                   </div>
                 )}
               </Card>
-            )}
+            </TabsContent>
 
-            {activeTab === 'security' && (
+            {/* Security Reports Tab */}
+            <TabsContent value="security">
               <Card className="p-6">
                 <h3 className="text-lg font-bold text-[#2d2a26] dark:text-slate-100 mb-4">
                   Security Summary Reports
@@ -501,8 +542,8 @@ export default function AIRedTeamingEngagementDetailPage() {
                   </div>
                 )}
               </Card>
-            )}
-          </div>
+            </TabsContent>
+          </Tabs>
 
           {/* Modals */}
           <AIRedTeamingEnvironmentSetupModal

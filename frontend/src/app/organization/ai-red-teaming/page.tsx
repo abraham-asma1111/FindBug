@@ -37,8 +37,8 @@ export default function OrganizationAIRedTeamingPage() {
           <div className="space-y-6">
             {/* Header with Create Button */}
             <div className="flex items-start justify-between">
-              <div className="flex-1 ml-12">
-                <h2 className="text-3xl font-bold text-[#2d2a26] dark:text-slate-100">
+              <div className="flex-1">
+                <h2 className="text-4xl font-extrabold text-[#2d2a26] dark:text-slate-100">
                   AI Red Teaming Engagements
                 </h2>
                 <p className="mt-3 text-sm text-[#6d6760] dark:text-slate-400">

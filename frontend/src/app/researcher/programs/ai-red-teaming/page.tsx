@@ -122,61 +122,68 @@ export default function ResearcherAIRedTeamingPage() {
           hideTitle={true}
           hideSubtitle={true}
         >
-          <div className="space-y-6">
-            {/* Hero Banner with Background Image */}
-            <div className="relative w-full overflow-hidden rounded-2xl h-[600px]">
-              {/* Background Image - Full Width */}
-              <img 
-                src="/images/ai-red-teaming-hero.png" 
-                alt="AI Red Teaming" 
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              
-              {/* Very light overlay for text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-              
-              {/* Content - Bottom Center */}
-              <div className="relative z-10 h-full flex items-end justify-center pb-12">
-                <div className="text-center px-8">
-                  <h1 className="text-7xl font-black text-white drop-shadow-2xl mb-4">
-                    AI RED TEAMING
-                  </h1>
-                  <h2 className="text-4xl font-bold text-white drop-shadow-2xl">
-                    AI security testing <span className="text-orange-400">for the future</span>
-                  </h2>
-                </div>
+          {/* Hero Banner with Background Image - No gap at top, minimal side gaps */}
+          <div className="relative w-full overflow-hidden h-[600px] -mt-6 -mx-4">
+            {/* Background Image - Full Width */}
+            <img 
+              src="/images/ai-red-teaming-hero.png" 
+              alt="AI Red Teaming" 
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            
+            {/* Very light overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+            
+            {/* Content - Bottom Center */}
+            <div className="relative z-10 h-full flex items-end justify-center pb-12">
+              <div className="text-center px-8">
+                <h1 className="text-7xl font-black text-white drop-shadow-2xl mb-4">
+                  AI RED TEAMING
+                </h1>
+                <h2 className="text-4xl font-bold text-white drop-shadow-2xl">
+                  AI security testing <span className="text-orange-400">for the future</span>
+                </h2>
               </div>
             </div>
+          </div>
 
-            {/* What Makes AI Red Teaming Different */}
-            <div className="rounded-2xl bg-white dark:bg-[#111111] dark:bg-[#111111] border border-slate-200 dark:border-gray-800 p-6">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">What Makes AI Red Teaming Different?</h3>
+          {/* What Makes AI Red Teaming Different - Blue-black background */}
+          <div className="relative bg-gradient-to-br from-[#0a0a1a] via-[#0f0f2a] to-[#0a0a1a] dark:bg-gradient-to-br dark:from-[#0a0a1a] dark:via-[#0f0f2a] dark:to-[#0a0a1a] py-16 px-6 -mx-4 overflow-hidden">
+            {/* Geometric Background Pattern */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -left-1/4 top-0 w-1/2 h-full bg-gradient-to-br from-[#1a1a2a] to-transparent transform -skew-x-12 opacity-60"></div>
+              <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-bl from-[#1a1a3a] to-transparent transform skew-x-6 opacity-40"></div>
+              <div className="absolute left-1/3 bottom-0 w-1/2 h-2/3 bg-gradient-to-tr from-[#0f0f1a] to-transparent transform -skew-y-12 opacity-50"></div>
+            </div>
+            
+            <div className="max-w-6xl mx-auto relative z-10">
+              <h3 className="text-3xl font-bold text-white dark:text-gray-100 mb-10 text-center">What Makes AI Red Teaming Different?</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {concepts.map((concept) => (
                   <button
                     key={concept.id}
                     onClick={() => setExpandedConcept(expandedConcept === concept.id ? null : concept.id)}
-                    className={`group rounded-xl bg-white dark:bg-[#111111] p-6 border-2 transition-all duration-300 hover:shadow-lg text-left ${
+                    className={`group bg-gradient-to-br from-orange-500 to-orange-600 p-6 transition-all duration-300 hover:shadow-lg text-left ${
                       expandedConcept === concept.id
-                        ? 'border-orange-500 dark:border-orange-500 ring-2 ring-orange-200 dark:ring-orange-900'
-                        : 'border-slate-200 dark:border-gray-700 hover:border-orange-500 dark:hover:border-orange-500'
+                        ? 'ring-2 ring-orange-300 shadow-xl'
+                        : 'hover:shadow-md'
                     }`}
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">{concept.title}</h4>
-                      <span className={`text-orange-500 transition-transform duration-300 ${expandedConcept === concept.id ? 'rotate-180' : ''}`}>
+                      <h4 className="text-lg font-bold text-white">{concept.title}</h4>
+                      <span className={`text-white transition-transform duration-300 ${expandedConcept === concept.id ? 'rotate-180' : ''}`}>
                         ▼
                       </span>
                     </div>
-                    <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+                    <p className="text-base text-white/90 leading-relaxed mb-3">
                       {concept.summary}
                     </p>
                     {expandedConcept === concept.id && (
-                      <div className="mt-4 pt-4 border-t border-slate-200 dark:border-gray-700 space-y-3">
+                      <div className="mt-4 pt-4 border-t border-white/20 space-y-3">
                         {concept.details.map((detail, idx) => (
                           <div key={idx} className="flex items-start gap-2">
-                            <span className="text-orange-500 mt-1">•</span>
-                            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <span className="text-white mt-1">•</span>
+                            <p className="text-sm text-white/80 leading-relaxed">
                               {detail}
                             </p>
                           </div>
@@ -187,25 +194,27 @@ export default function ResearcherAIRedTeamingPage() {
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Interactive Attack Types */}
-            <div className="rounded-2xl bg-white dark:bg-[#111111] dark:bg-[#111111] border border-slate-200 dark:border-gray-800 p-6">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4 text-center">Common Attack Types</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 text-center">
+          {/* Interactive Attack Types - Thick white section */}
+          <div className="bg-white dark:bg-white py-16 px-6 -mx-4">
+            <div className="max-w-6xl mx-auto">
+              <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-900 mb-4 text-center">Common Attack Types</h3>
+              <p className="text-lg text-slate-600 dark:text-slate-600 mb-10 text-center">
                 Click on an attack type to see example techniques
               </p>
               <div className="flex flex-col items-center gap-8">
                 {/* First Row - 3 cards */}
-                <div className="flex justify-center gap-8">
+                <div className="flex justify-center gap-8 flex-wrap">
                   {attackTypes.slice(0, 3).map((attack) => (
                     <button
                       key={attack.id}
                       onClick={() => setSelectedAttack(selectedAttack === attack.id ? null : attack.id)}
                       className={`
-                        rounded-xl p-6 text-left transition-all duration-300 transform hover:scale-105 w-80 min-h-[160px]
+                        p-6 text-left transition-all duration-300 w-80 min-h-[160px]
                         ${selectedAttack === attack.id 
-                          ? `ring-2 ${attack.borderColor} shadow-lg` 
-                          : 'hover:shadow-md'
+                          ? `ring-2 ${attack.borderColor} shadow-xl` 
+                          : 'hover:shadow-lg'
                         }
                         ${attack.color} text-white
                       `}
@@ -217,7 +226,7 @@ export default function ResearcherAIRedTeamingPage() {
                           <p className="text-sm font-bold mb-3 text-white">Example Techniques:</p>
                           <div className="space-y-2">
                             {attack.examples.map((example, idx) => (
-                              <div key={idx} className="text-sm px-3 py-2 bg-white/30 rounded-lg text-white font-semibold shadow-sm">
+                              <div key={idx} className="text-sm px-3 py-2 bg-white/30 text-white font-semibold">
                                 • {example}
                               </div>
                             ))}
@@ -229,16 +238,16 @@ export default function ResearcherAIRedTeamingPage() {
                 </div>
                 
                 {/* Second Row - 3 cards */}
-                <div className="flex justify-center gap-8">
+                <div className="flex justify-center gap-8 flex-wrap">
                   {attackTypes.slice(3, 6).map((attack) => (
                     <button
                       key={attack.id}
                       onClick={() => setSelectedAttack(selectedAttack === attack.id ? null : attack.id)}
                       className={`
-                        rounded-xl p-6 text-left transition-all duration-300 transform hover:scale-105 w-80 min-h-[160px]
+                        p-6 text-left transition-all duration-300 w-80 min-h-[160px]
                         ${selectedAttack === attack.id 
-                          ? `ring-2 ${attack.borderColor} shadow-lg` 
-                          : 'hover:shadow-md'
+                          ? `ring-2 ${attack.borderColor} shadow-xl` 
+                          : 'hover:shadow-lg'
                         }
                         ${attack.color} text-white
                       `}
@@ -250,7 +259,7 @@ export default function ResearcherAIRedTeamingPage() {
                           <p className="text-sm font-bold mb-3 text-white">Example Techniques:</p>
                           <div className="space-y-2">
                             {attack.examples.map((example, idx) => (
-                              <div key={idx} className="text-sm px-3 py-2 bg-white/30 rounded-lg text-white font-semibold shadow-sm">
+                              <div key={idx} className="text-sm px-3 py-2 bg-white/30 text-white font-semibold">
                                 • {example}
                               </div>
                             ))}
@@ -262,47 +271,81 @@ export default function ResearcherAIRedTeamingPage() {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* How to Get Invited */}
-            <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border border-orange-200 dark:border-orange-800 p-6">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">How to Get Invited</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* How to Get Invited - Blue-black background */}
+          <div className="relative bg-gradient-to-br from-[#0a0a1a] via-[#0f0f2a] to-[#0a0a1a] dark:bg-gradient-to-br dark:from-[#0a0a1a] dark:via-[#0f0f2a] dark:to-[#0a0a1a] py-16 px-6 -mx-4 overflow-hidden">
+            {/* Geometric Background Pattern */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -left-1/4 top-0 w-1/2 h-full bg-gradient-to-br from-[#1a1a2a] to-transparent transform -skew-x-12 opacity-60"></div>
+              <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-bl from-[#1a1a3a] to-transparent transform skew-x-6 opacity-40"></div>
+            </div>
+            
+            <div className="max-w-6xl mx-auto relative z-10">
+              <h3 className="text-3xl font-bold text-white dark:text-white mb-10 text-center">How to Get Invited</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[
                   { title: 'Build Your Reputation', desc: 'Demonstrate expertise in regular bug bounty programs. High-quality reports and good reputation increase your chances.' },
                   { title: 'Show AI/ML Knowledge', desc: 'Publish research, blog posts, or talks about AI security. Contribute to AI safety communities.' },
                   { title: 'Complete Profile', desc: 'Update your profile with relevant skills, certifications, and experience in AI/ML security testing.' },
                   { title: 'Wait for Invitation', desc: 'Organizations will invite you directly when they need AI security specialists. You\'ll receive a notification.' }
                 ].map((step, idx) => (
-                  <div key={idx} className="bg-white dark:bg-[#111111] dark:bg-[#111111] rounded-xl p-5 border border-slate-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700 transition-all duration-200 hover:shadow-md">
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100 mb-2 text-base">{step.title}</h4>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{step.desc}</p>
+                  <div key={idx} className="bg-gray-900 dark:bg-gray-900 p-6 hover:shadow-lg transition-all duration-200">
+                    <h4 className="font-bold text-white dark:text-white mb-2 text-lg">{step.title}</h4>
+                    <p className="text-base text-gray-300 dark:text-gray-300 leading-relaxed">{step.desc}</p>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Empty State */}
-            <EmptyState
-              icon="🔒"
-              title="No Active Invitations"
-              description="You don't have any AI Red Teaming invitations yet. Build your reputation and showcase your AI/ML security expertise to get invited!"
-            />
+          {/* Call to Action - Thick white section */}
+          <div className="bg-white dark:bg-white py-16 px-6 -mx-4">
+            <div className="max-w-6xl mx-auto">
+              <div className="max-w-2xl mx-auto text-center">
+                <div className="text-5xl mb-4">🤖</div>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-900 mb-4">
+                  Ready to Start AI Red Teaming?
+                </h3>
+                <p className="text-lg text-slate-600 dark:text-slate-600 mb-6 leading-relaxed">
+                  When organizations publish AI security engagements, the BountyMatch algorithm automatically filters by your AI/ML expertise and broadcasts to you. Check your workspace to see algorithm-matched opportunities!
+                </p>
+                <button
+                  onClick={() => window.location.href = '/researcher/programs/ai-red-teaming/workspace'}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  <span>View My AI Red Teaming Workspace</span>
+                  <span className="text-xl">→</span>
+                </button>
+                <p className="mt-4 text-base text-slate-500 dark:text-slate-500">
+                  Algorithm-matched engagements • Real-time notifications • Transcript-based workflow
+                </p>
+              </div>
+            </div>
+          </div>
 
-            {/* Required Skills */}
-            <div className="rounded-2xl bg-white dark:bg-[#111111] dark:bg-[#111111] border border-slate-200 dark:border-gray-800 p-6">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">Required Skills & Knowledge</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Required Skills - Blue-black background */}
+          <div className="relative bg-gradient-to-br from-[#0a0a1a] via-[#0f0f2a] to-[#0a0a1a] dark:bg-gradient-to-br dark:from-[#0a0a1a] dark:via-[#0f0f2a] dark:to-[#0a0a1a] py-16 px-6 -mx-4 overflow-hidden">
+            {/* Geometric Background Pattern */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -left-1/4 top-0 w-1/2 h-full bg-gradient-to-br from-[#1a1a2a] to-transparent transform -skew-x-12 opacity-60"></div>
+              <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-bl from-[#1a1a3a] to-transparent transform skew-x-6 opacity-40"></div>
+            </div>
+            
+            <div className="max-w-6xl mx-auto relative z-10">
+              <h3 className="text-3xl font-bold text-white dark:text-white mb-12 text-center">Required Skills & Knowledge</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500 text-white flex items-center justify-center text-xl">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-10 h-10 bg-orange-500 text-white flex items-center justify-center text-xl">
                       💻
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100">Technical Skills</h4>
+                    <h4 className="font-bold text-white dark:text-white text-xl">Technical Skills</h4>
                   </div>
-                  <ul className="space-y-2">
+                  <ul className="space-y-3">
                     {['LLM architecture understanding', 'Prompt engineering', 'NLP fundamentals', 'API testing', 'Python/scripting'].map((skill, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
-                        <span className="text-orange-500">•</span>
+                      <li key={idx} className="flex items-start gap-3 text-base text-gray-300 dark:text-gray-300">
+                        <span className="text-orange-500 text-lg">•</span>
                         <span>{skill}</span>
                       </li>
                     ))}
@@ -310,16 +353,16 @@ export default function ResearcherAIRedTeamingPage() {
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500 text-white flex items-center justify-center text-xl">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-10 h-10 bg-orange-500 text-white flex items-center justify-center text-xl">
                       🛡️
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100">Security Knowledge</h4>
+                    <h4 className="font-bold text-white dark:text-white text-xl">Security Knowledge</h4>
                   </div>
-                  <ul className="space-y-2">
+                  <ul className="space-y-3">
                     {['OWASP LLM Top 10', 'Adversarial ML', 'Model security', 'Data privacy', 'Threat modeling'].map((skill, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
-                        <span className="text-orange-500">•</span>
+                      <li key={idx} className="flex items-start gap-3 text-base text-gray-300 dark:text-gray-300">
+                        <span className="text-orange-500 text-lg">•</span>
                         <span>{skill}</span>
                       </li>
                     ))}
@@ -327,16 +370,16 @@ export default function ResearcherAIRedTeamingPage() {
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500 text-white flex items-center justify-center text-xl">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-10 h-10 bg-orange-500 text-white flex items-center justify-center text-xl">
                       🎯
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100">Soft Skills</h4>
+                    <h4 className="font-bold text-white dark:text-white text-xl">Soft Skills</h4>
                   </div>
-                  <ul className="space-y-2">
+                  <ul className="space-y-3">
                     {['Clear communication', 'Ethical testing', 'Detailed documentation', 'Creative thinking', 'Patience & persistence'].map((skill, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
-                        <span className="text-orange-500">•</span>
+                      <li key={idx} className="flex items-start gap-3 text-base text-gray-300 dark:text-gray-300">
+                        <span className="text-orange-500 text-lg">•</span>
                         <span>{skill}</span>
                       </li>
                     ))}

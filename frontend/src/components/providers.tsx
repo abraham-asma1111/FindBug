@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import { ToastProvider } from '@/components/ui/Toast';
 
 type AuthContextValue = ReturnType<typeof useAuthStore>;
 
@@ -24,5 +25,11 @@ export function useAuth() {
 }
 
 export default function Providers({ children }: { children: ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        {children}
+      </ToastProvider>
+    </AuthProvider>
+  );
 }

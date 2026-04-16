@@ -88,7 +88,16 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       { href: '/organization/dashboard', label: 'Dashboard' },
       { href: '/organization/programs', label: 'Programs' },
       { href: '/organization/reports', label: 'Reports' },
-      { href: '/organization/ai-red-teaming', label: 'AI Red Teaming' },
+      { 
+        href: '/organization/services', 
+        label: 'Services',
+        children: [
+          { href: '/organization/ai-red-teaming', label: 'AI Red Teaming' },
+          { href: '/organization/services/ptaas', label: 'PTaaS' },
+          { href: '/organization/services/code-review', label: 'Code Review' },
+          { href: '/organization/services/live-events', label: 'Live Events' },
+        ]
+      },
       { href: '/organization/researchers', label: 'Researchers' },
       { href: '/organization/analytics', label: 'Analytics' },
       { href: '/organization/billing', label: 'Billing' },

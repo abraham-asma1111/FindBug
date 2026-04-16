@@ -6,11 +6,43 @@ import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import EmptyState from '@/components/ui/EmptyState';
+import Button from '@/components/ui/Button';
+import ResearcherPTaaSEngagementList from '@/components/researcher/ptaas/ResearcherPTaaSEngagementList';
 
 
 export default function ResearcherPTaaSPage() {
   const user = useAuthStore((state) => state.user);
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
+  const [showEngagements, setShowEngagements] = useState(false);
+
+  // If user wants to see engagements, show the list
+  if (showEngagements) {
+    return (
+      <ProtectedRoute allowedRoles={['researcher']}>
+        {user ? (
+          <PortalShell
+            user={user}
+            title="Penetration Testing as a Service"
+            subtitle="Your assigned PTaaS engagements and testing workspace"
+            navItems={getPortalNavItems(user.role)}
+            headerAlign="left"
+            eyebrowText="Researcher Portal"
+            eyebrowClassName="text-xl tracking-[0.18em]"
+          >
+            <div className="space-y-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowEngagements(false)}
+              >
+                ← Back to PTaaS Information
+              </Button>
+              <ResearcherPTaaSEngagementList />
+            </div>
+          </PortalShell>
+        ) : null}
+      </ProtectedRoute>
+    );
+  }
 
   const features = [
     {
@@ -171,6 +203,16 @@ export default function ResearcherPTaaSPage() {
                   </h2>
                 </div>
               </div>
+            </div>
+
+            {/* Quick Access Button */}
+            <div className="flex justify-center">
+              <Button
+                onClick={() => setShowEngagements(true)}
+                className="px-8 py-4 text-lg"
+              >
+                🚀 View My PTaaS Engagements
+              </Button>
             </div>
 
             {/* What is PTaaS */}

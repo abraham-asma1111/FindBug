@@ -45,16 +45,29 @@ export default function AIRedTeamingExpertInvitationModal({
 }: AIRedTeamingExpertInvitationModalProps) {
   const [activeTab, setActiveTab] = useState<'recommended' | 'browse'>('recommended');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedResearchers, setSelectedResearchers] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [recommendations, setRecommendations] = useState<MatchRecommendation[]>([]);
 
-  // Fetch all researchers for browse tab
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch all researchers for browse tab with search
   const { data: researchers, isLoading } = useApiQuery<Researcher[]>(
-    '/researchers',
-    { enabled: isOpen && activeTab === 'browse' }
+    `/ai-red-teaming/engagements/${engagementId}/available-researchers${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ''}`,
+    { 
+      enabled: isOpen && activeTab === 'browse',
+      // Refetch when debounced search query changes
+      queryKey: ['available-researchers', engagementId, debouncedSearch]
+    }
   );
 
   // Fetch AI-powered recommendations
@@ -80,14 +93,8 @@ export default function AIRedTeamingExpertInvitationModal({
     }
   };
 
-  // Filter researchers based on search
-  const filteredResearchers = researchers?.filter((researcher) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      researcher.user.username.toLowerCase().includes(query) ||
-      researcher.user.email.toLowerCase().includes(query)
-    );
-  }) || [];
+  // Researchers are already filtered by search on the server
+  const filteredResearchers = researchers || [];
 
   const handleToggleResearcher = (researcherId: string) => {
     setSelectedResearchers((prev) =>
@@ -138,7 +145,7 @@ export default function AIRedTeamingExpertInvitationModal({
         {error && <Alert variant="error">{error}</Alert>}
 
         <Alert variant="info">
-          Our AI-powered matching algorithm recommends researchers based on AI/ML expertise, reputation, and past performance.
+          <strong>Hybrid Approach:</strong> When you publish this engagement (Start Engagement), the BountyMatch algorithm automatically broadcasts to ALL qualified researchers based on AI/ML expertise and reputation. You can also manually invite specific researchers from the filtered list below.
         </Alert>
 
         <Tabs tabs={tabs} activeTab={activeTab} onChange={(tab) => setActiveTab(tab as any)} />

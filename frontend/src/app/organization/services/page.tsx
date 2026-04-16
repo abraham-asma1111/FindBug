@@ -7,6 +7,10 @@ import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import SimpleTabs from '@/components/ui/SimpleTabs';
 import EmptyState from '@/components/ui/EmptyState';
+import PTaaSEngagementList from '@/components/organization/services/ptaas/PTaaSEngagementList';
+import CodeReviewEngagementList from '@/components/organization/services/code-review/CodeReviewEngagementList';
+import LiveEventsList from '@/components/organization/services/live-events/LiveEventsList';
+import AIRedTeamingEngagementList from '@/components/organization/services/ai-red-teaming/AIRedTeamingEngagementList';
 
 export default function OrganizationServicesPage() {
   const user = useAuthStore((state) => state.user);
@@ -31,37 +35,13 @@ export default function OrganizationServicesPage() {
           />
         );
       case 'ptaas':
-        return (
-          <EmptyState
-            title="Penetration Testing as a Service"
-            description="Comprehensive penetration testing engagements with structured methodologies (OWASP, PTES, NIST). Create engagements, assign researchers, and track findings."
-            action={undefined}
-          />
-        );
+        return <PTaaSEngagementList />;
       case 'ai-red-teaming':
-        return (
-          <EmptyState
-            title="AI Red Teaming"
-            description="Specialized AI security testing for LLMs and AI systems. Test for prompt injection, jailbreaking, data leakage, and model vulnerabilities."
-            action={undefined}
-          />
-        );
+        return <AIRedTeamingEngagementList />;
       case 'code-review':
-        return (
-          <EmptyState
-            title="Expert Code Review"
-            description="Professional security code reviews by expert researchers. Get detailed analysis of authentication, input validation, cryptography, and business logic."
-            action={undefined}
-          />
-        );
+        return <CodeReviewEngagementList />;
       case 'live-events':
-        return (
-          <EmptyState
-            title="Live Hacking Events"
-            description="Real-time competitive security events. Host live hacking competitions with instant validation, leaderboards, and immediate rewards."
-            action={undefined}
-          />
-        );
+        return <LiveEventsList />;
       default:
         return null;
     }

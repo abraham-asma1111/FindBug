@@ -1,13 +1,37 @@
-import { ReactNode } from 'react';
+import { ReactNode, ComponentType } from 'react';
+import Button from './Button';
 
 export interface EmptyStateProps {
   icon?: ReactNode;
   title: string;
   description?: string;
-  action?: ReactNode;
+  action?: ReactNode | {
+    label: string;
+    onClick: () => void;
+    icon?: ComponentType<{ className?: string }>;
+  };
 }
 
 export default function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+  // Handle action as either ReactNode or object
+  const renderAction = () => {
+    if (!action) return null;
+    
+    // If action is an object with label/onClick, render as Button
+    if (typeof action === 'object' && 'label' in action && 'onClick' in action) {
+      const ActionIcon = action.icon;
+      return (
+        <Button onClick={action.onClick}>
+          {ActionIcon && <ActionIcon className="h-4 w-4 mr-2" />}
+          {action.label}
+        </Button>
+      );
+    }
+    
+    // Otherwise render as ReactNode
+    return action;
+  };
+
   return (
     <div className="text-center py-12">
       {icon && (
@@ -25,7 +49,7 @@ export default function EmptyState({ icon, title, description, action }: EmptySt
       )}
       {action && (
         <div className="mt-6">
-          {action}
+          {renderAction()}
         </div>
       )}
     </div>

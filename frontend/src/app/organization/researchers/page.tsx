@@ -45,9 +45,9 @@ export default function ResearcherManagementPage() {
   const [minReputation, setMinReputation] = useState('0');
   const [specialization, setSpecialization] = useState('all');
 
-  // Fetch all researchers
-  const { data: researchers, isLoading } = useApiQuery<Researcher[]>(
-    '/researchers',
+  // Fetch all researchers - use organization-specific endpoint
+  const { data: researchers, isLoading, error } = useApiQuery<Researcher[]>(
+    '/matching/organization/researchers',
     { enabled: !!user }
   );
 
@@ -55,7 +55,6 @@ export default function ResearcherManagementPage() {
   const filteredResearchers = researchers?.filter((researcher) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch =
-      researcher.user.username.toLowerCase().includes(query) ||
       researcher.user.email.toLowerCase().includes(query);
     
     const matchesReputation = researcher.reputation_score >= parseInt(minReputation);
@@ -82,6 +81,18 @@ export default function ResearcherManagementPage() {
           navItems={getPortalNavItems(user.role)}
         >
           <div className="space-y-6">
+            {/* Error Display */}
+            {error && (
+              <Card className="p-4 border-red-300 bg-red-50 dark:bg-red-900/20">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  Error loading researchers: {error.message || 'Unknown error'}
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-300 mt-2">
+                  API Endpoint: GET /api/v1/matching/organization/researchers
+                </p>
+              </Card>
+            )}
+
             {/* Info Banner */}
             <Card className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-800">
               <div className="flex items-start gap-4">
@@ -98,7 +109,7 @@ export default function ResearcherManagementPage() {
             </Card>
 
             {/* Tabs */}
-            <Tabs tabs={tabs} activeTab={activeTab} onChange={(tab) => setActiveTab(tab as any)} />
+            <Tabs tabs={tabs} value={activeTab} onChange={(tab) => setActiveTab(tab as 'browse' | 'recommendations')} />
 
             {/* Browse Tab */}
             {activeTab === 'browse' && (
@@ -113,7 +124,7 @@ export default function ResearcherManagementPage() {
                       label="Search"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Username or email..."
+                      placeholder="Search by email..."
                     />
                     <Input
                       label="Min Reputation"
@@ -196,7 +207,7 @@ export default function ResearcherManagementPage() {
                               <div className="text-sm text-[#6d6760] dark:text-slate-400 mb-3">
                                 {researcher.verified_reports} verified
                               </div>
-                              <Button size="small">View Profile</Button>
+                              <Button size="sm">View Profile</Button>
                             </div>
                           </div>
                         </div>

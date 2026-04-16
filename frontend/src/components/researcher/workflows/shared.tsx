@@ -214,31 +214,31 @@ export function Banner({
   const toneStyles = getWorkflowToneStyles(tone);
 
   return (
-    <div className="relative overflow-hidden rounded-[32px] border border-[#111827] bg-[#08111d] p-8 text-white shadow-[0_22px_60px_rgba(8,17,29,0.28)]">
-      <div className={`absolute -right-14 -top-16 h-60 w-60 rounded-full opacity-90 blur-3xl ${toneStyles.accentGlow}`} />
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.02)_42%,transparent_72%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_55%)]" />
+    <div className="relative overflow-hidden rounded-[32px] border border-[#d5c4eb] bg-gradient-to-br from-[#f6efff] via-[#faf7fc] to-[#f0e7fa] p-8 shadow-[0_22px_60px_rgba(125,57,194,0.15)]">
+      <div className="absolute -right-14 -top-16 h-60 w-60 rounded-full bg-[#e5d4f7] opacity-40 blur-3xl" />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(125,57,194,0.08)_0%,rgba(193,118,255,0.05)_42%,transparent_72%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.6),transparent_55%)]" />
 
       <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <div className="mb-5 flex items-center gap-3">
-            <span className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 ${toneStyles.accentSoft} ${toneStyles.accentText} text-sm font-bold shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]`}>
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[#d5c4eb] bg-white text-2xl shadow-[0_4px_12px_rgba(125,57,194,0.12)]">
               {icon}
             </span>
             {badge ? (
-              <span className="inline-flex rounded-full border border-white/15 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/85">
+              <span className="inline-flex rounded-full border border-[#d5c4eb] bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7d39c2] shadow-sm">
                 {badge}
               </span>
             ) : null}
           </div>
-          <h2 className="text-3xl font-semibold tracking-[-0.02em] text-white sm:text-[2rem]">{title}</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">{subtitle}</p>
+          <h2 className="text-3xl font-semibold tracking-[-0.02em] text-[#2d2a26] sm:text-[2rem]">{title}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-[#5f5851]">{subtitle}</p>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 backdrop-blur-sm lg:max-w-xs">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Delivery Mode</p>
-          <p className="mt-2 text-sm font-semibold text-white">Live assigned workflow</p>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
+        <div className="rounded-[24px] border border-[#d5c4eb] bg-white/90 p-4 backdrop-blur-sm shadow-sm lg:max-w-xs">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b8177]">Delivery Mode</p>
+          <p className="mt-2 text-sm font-semibold text-[#2d2a26]">Live assigned workflow</p>
+          <p className="mt-2 text-sm leading-6 text-[#6d6760]">
             Operational data, submissions, and workflow state stay on this page instead of static copy.
           </p>
         </div>
@@ -259,11 +259,11 @@ export function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-[#dbe3ec] bg-white dark:bg-[#111111] p-6 shadow-[0_2px_6px_rgba(15,23,42,0.03),0_16px_36px_rgba(15,23,42,0.06)]">
-      <div className="flex flex-col gap-4 border-b border-[#ecf0f5] pb-5 sm:flex-row sm:items-start sm:justify-between">
+    <section className="rounded-[28px] border border-[#dbe3ec] dark:border-gray-700 bg-white dark:bg-[#111111] p-6 shadow-[0_2px_6px_rgba(15,23,42,0.03),0_16px_36px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-4 border-b border-[#ecf0f5] dark:border-gray-700 pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#0f172a]">{title}</h3>
-          {description ? <p className="mt-1 text-sm leading-6 text-[#556273]">{description}</p> : null}
+          <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#0f172a] dark:text-slate-100">{title}</h3>
+          {description ? <p className="mt-1 text-sm leading-6 text-[#556273] dark:text-slate-400">{description}</p> : null}
         </div>
         {action}
       </div>
@@ -282,12 +282,12 @@ export function MetricGrid({
       {items.map((item) => (
         <div
           key={item.label}
-          className="overflow-hidden rounded-[24px] border border-[#dbe3ec] bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] p-5 shadow-[0_2px_4px_rgba(15,23,42,0.03)]"
+          className="overflow-hidden rounded-[24px] border border-[#dbe3ec] dark:border-gray-700 bg-[linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] dark:bg-gray-800 p-5 shadow-[0_2px_4px_rgba(15,23,42,0.03)]"
         >
-          <div className="mb-4 h-1.5 w-14 rounded-full bg-[linear-gradient(90deg,#0f172a_0%,#94a3b8_100%)]" />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#728092]">{item.label}</p>
-          <p className="mt-3 text-[1.7rem] font-semibold tracking-[-0.03em] text-[#0f172a]">{item.value}</p>
-          {item.helper ? <p className="mt-2 text-sm leading-6 text-[#556273]">{item.helper}</p> : null}
+          <div className="mb-4 h-1.5 w-14 rounded-full bg-[linear-gradient(90deg,#0f172a_0%,#94a3b8_100%)] dark:bg-[linear-gradient(90deg,#7d39c2_0%,#c176ff_100%)]" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#728092] dark:text-slate-400">{item.label}</p>
+          <p className="mt-3 text-[1.7rem] font-semibold tracking-[-0.03em] text-[#0f172a] dark:text-slate-100">{item.value}</p>
+          {item.helper ? <p className="mt-2 text-sm leading-6 text-[#556273] dark:text-slate-400">{item.helper}</p> : null}
         </div>
       ))}
     </div>
@@ -300,20 +300,20 @@ export function WorkflowTimeline({ steps }: { steps: WorkflowStep[] }) {
       {steps.map((step, index) => {
         const tone =
           step.state === 'complete'
-            ? 'border-[#c9e2cf] bg-[#eef7ef] text-[#24613a]'
+            ? 'border-[#c9e2cf] bg-[#eef7ef] text-[#24613a] dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
             : step.state === 'active'
-              ? 'border-[#f7c3aa] bg-[#fff3ee] text-[#b54708]'
-              : 'border-[#d6dee7] bg-[#f5f7fa] text-[#556273]';
+              ? 'border-[#f7c3aa] bg-[#fff3ee] text-[#b54708] dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+              : 'border-[#d6dee7] bg-[#f5f7fa] text-[#556273] dark:border-gray-700 dark:bg-gray-800 dark:text-slate-400';
 
         return (
           <div key={`${step.label}-${index}`} className="relative flex gap-4">
-            {index < steps.length - 1 ? <div className="absolute left-[17px] top-10 h-[calc(100%-8px)] w-px bg-[#dbe3ec]" /> : null}
+            {index < steps.length - 1 ? <div className="absolute left-[17px] top-10 h-[calc(100%-8px)] w-px bg-[#dbe3ec] dark:bg-gray-700" /> : null}
             <div className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${tone}`}>
               {step.state === 'complete' ? '✓' : index + 1}
             </div>
-            <div className="min-w-0 rounded-[22px] border border-[#e9eef5] bg-[#fbfcfd] px-4 py-3">
-              <p className="text-sm font-semibold text-[#0f172a]">{step.label}</p>
-              <p className="mt-1 text-sm leading-6 text-[#556273]">{step.detail}</p>
+            <div className="min-w-0 rounded-[22px] border border-[#e9eef5] dark:border-gray-700 bg-[#fbfcfd] dark:bg-gray-800 px-4 py-3">
+              <p className="text-sm font-semibold text-[#0f172a] dark:text-slate-100">{step.label}</p>
+              <p className="mt-1 text-sm leading-6 text-[#556273] dark:text-slate-400">{step.detail}</p>
             </div>
           </div>
         );
@@ -332,18 +332,18 @@ export function EmptyCollection({
   hint?: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-[#cfd8e3] bg-[linear-gradient(180deg,#fcfdff_0%,#f6f8fb_100%)] px-6 py-10 text-center">
-      <div className="mx-auto mb-4 h-12 w-12 rounded-2xl border border-[#dbe3ec] bg-white dark:bg-[#111111] shadow-[0_8px_18px_rgba(15,23,42,0.06)]" />
-      <h4 className="text-base font-semibold text-[#0f172a]">{title}</h4>
-      <p className="mt-2 text-sm leading-6 text-[#556273]">{description}</p>
-      {hint ? <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#728092]">{hint}</p> : null}
+    <div className="rounded-[24px] border border-dashed border-[#cfd8e3] dark:border-gray-600 bg-[linear-gradient(180deg,#fcfdff_0%,#f6f8fb_100%)] dark:bg-gray-800/50 px-6 py-10 text-center">
+      <div className="mx-auto mb-4 h-12 w-12 rounded-2xl border border-[#dbe3ec] dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_8px_18px_rgba(15,23,42,0.06)]" />
+      <h4 className="text-base font-semibold text-[#0f172a] dark:text-slate-100">{title}</h4>
+      <p className="mt-2 text-sm leading-6 text-[#556273] dark:text-slate-400">{description}</p>
+      {hint ? <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#728092] dark:text-slate-500">{hint}</p> : null}
     </div>
   );
 }
 
 export function PillList({ items }: { items: string[] }) {
   if (!items.length) {
-    return <p className="text-sm text-[#728092]">Not provided.</p>;
+    return <p className="text-sm text-[#728092] dark:text-slate-500">Not provided.</p>;
   }
 
   return (
@@ -351,7 +351,7 @@ export function PillList({ items }: { items: string[] }) {
       {items.map((item) => (
         <span
           key={item}
-          className="rounded-full border border-[#dbe3ec] bg-[#f7f9fc] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#475467]"
+          className="rounded-full border border-[#dbe3ec] dark:border-gray-700 bg-[#f7f9fc] dark:bg-gray-800 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#475467] dark:text-slate-300"
         >
           {item}
         </span>
