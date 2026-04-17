@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { useRouter } from 'next/navigation';
-import { Calendar, Users, Target, Clock, CheckCircle, AlertCircle, TrendingUp } from 'lucide-react';
+import { Calendar, Target, AlertCircle, CheckCircle, Clock, TrendingUp, Eye } from 'lucide-react';
+import Button from '@/components/ui/Button';
 
 interface PTaaSEngagement {
   id: string;
@@ -42,12 +43,11 @@ export default function ResearcherPTaaSEngagementList() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="rounded-2xl border border-[#e6ddd4] bg-white p-6 animate-pulse">
-            <div className="h-32 bg-[#faf6f1] rounded"></div>
-          </div>
-        ))}
+      <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-[#faf6f1] rounded"></div>
+          <div className="h-64 bg-[#faf6f1] rounded"></div>
+        </div>
       </div>
     );
   }
@@ -78,7 +78,17 @@ export default function ResearcherPTaaSEngagementList() {
 
   return (
     <div className="space-y-6">
-      {/* Filter Tabs - Always show */}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#2d2a26]">PTaaS Engagements</h2>
+          <p className="mt-1 text-sm text-[#6d6760]">
+            View and manage your assigned penetration testing engagements
+          </p>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setStatusFilter('all')}
@@ -109,7 +119,7 @@ export default function ResearcherPTaaSEngagementList() {
         })}
       </div>
 
-      {/* Engagement Cards or Empty State */}
+      {/* Table or Empty State */}
       {engagementsList.length === 0 ? (
         <div className="rounded-2xl border border-[#e6ddd4] bg-white p-12">
           <div className="text-center">
@@ -125,75 +135,118 @@ export default function ResearcherPTaaSEngagementList() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {engagementsList.map((engagement) => {
-            const statusInfo = statusConfig[engagement.status as keyof typeof statusConfig] || statusConfig.DRAFT;
-            const StatusIcon = statusInfo.icon;
-            
-            return (
-              <button
-                key={engagement.id}
-                onClick={() => router.push(`/researcher/programs/ptaas/${engagement.id}`)}
-                className="w-full rounded-2xl border border-[#e6ddd4] bg-white p-6 hover:shadow-lg transition-all text-left"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-[#2d2a26] mb-2">
-                      {engagement.name}
-                    </h3>
-                    <p className="text-sm text-[#6d6760] line-clamp-2">
-                      {engagement.description}
-                    </p>
-                  </div>
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color} ml-4 flex-shrink-0`}>
-                    <StatusIcon className="h-3.5 w-3.5" />
-                    {statusInfo.label}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#e6ddd4]">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-blue-50 p-2">
-                      <Target className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#8b8177]">Methodology</p>
-                      <p className="text-sm font-semibold text-[#2d2a26]">{engagement.testing_methodology}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-green-50 p-2">
-                      <Users className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#8b8177]">Team Size</p>
-                      <p className="text-sm font-semibold text-[#2d2a26]">{engagement.team_size}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-purple-50 p-2">
-                      <Calendar className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#8b8177]">Duration</p>
-                      <p className="text-sm font-semibold text-[#2d2a26]">{engagement.duration_days} days</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-orange-50 p-2">
-                      <Calendar className="h-4 w-4 text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-[#8b8177]">Start Date</p>
-                      <p className="text-sm font-semibold text-[#2d2a26]">
-                        {new Date(engagement.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+        <div className="rounded-2xl border border-[#e6ddd4] bg-white overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[#faf6f1] border-b border-[#e6ddd4]">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Engagement
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Methodology
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Timeline
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Team Size
+                  </th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e6ddd4]">
+                {engagementsList.map((engagement) => {
+                  const statusInfo = statusConfig[engagement.status as keyof typeof statusConfig] || statusConfig.DRAFT;
+                  const StatusIcon = statusInfo.icon;
+                  
+                  return (
+                    <tr 
+                      key={engagement.id}
+                      className="hover:bg-[#faf6f1] transition-colors cursor-pointer"
+                      onClick={() => router.push(`/researcher/programs/ptaas/${engagement.id}`)}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold flex-shrink-0">
+                            {engagement.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-[#2d2a26] truncate">
+                              {engagement.name}
+                            </p>
+                            <p className="text-sm text-[#6d6760] line-clamp-1 mt-0.5">
+                              {engagement.description}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>
+                          <StatusIcon className="h-3.5 w-3.5" />
+                          {statusInfo.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-[#8b8177]" />
+                          <span className="text-sm text-[#2d2a26]">{engagement.testing_methodology}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-[#8b8177]" />
+                          <div className="text-sm">
+                            <p className="text-[#2d2a26] font-medium">{engagement.duration_days} days</p>
+                            <p className="text-[#8b8177] text-xs">
+                              {new Date(engagement.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-2">
+                            {Array.from({ length: Math.min(engagement.team_size, 3) }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-semibold"
+                              >
+                                {i + 1}
+                              </div>
+                            ))}
+                            {engagement.team_size > 3 && (
+                              <div className="w-8 h-8 rounded-full bg-[#e6ddd4] border-2 border-white flex items-center justify-center text-[#6d6760] text-xs font-semibold">
+                                +{engagement.team_size - 3}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/researcher/programs/ptaas/${engagement.id}`);
+                          }}
+                          icon={Eye}
+                        >
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -8,7 +8,7 @@ export interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   showCloseButton?: boolean;
 }
 
@@ -50,6 +50,7 @@ export default function Modal({
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    full: 'max-w-full mx-4',
   };
   
   const modalContent = (
@@ -67,7 +68,7 @@ export default function Modal({
           bg-white dark:bg-gray-900
           border border-[#e6ddd4] dark:border-gray-700
           rounded-2xl shadow-2xl
-          max-h-[90vh] overflow-y-auto
+          ${size === 'full' ? 'h-[95vh]' : 'max-h-[90vh]'} overflow-y-auto
         `}
       >
         {/* Header */}

@@ -62,10 +62,26 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   if (role === 'triage_specialist') {
     return [
       { href: '/triage/dashboard', label: 'Dashboard' },
-      { href: '/triage/queue', label: 'Queue' },
-      { href: '/triage/reports', label: 'Reports' },
-      { href: '/triage/duplicates', label: 'Duplicates' },
+      { 
+        href: '/triage/queue', 
+        label: 'Queue',
+        children: [
+          { href: '/triage/queue?status=validated', label: 'Validated' },
+          { href: '/triage/queue?status=rejected', label: 'Rejected' },
+          { href: '/triage/queue?status=in-progress', label: 'In Progress' },
+        ]
+      },
+      { 
+        href: '/triage/reports', 
+        label: 'Reports',
+        children: [
+          { href: '/triage/duplicates', label: 'Duplicate Checker' },
+          { href: '/triage/templates', label: 'Templates' },
+        ]
+      },
       { href: '/triage/analytics', label: 'Analytics' },
+      { href: '/triage/researchers', label: 'Researchers' },
+      { href: '/triage/programs', label: 'Programs' },
       { href: '/triage/messages', label: 'Messages' },
     ];
   }
@@ -74,11 +90,36 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   if (role === 'finance_officer') {
     return [
       { href: '/finance/dashboard', label: 'Dashboard' },
-      { href: '/finance/payments', label: 'Payments' },
-      { href: '/finance/payouts', label: 'Payouts' },
-      { href: '/finance/kyc', label: 'KYC' },
+      { 
+        href: '/finance/payments', 
+        label: 'Payments',
+        children: [
+          { href: '/finance/payments?status=pending', label: 'Pending' },
+          { href: '/finance/payments?status=approved', label: 'Approved' },
+          { href: '/finance/payments?status=completed', label: 'Completed' },
+        ]
+      },
+      { 
+        href: '/finance/payouts', 
+        label: 'Payouts',
+        children: [
+          { href: '/finance/payouts?status=requested', label: 'Requested' },
+          { href: '/finance/payouts?status=processing', label: 'Processing' },
+          { href: '/finance/payouts?status=completed', label: 'Completed' },
+        ]
+      },
+      { 
+        href: '/finance/kyc', 
+        label: 'KYC',
+        children: [
+          { href: '/finance/kyc?status=pending', label: 'Pending Review' },
+          { href: '/finance/kyc?status=approved', label: 'Approved' },
+          { href: '/finance/kyc?status=rejected', label: 'Rejected' },
+        ]
+      },
       { href: '/finance/billing', label: 'Billing' },
       { href: '/finance/reports', label: 'Financial Reports' },
+      { href: '/finance/analytics', label: 'Analytics' },
     ];
   }
 

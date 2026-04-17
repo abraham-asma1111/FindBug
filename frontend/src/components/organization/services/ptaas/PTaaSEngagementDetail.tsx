@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import SimpleTabs from '@/components/ui/SimpleTabs';
@@ -332,52 +333,304 @@ export default function PTaaSEngagementDetail({ engagement }: PTaaSEngagementDet
 
 // Overview Tab
 function OverviewTab({ engagement }: { engagement: PTaaSEngagement }) {
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const scope = engagement.scope;
+  
+  // Parse scope data
+  const inScopeTargets = scope?.in_scope_targets || [];
+  const outOfScopeTargets = scope?.out_of_scope_targets || [];
+  const testingRules = scope?.testing_rules || [];
+  const restrictions = scope?.restrictions || [];
+  
+  // Get any additional fields not covered above
+  const additionalFields = scope ? Object.keys(scope).filter(
+    key => !['in_scope_targets', 'out_of_scope_targets', 'testing_rules', 'restrictions', 'testing_methodology', 'custom_methodology_details'].includes(key)
+  ) : [];
+
+  // Combine all scope items into one table structure
+  const allScopeItems: Array<{
+    type: 'IN_SCOPE' | 'OUT_OF_SCOPE' | 'TESTING_RULE' | 'RESTRICTION' | 'ADDITIONAL';
+    content: string;
+    details?: string;
+    itemType?: string;
+    fieldName?: string;
+    rawData?: any;
+  }> = [];
+
+  // Add in-scope targets
+  inScopeTargets.forEach((target: any) => {
+    allScopeItems.push({
+      type: 'IN_SCOPE',
+      content: typeof target === 'string' ? target : target.url || target.target || target.name || 'N/A',
+      itemType: typeof target === 'object' ? target.type || 'Web Application' : 'Web Application',
+      details: typeof target === 'object' ? target.notes : undefined,
+      rawData: target
+    });
+  });
+
+  // Add out-of-scope items
+  outOfScopeTargets.forEach((item: any) => {
+    allScopeItems.push({
+      type: 'OUT_OF_SCOPE',
+      content: typeof item === 'string' ? item : item.target || item.name || JSON.stringify(item),
+      rawData: item
+    });
+  });
+
+  // Add testing rules
+  testingRules.forEach((rule: any) => {
+    allScopeItems.push({
+      type: 'TESTING_RULE',
+      content: typeof rule === 'string' ? rule : rule.rule || JSON.stringify(rule),
+      rawData: rule
+    });
+  });
+
+  // Add restrictions
+  restrictions.forEach((restriction: any) => {
+    allScopeItems.push({
+      type: 'RESTRICTION',
+      content: typeof restriction === 'string' ? restriction : restriction.restriction || JSON.stringify(restriction),
+      rawData: restriction
+    });
+  });
+
+  // Add additional fields as rows
+  additionalFields.forEach((field) => {
+    const value = scope[field];
+    allScopeItems.push({
+      type: 'ADDITIONAL',
+      fieldName: field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      content: typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value),
+      itemType: typeof value === 'object' ? 'JSON' : typeof value,
+      rawData: value
+    });
+  });
+
+  const handleRowClick = (item: any) => {
+    setSelectedItem(item);
+    setShowDetailModal(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-[#2d2a26]">Engagement Details</h3>
-        <div className="mt-4 space-y-4">
+        <h3 className="text-lg font-semibold text-[#2d2a26] mb-4">Engagement Details</h3>
+        
+        {/* Timeline */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="text-sm font-medium text-[#8b8177]">Scope</label>
-            <div className="mt-1 text-sm text-[#2d2a26] space-y-1">
-              {engagement.scope?.in_scope_targets && engagement.scope.in_scope_targets.length > 0 && (
-                <div>
-                  <span className="font-medium">In-Scope: </span>
-                  {engagement.scope.in_scope_targets.join(', ')}
-                </div>
-              )}
-              {engagement.scope?.out_of_scope_targets && engagement.scope.out_of_scope_targets.length > 0 && (
-                <div>
-                  <span className="font-medium">Out-of-Scope: </span>
-                  {engagement.scope.out_of_scope_targets.join(', ')}
-                </div>
-              )}
-              {engagement.scope?.testing_methodology && (
-                <div>
-                  <span className="font-medium">Methodology: </span>
-                  {engagement.scope.testing_methodology}
-                </div>
-              )}
-            </div>
+            <label className="text-sm font-medium text-[#8b8177]">Start Date</label>
+            <p className="mt-1 text-sm text-[#2d2a26]">{new Date(engagement.start_date).toLocaleDateString()}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-[#8b8177]">Start Date</label>
-              <p className="mt-1 text-sm text-[#2d2a26]">{new Date(engagement.start_date).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-[#8b8177]">End Date</label>
-              <p className="mt-1 text-sm text-[#2d2a26]">{new Date(engagement.end_date).toLocaleDateString()}</p>
-            </div>
+          <div>
+            <label className="text-sm font-medium text-[#8b8177]">End Date</label>
+            <p className="mt-1 text-sm text-[#2d2a26]">{new Date(engagement.end_date).toLocaleDateString()}</p>
           </div>
-          {engagement.budget > 0 && (
-            <div>
-              <label className="text-sm font-medium text-[#8b8177]">Budget</label>
-              <p className="mt-1 text-sm text-[#2d2a26]">{engagement.budget.toLocaleString()} ETB</p>
-            </div>
-          )}
         </div>
+
+        {/* Budget */}
+        {engagement.budget > 0 && (
+          <div className="mb-6">
+            <label className="text-sm font-medium text-[#8b8177]">Budget</label>
+            <p className="mt-1 text-sm text-[#2d2a26]">{engagement.budget.toLocaleString()} ETB</p>
+          </div>
+        )}
+
+        {/* Methodology */}
+        {scope?.testing_methodology && (
+          <div className="mb-6">
+            <label className="text-sm font-medium text-[#8b8177]">Testing Methodology</label>
+            <p className="mt-1 text-sm text-[#2d2a26]">{scope.testing_methodology}</p>
+          </div>
+        )}
+
+        {/* Unified Scope Table */}
+        <h4 className="text-md font-semibold text-[#2d2a26] mb-3">Scope & Target Assets</h4>
+        {allScopeItems.length > 0 ? (
+          <div className="rounded-xl border border-[#e6ddd4] overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-[#faf6f1]">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider w-40">
+                    Category
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider">
+                    Item
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider w-40">
+                    Type
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#2d2a26] uppercase tracking-wider w-48">
+                    Details
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-[#e6ddd4]">
+                {allScopeItems.map((item, idx) => {
+                  const categoryConfig = {
+                    IN_SCOPE: {
+                      label: 'In Scope',
+                      bgColor: 'bg-green-50',
+                      textColor: 'text-green-700',
+                      borderColor: 'border-l-green-500',
+                      icon: '✓'
+                    },
+                    OUT_OF_SCOPE: {
+                      label: 'Out of Scope',
+                      bgColor: 'bg-red-50',
+                      textColor: 'text-red-700',
+                      borderColor: 'border-l-red-500',
+                      icon: '✗'
+                    },
+                    TESTING_RULE: {
+                      label: 'Testing Rule',
+                      bgColor: 'bg-blue-50',
+                      textColor: 'text-blue-700',
+                      borderColor: 'border-l-blue-500',
+                      icon: 'ℹ'
+                    },
+                    RESTRICTION: {
+                      label: 'Restriction',
+                      bgColor: 'bg-orange-50',
+                      textColor: 'text-orange-700',
+                      borderColor: 'border-l-orange-500',
+                      icon: '⚠'
+                    },
+                    ADDITIONAL: {
+                      label: item.fieldName || 'Additional',
+                      bgColor: 'bg-purple-50',
+                      textColor: 'text-purple-700',
+                      borderColor: 'border-l-purple-500',
+                      icon: '📋'
+                    }
+                  };
+
+                  const config = categoryConfig[item.type];
+
+                  return (
+                    <tr 
+                      key={idx} 
+                      onClick={() => handleRowClick(item)}
+                      className={`hover:bg-blue-50 transition-colors border-l-4 ${config.borderColor} cursor-pointer`}
+                    >
+                      <td className={`px-4 py-3 ${config.bgColor}`}>
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${config.textColor}`}>
+                          <span>{config.icon}</span>
+                          {config.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#2d2a26]">
+                        <span className={item.content.length > 100 ? 'break-words line-clamp-2' : ''}>
+                          {item.content.length > 150 ? item.content.substring(0, 150) + '...' : item.content}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#6d6760]">
+                        {item.itemType || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#6d6760]">
+                        {item.details ? (item.details.length > 50 ? item.details.substring(0, 50) + '...' : item.details) : '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[#e6ddd4] bg-[#faf6f1] p-4">
+            <p className="text-sm text-[#6d6760]">No scope items defined</p>
+          </div>
+        )}
       </div>
+
+      {/* Scope Item Detail Modal */}
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedItem(null);
+        }}
+        title="Scope Item Details"
+        size="lg"
+      >
+        {selectedItem && (
+          <div className="space-y-4">
+            {/* Category Badge */}
+            <div>
+              <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold ${
+                selectedItem.type === 'IN_SCOPE' ? 'bg-green-100 text-green-700' :
+                selectedItem.type === 'OUT_OF_SCOPE' ? 'bg-red-100 text-red-700' :
+                selectedItem.type === 'TESTING_RULE' ? 'bg-blue-100 text-blue-700' :
+                selectedItem.type === 'RESTRICTION' ? 'bg-orange-100 text-orange-700' :
+                'bg-purple-100 text-purple-700'
+              }`}>
+                {selectedItem.fieldName || selectedItem.type.replace(/_/g, ' ')}
+              </span>
+            </div>
+
+            {/* Content */}
+            <div>
+              <label className="block text-sm font-medium text-[#8b8177] mb-2">Content</label>
+              <div className="rounded-xl border border-[#e6ddd4] bg-[#faf6f1] p-4">
+                {selectedItem.itemType === 'JSON' ? (
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-[#2d2a26] overflow-x-auto">
+                    {selectedItem.content}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-[#2d2a26] whitespace-pre-wrap">{selectedItem.content}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Type */}
+            {selectedItem.itemType && (
+              <div>
+                <label className="block text-sm font-medium text-[#8b8177] mb-2">Type</label>
+                <div className="rounded-lg border border-[#e6ddd4] bg-white p-3">
+                  <p className="text-sm text-[#2d2a26]">{selectedItem.itemType}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Details */}
+            {selectedItem.details && (
+              <div>
+                <label className="block text-sm font-medium text-[#8b8177] mb-2">Additional Details</label>
+                <div className="rounded-lg border border-[#e6ddd4] bg-white p-3">
+                  <p className="text-sm text-[#2d2a26] whitespace-pre-wrap">{selectedItem.details}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Raw Data (for debugging/advanced view) */}
+            {selectedItem.rawData && typeof selectedItem.rawData === 'object' && (
+              <div>
+                <label className="block text-sm font-medium text-[#8b8177] mb-2">Raw Data</label>
+                <div className="rounded-xl border border-[#e6ddd4] bg-gray-900 p-4">
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-gray-100 overflow-x-auto">
+                    {JSON.stringify(selectedItem.rawData, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Close Button */}
+            <div className="flex justify-end pt-4 border-t border-[#e6ddd4]">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedItem(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -776,7 +1029,7 @@ function FindingsTab({ engagementId }: { engagementId: string }) {
 
 // Finding Card Component
 function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => void }) {
-  const [showDetail, setShowDetail] = useState(false);
+  const router = useRouter();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
 
@@ -807,7 +1060,10 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
     <>
       <div className="rounded-xl border border-[#e6ddd4] bg-white p-4 hover:border-blue-300 transition-colors">
         <div className="flex items-start justify-between">
-          <div className="flex-1 cursor-pointer" onClick={() => setShowDetail(true)}>
+          <div 
+            className="flex-1 cursor-pointer" 
+            onClick={() => router.push(`/organization/services/ptaas/findings/${finding.id}`)}
+          >
             <div className="flex items-center gap-2 mb-2">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${severity.color}`}>
                 <span>{severity.icon}</span>
@@ -844,7 +1100,20 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => setShowAssignModal(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/organization/services/ptaas/findings/${finding.id}`);
+              }}
+            >
+              View Details
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAssignModal(true);
+              }}
             >
               <UserPlus className="h-4 w-4 mr-1" />
               Assign
@@ -852,72 +1121,16 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => setShowStatusModal(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowStatusModal(true);
+              }}
             >
               Change Status
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => setShowDetail(true)}
-            >
-              View Details
             </Button>
           </div>
         </div>
       </div>
-
-      {/* Finding Detail Modal */}
-      {showDetail && (
-        <Modal
-          isOpen={showDetail}
-          onClose={() => setShowDetail(false)}
-          title={`Finding #${finding.id}`}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${severity.color}`}>
-                <span>{severity.icon}</span>
-                {severity.label}
-              </span>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${status.color}`}>
-                {status.label}
-              </span>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#2d2a26] mb-2">{finding.title}</h3>
-              <p className="text-sm text-[#6d6760]">{finding.description}</p>
-            </div>
-
-            {finding.impact && (
-              <div>
-                <label className="text-sm font-medium text-[#8b8177]">Impact</label>
-                <p className="mt-1 text-sm text-[#2d2a26]">{finding.impact}</p>
-              </div>
-            )}
-
-            {finding.remediation && (
-              <div>
-                <label className="text-sm font-medium text-[#8b8177]">Remediation</label>
-                <p className="mt-1 text-sm text-[#2d2a26]">{finding.remediation}</p>
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-4 border-t border-[#e6ddd4]">
-              <Button variant="outline" onClick={() => setShowDetail(false)} className="flex-1">
-                Close
-              </Button>
-              <Button variant="outline" onClick={() => { setShowDetail(false); setShowAssignModal(true); }} className="flex-1">
-                Assign
-              </Button>
-              <Button onClick={() => { setShowDetail(false); setShowStatusModal(true); }} className="flex-1">
-                Change Status
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
 
       {/* Assign Modal */}
       {showAssignModal && (

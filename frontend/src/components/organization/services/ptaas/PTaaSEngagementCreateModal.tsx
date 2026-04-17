@@ -714,6 +714,18 @@ export default function PTaaSEngagementCreateModal({
                   Minimum reputation score required (0-100)
                 </p>
               </div>
+
+              {/* Researcher Browser/Filter - Only for PRIVATE model */}
+              {formData.researcher_model === 'PRIVATE' && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <p className="text-sm text-blue-900 font-medium mb-3">
+                    Private PTaaS: You can invite specific researchers after creating the engagement
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    After creating this engagement, you'll be able to browse and filter researchers, then send invitations to your selected team members.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

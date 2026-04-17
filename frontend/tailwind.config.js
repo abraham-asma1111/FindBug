@@ -9,7 +9,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary - Blue (Trust & Security)
+        // Primary - Blue (Exact from Triage screenshot)
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -21,10 +21,10 @@ module.exports = {
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
-          DEFAULT: '#3b82f6',
+          DEFAULT: '#3b82f6',  // Primary accent/buttons
           hover: '#2563eb',
         },
-        // Danger - Red (Critical & Destructive)
+        // Danger - Red (Critical badge)
         danger: {
           50: '#fef2f2',
           100: '#fee2e2',
@@ -36,10 +36,10 @@ module.exports = {
           700: '#b91c1c',
           800: '#991b1b',
           900: '#7f1d1d',
-          DEFAULT: '#ef4444',
+          DEFAULT: '#ef4444',  // Critical badge
           hover: '#dc2626',
         },
-        // Success/Gold - Amber (Money & Rewards)
+        // Success/Warning - Amber (High badge)
         success: {
           50: '#fffbeb',
           100: '#fef3c7',
@@ -51,7 +51,7 @@ module.exports = {
           700: '#b45309',
           800: '#92400e',
           900: '#78350f',
-          DEFAULT: '#f59e0b',
+          DEFAULT: '#f59e0b',  // High badge
           hover: '#d97706',
         },
         // Supporting colors
@@ -62,6 +62,21 @@ module.exports = {
         info: {
           DEFAULT: '#3b82f6',
           hover: '#2563eb',
+        },
+        // Exact Triage Portal colors
+        triage: {
+          'page-bg': '#0F172A',        // Main background
+          'sidebar-bg': '#020617',     // Sidebar background
+          'card-bg': '#1E2937',        // Card backgrounds
+          'active-menu': '#2563EB',    // Active menu item
+          'badge-blue': '#2563EB',     // "12 New" badge
+          'button-primary': '#3B82F6', // Primary buttons
+          'critical': '#EF4444',       // Critical badge
+          'high': '#F59E0B',           // High badge
+          'text-main': '#F8FAFC',      // Main text
+          'text-secondary': '#94A3B8', // Secondary text
+          'hover': '#334155',          // Hover states
+          'border': '#334155',         // Borders/dividers
         },
       },
       fontFamily: {

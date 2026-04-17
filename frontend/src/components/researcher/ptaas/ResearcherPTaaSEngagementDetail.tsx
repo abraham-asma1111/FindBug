@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import api from '@/lib/api';
 import Button from '@/components/ui/Button';
@@ -9,7 +10,7 @@ import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import { 
   Calendar, Users, AlertCircle, CheckCircle, Clock, 
-  FileText, Target, TrendingUp, Flag, Play 
+  Target, TrendingUp, Flag
 } from 'lucide-react';
 
 interface PTaaSEngagement {
@@ -74,7 +75,7 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
     endpoint: `/ptaas/researcher/engagements/${engagementId}`
   });
 
-  const { data: findings } = useApiQuery<Finding[]>({
+  const { data: findings } = useApiQuery<Finding[] | null>({
     endpoint: `/ptaas/engagements/${engagementId}/findings`
   });
 
@@ -245,7 +246,7 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
         {activeTab === 'overview' && <OverviewTab engagement={engagement} />}
         {activeTab === 'scope' && <ScopeTab engagement={engagement} />}
         {activeTab === 'testing' && <TestingTab engagement={engagement} />}
-        {activeTab === 'findings' && <FindingsTab findings={findings} onSubmit={() => setShowFindingModal(true)} />}
+        {activeTab === 'findings' && <FindingsTab findings={findings} onSubmit={() => setShowFindingModal(true)} engagementId={engagementId} />}
         {activeTab === 'team' && <TeamTab engagement={engagement} />}
       </div>
 
@@ -490,7 +491,9 @@ function TestingTab({ engagement }: { engagement: PTaaSEngagement }) {
 }
 
 // Findings Tab
-function FindingsTab({ findings, onSubmit }: { findings: Finding[] | undefined; onSubmit: () => void }) {
+function FindingsTab({ findings, onSubmit, engagementId }: { findings: Finding[] | null | undefined; onSubmit: () => void; engagementId: string }) {
+  const router = useRouter();
+  
   if (!findings || findings.length === 0) {
     return (
       <div className="text-center py-12">
@@ -520,7 +523,11 @@ function FindingsTab({ findings, onSubmit }: { findings: Finding[] | undefined; 
       </div>
       <div className="space-y-3">
         {findings.map((finding) => (
-          <div key={finding.id} className="p-4 rounded-xl border border-[#e6ddd4] bg-[#faf6f1]">
+          <div 
+            key={finding.id} 
+            className="p-4 rounded-xl border border-[#e6ddd4] bg-[#faf6f1] hover:bg-white cursor-pointer transition-colors"
+            onClick={() => router.push(`/researcher/programs/ptaas/${engagementId}/findings/${finding.id}`)}
+          >
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <h4 className="font-medium text-[#2d2a26] mb-1">{finding.title}</h4>
