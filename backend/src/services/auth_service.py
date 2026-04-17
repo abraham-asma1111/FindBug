@@ -464,7 +464,7 @@ class AuthService:
             )
             
             # Lock account if max attempts reached
-            if user.failed_login_attempts >= AuthenticationSecurity.MAX_LOGIN_ATTEMPTS:
+            if user.failed_login_attempts and user.failed_login_attempts >= AuthenticationSecurity.MAX_LOGIN_ATTEMPTS:
                 locked_until = datetime.utcnow() + timedelta(
                     minutes=AuthenticationSecurity.LOCKOUT_DURATION_MINUTES
                 )
@@ -496,7 +496,7 @@ class AuthService:
                 )
             
             # Log brute force attempt if multiple failures
-            if user.failed_login_attempts >= 3:
+            if user.failed_login_attempts and user.failed_login_attempts >= 3:
                 self._log_security_event(
                     event_type="brute_force",
                     user_id=user.id,
@@ -530,7 +530,7 @@ class AuthService:
                     "token_type": "bearer",
                     "user_id": str(user.id),
                     "email": user.email,
-                    "role": user.role.value,
+                    "role": user.role if isinstance(user.role, str) else user.role.value,
                     "mfa_required": True,
                     "mfa_enabled": True
                 }
@@ -568,7 +568,7 @@ class AuthService:
                 raise ValueError("Invalid MFA code")
         
         # Reset failed login attempts
-        if user.failed_login_attempts > 0:
+        if user.failed_login_attempts and user.failed_login_attempts > 0:
             user = self.user_repo.reset_failed_login(user)
         
         # Update last login
@@ -578,7 +578,7 @@ class AuthService:
         token_data = {
             "sub": user.email,
             "user_id": str(user.id),
-            "role": user.role.value
+            "role": user.role if isinstance(user.role, str) else user.role.value
         }
         access_token = TokenSecurity.create_access_token(token_data)
         
@@ -606,7 +606,7 @@ class AuthService:
             SecurityAudit.log_security_event(
                 "LOGIN_SUCCESS",
                 str(user.id),
-                {"email": user.email, "role": user.role.value, "mfa_used": user.mfa_enabled},
+                {"email": user.email, "role": user.role if isinstance(user.role, str) else user.role.value, "mfa_used": user.mfa_enabled},
                 request
             )
         
@@ -622,7 +622,7 @@ class AuthService:
             "token_type": "bearer",
             "user_id": str(user.id),
             "email": user.email,
-            "role": user.role.value,
+            "role": user.role if isinstance(user.role, str) else user.role.value,
             "mfa_required": False,
             "mfa_enabled": user.mfa_enabled
         }
@@ -905,7 +905,7 @@ class AuthService:
         token_data = {
             "sub": user.email,
             "user_id": str(user.id),
-            "role": user.role.value
+            "role": user.role if isinstance(user.role, str) else user.role.value
         }
         access_token = TokenSecurity.create_access_token(token_data)
         

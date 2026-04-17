@@ -20,6 +20,10 @@ class UserRole(str, enum.Enum):
     FINANCE_OFFICER = "finance_officer"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
+    
+    # Note: The database enum also has uppercase values for backward compatibility:
+    # 'RESEARCHER', 'ORGANIZATION', 'STAFF', 'ADMIN', 'SUPER_ADMIN'
+    # But we use lowercase values in the application
 
 
 class User(Base):
@@ -37,7 +41,9 @@ class User(Base):
     # Authentication
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(SQLEnum(UserRole), nullable=False)
+    # Using String instead of Enum to handle mixed case values in database
+    # (RESEARCHER vs triage_specialist)
+    role = Column(String(50), nullable=False)
     
     # Account Status
     is_verified = Column(Boolean, default=False)

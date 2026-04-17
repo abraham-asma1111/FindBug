@@ -3,8 +3,11 @@ Bug Bounty Platform - Main Application
 FastAPI Backend Server
 """
 
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, Response, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration
 from src.api.v1.endpoints import simulation_gateway
@@ -22,6 +25,18 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Add validation exception handler for debugging
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors for debugging"""
+    print(f"❌ VALIDATION ERROR on {request.method} {request.url.path}")
+    print(f"Errors: {exc.errors()}")
+    print(f"Body: {exc.body}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body}
+    )
 
 # CORS Configuration
 app.add_middleware(

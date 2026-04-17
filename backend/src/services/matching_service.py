@@ -917,9 +917,10 @@ class MatchingService:
         # Select top matches
         selected_researchers = []
         for researcher, match_details in matches[:team_size]:
+            full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip() or researcher.user.email.split('@')[0]
             selected_researchers.append({
                 'researcher_id': str(researcher.id),
-                'researcher_name': f"{researcher.user.first_name} {researcher.user.last_name}",
+                'researcher_name': full_name,
                 'match_score': match_details['overall_score'],
                 'skill_score': match_details['skill_score'],
                 'reputation_score': match_details['reputation_score'],

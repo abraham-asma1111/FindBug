@@ -67,25 +67,67 @@ class PTaaSEngagement(Base):
 
 
 class PTaaSFinding(Base):
-    """PTaaS finding model"""
+    """PTaaS finding model - FREQ-35 Structured Templates"""
     __tablename__ = "ptaas_findings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False, index=True)
     
+    # Basic Info
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
     severity = Column(String(50), nullable=False, index=True)
     cvss_score = Column(Numeric(3, 1), nullable=True)
-    
     affected_component = Column(String(255), nullable=True)
-    reproduction_steps = Column(Text, nullable=True)
-    remediation = Column(Text, nullable=True)
+    
+    # Mandatory: Proof of Exploit - FREQ-35 (nullable in DB for backward compatibility)
+    proof_of_exploit = Column(Text, nullable=True)  # min 50 chars in validation
+    exploit_code = Column(Text, nullable=True)
+    exploit_screenshots = Column(JSON, nullable=True)  # Array of URLs
+    exploit_video_url = Column(String(500), nullable=True)
+    
+    # Mandatory: Impact Analysis - FREQ-35 (nullable in DB for backward compatibility)
+    impact_analysis = Column(Text, nullable=True)  # min 50 chars in validation
+    business_impact = Column(String(50), nullable=True)
+    technical_impact = Column(JSON, nullable=True)  # CIA triad dict
+    affected_users = Column(String(100), nullable=True)
+    data_at_risk = Column(Text, nullable=True)
+    
+    # Mandatory: Remediation - FREQ-35 (nullable in DB for backward compatibility)
+    remediation = Column(Text, nullable=True)  # min 50 chars in validation
+    remediation_priority = Column(String(50), nullable=True)
+    remediation_effort = Column(String(50), nullable=True)
+    remediation_steps = Column(JSON, nullable=True)  # Array of steps
+    code_fix_example = Column(Text, nullable=True)
+    
+    # Vulnerability Classification
+    vulnerability_type = Column(String(100), nullable=True)
+    cwe_id = Column(String(50), nullable=True)
+    owasp_category = Column(String(100), nullable=True)
+    
+    # Attack Vector Details (CVSS metrics)
+    attack_vector = Column(String(50), nullable=True)
+    attack_complexity = Column(String(50), nullable=True)
+    privileges_required = Column(String(50), nullable=True)
+    user_interaction = Column(String(50), nullable=True)
+    
+    # Additional fields
+    reproduction_steps = Column(Text, nullable=True)  # min 20 chars in validation
     references = Column(JSON, nullable=True)
     
-    status = Column(String(50), nullable=True)
+    # Status tracking
+    status = Column(String(50), nullable=True, default='PENDING')
+    retest_notes = Column(Text, nullable=True)
+    validated = Column(Boolean, nullable=True, default=False)
+    validated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    validated_at = Column(DateTime, nullable=True)
+    retest_required = Column(Boolean, nullable=True, default=False)
+    template_version = Column(String(20), nullable=True)
+    mandatory_fields_complete = Column(Boolean, nullable=True, default=False)
+    
+    # Metadata
     discovered_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    discovered_at = Column(DateTime, nullable=True)
+    discovered_at = Column(DateTime, nullable=True, default=datetime.utcnow)
     
     # Relationships
     engagement = relationship("PTaaSEngagement", back_populates="findings")

@@ -370,3 +370,384 @@ def get_report_history(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+# ============================================
+# TRIAGE TEMPLATES ENDPOINTS
+# ============================================
+
+@router.get("/triage/templates", status_code=status.HTTP_200_OK)
+def get_triage_templates(
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get triage response templates.
+    
+    Templates help triage specialists respond quickly with standardized messages.
+    
+    Only triage specialists can access.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can access templates"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        templates = service.get_templates(
+            is_active=is_active,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "templates": templates,
+            "total": len(templates),
+            "limit": limit,
+            "offset": offset
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get templates: {str(e)}"
+        )
+
+
+@router.post("/triage/templates", status_code=status.HTTP_201_CREATED)
+def create_triage_template(
+    name: str = Query(..., description="Template name"),
+    title: str = Query(..., description="Template title"),
+    content: str = Query(..., description="Template content"),
+    category: str = Query(..., description="Template category (validation, rejection, duplicate, etc.)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create triage response template.
+    
+    Categories: validation, rejection, duplicate, need_info, resolved
+    
+    Only triage specialists can create templates.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can create templates"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        template = service.create_template(
+            name=name,
+            title=title,
+            content=content,
+            category=category,
+            created_by=current_user.id
+        )
+        
+        return {
+            "message": "Template created successfully",
+            "template": template
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create template: {str(e)}"
+        )
+
+
+@router.get("/triage/templates/{template_id}", status_code=status.HTTP_200_OK)
+def get_triage_template(
+    template_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get triage template by ID.
+    
+    Only triage specialists can access.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can access templates"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        template = service.get_template(template_id=template_id)
+        return template
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.put("/triage/templates/{template_id}", status_code=status.HTTP_200_OK)
+def update_triage_template(
+    template_id: UUID,
+    name: Optional[str] = Query(None, description="Template name"),
+    title: Optional[str] = Query(None, description="Template title"),
+    content: Optional[str] = Query(None, description="Template content"),
+    category: Optional[str] = Query(None, description="Template category"),
+    is_active: Optional[bool] = Query(None, description="Active status"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update triage template.
+    
+    Only triage specialists can update templates.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can update templates"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        template = service.update_template(
+            template_id=template_id,
+            name=name,
+            title=title,
+            content=content,
+            category=category,
+            is_active=is_active
+        )
+        
+        return {
+            "message": "Template updated successfully",
+            "template": template
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.delete("/triage/templates/{template_id}", status_code=status.HTTP_200_OK)
+def delete_triage_template(
+    template_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete triage template.
+    
+    Only triage specialists can delete templates.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can delete templates"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        service.delete_template(template_id=template_id)
+        
+        return {
+            "message": "Template deleted successfully",
+            "template_id": str(template_id)
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+# ============================================
+# TRIAGE RESEARCHERS ENDPOINTS
+# ============================================
+
+@router.get("/triage/researchers", status_code=status.HTTP_200_OK)
+def get_triage_researchers(
+    search: Optional[str] = Query(None, description="Search by name or email"),
+    sort_by: str = Query("reports_count", description="Sort by: reports_count, valid_reports, invalid_reports"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get researchers with triage metrics.
+    
+    Shows researcher statistics from triage perspective:
+    - Total reports submitted
+    - Valid reports count
+    - Invalid reports count
+    - Duplicate reports count
+    - Average triage time
+    
+    Only triage specialists can access.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can access researcher metrics"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        researchers = service.get_researchers_with_metrics(
+            search=search,
+            sort_by=sort_by,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "researchers": researchers,
+            "total": len(researchers),
+            "limit": limit,
+            "offset": offset
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get researchers: {str(e)}"
+        )
+
+
+@router.get("/triage/researchers/{researcher_id}", status_code=status.HTTP_200_OK)
+def get_triage_researcher_detail(
+    researcher_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get researcher triage details.
+    
+    Shows detailed triage metrics for a specific researcher.
+    
+    Only triage specialists can access.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can access researcher details"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        researcher = service.get_researcher_detail(researcher_id=researcher_id)
+        return researcher
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+# ============================================
+# TRIAGE PROGRAMS ENDPOINTS
+# ============================================
+
+@router.get("/triage/programs", status_code=status.HTTP_200_OK)
+def get_triage_programs(
+    search: Optional[str] = Query(None, description="Search by program name"),
+    sort_by: str = Query("pending_count", description="Sort by: pending_count, total_reports, avg_triage_time"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get programs with triage metrics.
+    
+    Shows program statistics from triage perspective:
+    - Pending reports count
+    - Total reports count
+    - Average triage time
+    - Valid/Invalid ratio
+    
+    Only triage specialists can access.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can access program metrics"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        programs = service.get_programs_with_metrics(
+            search=search,
+            sort_by=sort_by,
+            limit=limit,
+            offset=offset
+        )
+        
+        return {
+            "programs": programs,
+            "total": len(programs),
+            "limit": limit,
+            "offset": offset
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get programs: {str(e)}"
+        )
+
+
+@router.get("/triage/programs/{program_id}", status_code=status.HTTP_200_OK)
+def get_triage_program_detail(
+    program_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get program triage details.
+    
+    Shows detailed triage metrics for a specific program.
+    
+    Only triage specialists can access.
+    """
+    if not can_access_triage_queue(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only triage specialists can access program details"
+        )
+    
+    service = TriageService(db)
+    
+    try:
+        program = service.get_program_detail(program_id=program_id)
+        return program
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )

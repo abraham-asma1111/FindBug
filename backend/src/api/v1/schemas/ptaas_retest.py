@@ -4,6 +4,7 @@ PTaaS Retest Schemas - FREQ-37
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from uuid import UUID
 
 
 # Retest Policy Schemas
@@ -21,8 +22,8 @@ class PTaaSRetestPolicyCreate(BaseModel):
 
 
 class PTaaSRetestPolicyResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     retest_period_months: int
     max_free_retests_per_finding: int
     eligible_severities: Optional[List[str]]
@@ -48,16 +49,16 @@ class PTaaSRetestRequestCreate(BaseModel):
 
 
 class PTaaSRetestRequestResponse(BaseModel):
-    id: int
-    finding_id: int
-    engagement_id: int
-    requested_by: int
+    id: UUID
+    finding_id: UUID
+    engagement_id: UUID
+    requested_by: UUID
     requested_at: datetime
     status: str
     fix_description: str
     fix_implemented_at: Optional[datetime]
     fix_evidence: Optional[List[str]]
-    assigned_to: Optional[int]
+    assigned_to: Optional[UUID]
     assigned_at: Optional[datetime]
     retest_started_at: Optional[datetime]
     retest_completed_at: Optional[datetime]
@@ -77,7 +78,7 @@ class PTaaSRetestRequestResponse(BaseModel):
 
 
 class PTaaSRetestAssignment(BaseModel):
-    assigned_to: int = Field(..., description="User ID to assign retest to")
+    assigned_to: UUID = Field(..., description="User ID to assign retest to")
 
 
 class PTaaSRetestCompletion(BaseModel):

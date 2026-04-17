@@ -206,12 +206,15 @@ class PTaaSService:
         discovered_by: UUID
     ) -> PTaaSFinding:
         """Create a new finding with mandatory field validation - FREQ-35"""
+        from datetime import datetime
+        
         # Check if mandatory fields are complete
         mandatory_complete = self.check_mandatory_fields_complete(finding_data)
         
         finding_dict = {
             **finding_data, 
             'discovered_by': discovered_by,
+            'discovered_at': datetime.utcnow(),  # Set timestamp
             'mandatory_fields_complete': mandatory_complete,
             'template_version': '1.0',
             'status': 'SUBMITTED'

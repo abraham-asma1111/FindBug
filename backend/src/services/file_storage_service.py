@@ -69,7 +69,21 @@ class FileStorageService:
                     ContentType=file.content_type
                 )
             except Exception:
-                pass  # Fallback to database storage
+                pass  # Fallback to local storage
+        
+        # Fallback to local storage if S3 is not available
+        if not self.s3_client:
+            import os
+            local_storage_path = getattr(settings, 'LOCAL_STORAGE_PATH', 'uploads') if settings else 'uploads'
+            
+            # Create directory if it doesn't exist
+            full_dir_path = os.path.join(local_storage_path, str(user_id))
+            os.makedirs(full_dir_path, exist_ok=True)
+            
+            # Save file locally
+            local_file_path = os.path.join(local_storage_path, storage_key)
+            with open(local_file_path, 'wb') as f:
+                f.write(content)
         
         # Return file metadata
         return {

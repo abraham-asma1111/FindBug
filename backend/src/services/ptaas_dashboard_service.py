@@ -89,8 +89,8 @@ class PTaaSDashboardService:
         # Get unique assets tested (from findings)
         tested_assets = set()
         for finding in findings:
-            if finding.affected_asset:
-                tested_assets.add(finding.affected_asset)
+            if finding.affected_component:  # Fixed: was affected_asset
+                tested_assets.add(finding.affected_component)
         
         total_assets = len(in_scope_targets) if in_scope_targets else 0
         tested_assets_count = len(tested_assets)
@@ -133,6 +133,7 @@ class PTaaSDashboardService:
                 {
                     'id': p.id,
                     'name': p.phase_name,
+                    'description': p.description,
                     'order': p.phase_order,
                     'status': p.status,
                     'progress': p.progress_percentage,
@@ -296,32 +297,241 @@ class PTaaSDashboardService:
         """Initialize testing phases based on methodology - FREQ-34"""
         phase_templates = {
             'OWASP': [
-                {'name': 'Information Gathering', 'order': 1},
-                {'name': 'Configuration Management', 'order': 2},
-                {'name': 'Identity Management', 'order': 3},
-                {'name': 'Authentication Testing', 'order': 4},
-                {'name': 'Authorization Testing', 'order': 5},
-                {'name': 'Session Management', 'order': 6},
-                {'name': 'Input Validation', 'order': 7},
-                {'name': 'Error Handling', 'order': 8},
-                {'name': 'Cryptography', 'order': 9},
-                {'name': 'Business Logic', 'order': 10},
-                {'name': 'Client-Side Testing', 'order': 11}
+                {
+                    'name': 'Information Gathering', 
+                    'order': 1, 
+                    'description': 'Collect information about the target application and infrastructure',
+                    'checklist': [
+                        {'name': 'Search engine discovery', 'category': 'Reconnaissance'},
+                        {'name': 'Fingerprint web server', 'category': 'Reconnaissance'},
+                        {'name': 'Review webserver metafiles', 'category': 'Reconnaissance'},
+                        {'name': 'Enumerate applications', 'category': 'Reconnaissance'},
+                        {'name': 'Review webpage comments', 'category': 'Reconnaissance'}
+                    ]
+                },
+                {
+                    'name': 'Configuration Management', 
+                    'order': 2, 
+                    'description': 'Test configuration and deployment management',
+                    'checklist': [
+                        {'name': 'Test network infrastructure', 'category': 'Configuration'},
+                        {'name': 'Test application platform', 'category': 'Configuration'},
+                        {'name': 'Test file extensions handling', 'category': 'Configuration'},
+                        {'name': 'Review old backup files', 'category': 'Configuration'}
+                    ]
+                },
+                {
+                    'name': 'Identity Management', 
+                    'order': 3, 
+                    'description': 'Test user registration and account provisioning',
+                    'checklist': [
+                        {'name': 'Test role definitions', 'category': 'Identity'},
+                        {'name': 'Test user registration', 'category': 'Identity'},
+                        {'name': 'Test account provisioning', 'category': 'Identity'}
+                    ]
+                },
+                {
+                    'name': 'Authentication Testing', 
+                    'order': 4, 
+                    'description': 'Test authentication mechanisms and bypass techniques',
+                    'checklist': [
+                        {'name': 'Test credentials transport', 'category': 'Authentication'},
+                        {'name': 'Test default credentials', 'category': 'Authentication'},
+                        {'name': 'Test weak lockout mechanism', 'category': 'Authentication'},
+                        {'name': 'Test password policy', 'category': 'Authentication'},
+                        {'name': 'Test remember password', 'category': 'Authentication'}
+                    ]
+                },
+                {
+                    'name': 'Authorization Testing', 
+                    'order': 5, 
+                    'description': 'Test authorization and access control mechanisms',
+                    'checklist': [
+                        {'name': 'Test path traversal', 'category': 'Authorization'},
+                        {'name': 'Test privilege escalation', 'category': 'Authorization'},
+                        {'name': 'Test insecure direct object references', 'category': 'Authorization'}
+                    ]
+                },
+                {
+                    'name': 'Session Management', 
+                    'order': 6, 
+                    'description': 'Test session handling and token management',
+                    'checklist': [
+                        {'name': 'Test session management schema', 'category': 'Session'},
+                        {'name': 'Test cookies attributes', 'category': 'Session'},
+                        {'name': 'Test session fixation', 'category': 'Session'},
+                        {'name': 'Test logout functionality', 'category': 'Session'}
+                    ]
+                },
+                {
+                    'name': 'Input Validation', 
+                    'order': 7, 
+                    'description': 'Test input validation and injection vulnerabilities',
+                    'checklist': [
+                        {'name': 'Test reflected XSS', 'category': 'Input Validation'},
+                        {'name': 'Test stored XSS', 'category': 'Input Validation'},
+                        {'name': 'Test SQL injection', 'category': 'Input Validation'},
+                        {'name': 'Test command injection', 'category': 'Input Validation'},
+                        {'name': 'Test XXE injection', 'category': 'Input Validation'}
+                    ]
+                },
+                {
+                    'name': 'Error Handling', 
+                    'order': 8, 
+                    'description': 'Test error handling and information disclosure',
+                    'checklist': [
+                        {'name': 'Test error codes', 'category': 'Error Handling'},
+                        {'name': 'Test stack traces', 'category': 'Error Handling'}
+                    ]
+                },
+                {
+                    'name': 'Cryptography', 
+                    'order': 9, 
+                    'description': 'Test cryptographic implementations and weak encryption',
+                    'checklist': [
+                        {'name': 'Test weak SSL/TLS ciphers', 'category': 'Cryptography'},
+                        {'name': 'Test padding oracle', 'category': 'Cryptography'},
+                        {'name': 'Test sensitive data in transit', 'category': 'Cryptography'}
+                    ]
+                },
+                {
+                    'name': 'Business Logic', 
+                    'order': 10, 
+                    'description': 'Test business logic flaws and workflow bypasses',
+                    'checklist': [
+                        {'name': 'Test business logic data validation', 'category': 'Business Logic'},
+                        {'name': 'Test ability to forge requests', 'category': 'Business Logic'},
+                        {'name': 'Test integrity checks', 'category': 'Business Logic'}
+                    ]
+                },
+                {
+                    'name': 'Client-Side Testing', 
+                    'order': 11, 
+                    'description': 'Test client-side security controls and DOM-based vulnerabilities',
+                    'checklist': [
+                        {'name': 'Test DOM-based XSS', 'category': 'Client-Side'},
+                        {'name': 'Test JavaScript execution', 'category': 'Client-Side'},
+                        {'name': 'Test HTML injection', 'category': 'Client-Side'}
+                    ]
+                }
             ],
             'PTES': [
-                {'name': 'Pre-Engagement', 'order': 1},
-                {'name': 'Intelligence Gathering', 'order': 2},
-                {'name': 'Threat Modeling', 'order': 3},
-                {'name': 'Vulnerability Analysis', 'order': 4},
-                {'name': 'Exploitation', 'order': 5},
-                {'name': 'Post Exploitation', 'order': 6},
-                {'name': 'Reporting', 'order': 7}
+                {
+                    'name': 'Pre-Engagement', 
+                    'order': 1, 
+                    'description': 'Define scope, rules of engagement, and objectives',
+                    'checklist': [
+                        {'name': 'Define scope', 'category': 'Planning'},
+                        {'name': 'Define rules of engagement', 'category': 'Planning'},
+                        {'name': 'Define objectives', 'category': 'Planning'},
+                        {'name': 'Obtain authorization', 'category': 'Planning'}
+                    ]
+                },
+                {
+                    'name': 'Intelligence Gathering', 
+                    'order': 2, 
+                    'description': 'Collect information about the target environment',
+                    'checklist': [
+                        {'name': 'Passive reconnaissance', 'category': 'Intelligence'},
+                        {'name': 'Active reconnaissance', 'category': 'Intelligence'},
+                        {'name': 'Network enumeration', 'category': 'Intelligence'},
+                        {'name': 'Service enumeration', 'category': 'Intelligence'}
+                    ]
+                },
+                {
+                    'name': 'Threat Modeling', 
+                    'order': 3, 
+                    'description': 'Identify potential attack vectors and threats',
+                    'checklist': [
+                        {'name': 'Identify assets', 'category': 'Threat Modeling'},
+                        {'name': 'Identify threats', 'category': 'Threat Modeling'},
+                        {'name': 'Map attack vectors', 'category': 'Threat Modeling'}
+                    ]
+                },
+                {
+                    'name': 'Vulnerability Analysis', 
+                    'order': 4, 
+                    'description': 'Identify and analyze vulnerabilities',
+                    'checklist': [
+                        {'name': 'Automated scanning', 'category': 'Vulnerability Analysis'},
+                        {'name': 'Manual testing', 'category': 'Vulnerability Analysis'},
+                        {'name': 'Validate findings', 'category': 'Vulnerability Analysis'}
+                    ]
+                },
+                {
+                    'name': 'Exploitation', 
+                    'order': 5, 
+                    'description': 'Attempt to exploit identified vulnerabilities',
+                    'checklist': [
+                        {'name': 'Exploit vulnerabilities', 'category': 'Exploitation'},
+                        {'name': 'Gain initial access', 'category': 'Exploitation'},
+                        {'name': 'Document exploitation', 'category': 'Exploitation'}
+                    ]
+                },
+                {
+                    'name': 'Post Exploitation', 
+                    'order': 6, 
+                    'description': 'Assess impact and maintain access',
+                    'checklist': [
+                        {'name': 'Privilege escalation', 'category': 'Post Exploitation'},
+                        {'name': 'Lateral movement', 'category': 'Post Exploitation'},
+                        {'name': 'Data exfiltration', 'category': 'Post Exploitation'},
+                        {'name': 'Persistence', 'category': 'Post Exploitation'}
+                    ]
+                },
+                {
+                    'name': 'Reporting', 
+                    'order': 7, 
+                    'description': 'Document findings and provide recommendations',
+                    'checklist': [
+                        {'name': 'Executive summary', 'category': 'Reporting'},
+                        {'name': 'Technical findings', 'category': 'Reporting'},
+                        {'name': 'Remediation recommendations', 'category': 'Reporting'},
+                        {'name': 'Risk assessment', 'category': 'Reporting'}
+                    ]
+                }
             ],
             'NIST': [
-                {'name': 'Planning', 'order': 1},
-                {'name': 'Discovery', 'order': 2},
-                {'name': 'Attack', 'order': 3},
-                {'name': 'Reporting', 'order': 4}
+                {
+                    'name': 'Planning', 
+                    'order': 1, 
+                    'description': 'Plan the penetration test and define objectives',
+                    'checklist': [
+                        {'name': 'Define test objectives', 'category': 'Planning'},
+                        {'name': 'Identify scope', 'category': 'Planning'},
+                        {'name': 'Obtain authorization', 'category': 'Planning'}
+                    ]
+                },
+                {
+                    'name': 'Discovery', 
+                    'order': 2, 
+                    'description': 'Discover and enumerate target systems',
+                    'checklist': [
+                        {'name': 'Network discovery', 'category': 'Discovery'},
+                        {'name': 'Service enumeration', 'category': 'Discovery'},
+                        {'name': 'Vulnerability identification', 'category': 'Discovery'}
+                    ]
+                },
+                {
+                    'name': 'Attack', 
+                    'order': 3, 
+                    'description': 'Execute attacks and exploit vulnerabilities',
+                    'checklist': [
+                        {'name': 'Exploit vulnerabilities', 'category': 'Attack'},
+                        {'name': 'Gain access', 'category': 'Attack'},
+                        {'name': 'Escalate privileges', 'category': 'Attack'}
+                    ]
+                },
+                {
+                    'name': 'Reporting', 
+                    'order': 4, 
+                    'description': 'Report findings and recommendations',
+                    'checklist': [
+                        {'name': 'Document findings', 'category': 'Reporting'},
+                        {'name': 'Provide recommendations', 'category': 'Reporting'},
+                        {'name': 'Present results', 'category': 'Reporting'}
+                    ]
+                }
             ]
         }
         
@@ -329,13 +539,25 @@ class PTaaSDashboardService:
         phases = []
         
         for template in templates:
+            # Create phase
             phase = self.create_testing_phase({
                 'engagement_id': engagement_id,
                 'phase_name': template['name'],
+                'description': template.get('description', ''),
                 'phase_order': template['order'],
                 'status': 'NOT_STARTED',
                 'progress_percentage': 0
             })
             phases.append(phase)
+            
+            # Create checklist items for this phase
+            for checklist_item in template.get('checklist', []):
+                self.create_checklist_item({
+                    'phase_id': phase.id,
+                    'engagement_id': engagement_id,
+                    'item_name': checklist_item['name'],
+                    'category': checklist_item['category'],
+                    'is_completed': False
+                })
         
         return phases

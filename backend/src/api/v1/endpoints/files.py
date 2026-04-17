@@ -5,7 +5,9 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+import io
 
 from src.core.database import get_db
 from src.api.v1.middlewares.auth import get_current_user
@@ -13,26 +15,94 @@ from src.domain.models.user import User
 from src.services.file_storage_service import FileStorageService
 
 # File upload constants
-ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.txt', '.zip'}
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.txt', '.zip', '.mp4', '.mov', '.avi', '.webm', '.log'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 router = APIRouter(prefix="/files", tags=["files"])
 
 
-class FileUploadResponse:
-    def __init__(self, filename, file_path, size, content_type, uploaded_at):
-        self.filename = filename
-        self.file_path = file_path
-        self.size = size
-        self.content_type = content_type
-        self.uploaded_at = uploaded_at
+@router.get("/serve/{file_path:path}")
+async def serve_file(
+    file_path: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Serve uploaded files by proxying them from MinIO/S3 or local storage.
+    This endpoint streams file content through the backend.
+    """
+    try:
+        storage_service = FileStorageService(db)
+        
+        # Try S3/MinIO first
+        if storage_service.s3_client:
+            try:
+                from src.core.config import settings
+                bucket_name = getattr(settings, 'MINIO_BUCKET', 'bugbounty-files')
+                
+                response = storage_service.s3_client.get_object(
+                    Bucket=bucket_name,
+                    Key=file_path
+                )
+                
+                content_type = response.get('ContentType', 'application/octet-stream')
+                
+                return StreamingResponse(
+                    io.BytesIO(response['Body'].read()),
+                    media_type=content_type,
+                    headers={
+                        'Content-Disposition': f'inline; filename="{file_path.split("/")[-1]}"',
+                        'Cache-Control': 'public, max-age=3600'
+                    }
+                )
+            except Exception as s3_error:
+                # Fall through to local storage
+                pass
+        
+        # Try local storage as fallback
+        from src.core.config import settings
+        local_storage_path = getattr(settings, 'LOCAL_STORAGE_PATH', 'uploads')
+        local_file_path = os.path.join(local_storage_path, file_path)
+        
+        if os.path.exists(local_file_path):
+            # Determine content type from extension
+            import mimetypes
+            content_type, _ = mimetypes.guess_type(local_file_path)
+            if not content_type:
+                content_type = 'application/octet-stream'
+            
+            # Read and stream the file
+            with open(local_file_path, 'rb') as f:
+                file_content = f.read()
+            
+            return StreamingResponse(
+                io.BytesIO(file_content),
+                media_type=content_type,
+                headers={
+                    'Content-Disposition': f'inline; filename="{file_path.split("/")[-1]}"',
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            )
+        
+        # File not found in either location
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found in storage"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error serving file: {str(e)}"
+        )
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_file(
-    user_id: str = Form(...),
     file: UploadFile = File(...),
     report_id: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -54,29 +124,33 @@ async def upload_file(
                 detail=f"File type {file_extension} not allowed"
             )
         
-        # Check file size
-        file_content = await file.read()
-        if len(file_content) > MAX_FILE_SIZE:
+        # Check file size by reading content
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File size exceeds 10MB limit"
             )
         
-        # Store file
-        storage_service = FileStorageService()
-        file_path = storage_service.save_file(
-            file_content,
-            user_id=user_id,
-            subfolder=f"uploads/{datetime.utcnow().strftime('%Y/%m/%d')}"
+        # Reset file pointer for upload
+        await file.seek(0)
+        
+        # Store file using FileStorageService
+        storage_service = FileStorageService(db)
+        file_metadata = await storage_service.upload_file(
+            file=file,
+            user_id=current_user.id,
+            file_type="evidence"
         )
         
-        return FileUploadResponse(
-            filename=file.filename,
-            file_path=file_path["storage_path"],
-            size=len(file_content),
-            content_type=file.content_type,
-            uploaded_at=datetime.utcnow()
-        )
+        return {
+            "filename": file_metadata["filename"],
+            "file_path": file_metadata["storage_key"],
+            "file_id": file_metadata["id"],
+            "size": file_metadata["size"],
+            "content_type": file_metadata["mime_type"],
+            "uploaded_at": file_metadata["uploaded_at"]
+        }
         
     except HTTPException:
         raise

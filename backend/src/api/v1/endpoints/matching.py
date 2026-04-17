@@ -329,6 +329,51 @@ def get_program_recommendations(
     }
 
 
+@router.get("/organization/researchers")
+def list_researchers_for_organization(
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    List all researchers available for assignment.
+    
+    Organizations use this to browse and select researchers for engagements.
+    """
+    if current_user.role not in ["organization", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations and admins can list researchers"
+        )
+    
+    from src.domain.models.researcher import Researcher
+    
+    # Get all researchers with their profiles
+    researchers = db.query(Researcher).limit(limit).all()
+    
+    return [
+        {
+            "id": str(r.id),
+            "user": {
+                "id": str(r.user.id),
+                "email": r.user.email,
+                "full_name": f"{r.first_name or ''} {r.last_name or ''}".strip() or r.user.email.split('@')[0],
+                "username": r.username or r.user.email.split('@')[0]
+            },
+            "reputation_score": float(r.reputation_score) if r.reputation_score else 0,
+            "total_reports": r.total_reports or 0,
+            "verified_reports": r.verified_reports or 0,
+            "profile": {
+                "experience_years": 0,  # Not in current model
+                "skills": r.skills.split(',') if r.skills else [],
+                "specializations": [],  # Not in current model
+                "bio": r.bio
+            }
+        }
+        for r in researchers
+    ]
+
+
 @router.post("/feedback")
 def submit_feedback(
     request_id: UUID,
@@ -476,9 +521,10 @@ def get_ptaas_engagement_candidates(
     # Format response
     candidates = []
     for researcher, match_details in matches:
+        full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip() or researcher.user.email.split('@')[0]
         candidates.append({
             'researcher_id': str(researcher.id),
-            'researcher_name': f"{researcher.user.first_name} {researcher.user.last_name}",
+            'researcher_name': full_name,
             'reputation_score': researcher.reputation_score,
             'match_score': match_details['overall_score'],
             'skill_score': match_details['skill_score'],
@@ -575,9 +621,11 @@ def get_researcher_ptaas_match_score(
         compliance_requirements=None
     )
     
+    full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip() or researcher.user.email.split('@')[0]
+    
     return {
         "researcher_id": str(researcher_id),
-        "researcher_name": f"{researcher.user.first_name} {researcher.user.last_name}",
+        "researcher_name": full_name,
         "methodology": methodology,
         "match_details": match_details
     }
@@ -891,7 +939,7 @@ def get_pending_assignments(
                 "engagement_id": a.engagement_id,
                 "engagement_type": a.engagement_type,
                 "researcher_id": str(a.researcher_id),
-                "researcher_name": f"{a.researcher.user.first_name} {a.researcher.user.last_name}",
+                "researcher_name": f"{a.researcher.first_name or ''} {a.researcher.last_name or ''}".strip() or a.researcher.user.email.split('@')[0],
                 "match_score": float(a.match_score),
                 "match_details": a.match_details,
                 "proposed_at": a.proposed_at.isoformat(),
@@ -972,13 +1020,15 @@ def get_assignment_details(
             detail="Assignment not found"
         )
     
+    full_name = f"{assignment.researcher.first_name or ''} {assignment.researcher.last_name or ''}".strip() or assignment.researcher.user.email.split('@')[0]
+    
     return {
         "assignment": {
             "id": str(assignment.id),
             "engagement_id": assignment.engagement_id,
             "engagement_type": assignment.engagement_type,
             "researcher_id": str(assignment.researcher_id),
-            "researcher_name": f"{assignment.researcher.user.first_name} {assignment.researcher.user.last_name}",
+            "researcher_name": full_name,
             "organization_id": str(assignment.organization_id),
             "match_score": float(assignment.match_score),
             "match_details": assignment.match_details,
