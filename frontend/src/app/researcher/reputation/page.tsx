@@ -7,7 +7,7 @@ import SectionCard from '@/components/dashboard/SectionCard';
 import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
 import Spinner from '@/components/ui/Spinner';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import {
   formatCompactNumber,
   formatCurrency,

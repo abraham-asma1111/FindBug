@@ -28,7 +28,7 @@ import {
 } from '@/components/researcher/engagements/selectors';
 import type { EngagementProgram } from '@/hooks/useResearcherEngagementsData';
 import { useResearcherEngagementsData } from '@/hooks/useResearcherEngagementsData';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatCompactNumber, getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 

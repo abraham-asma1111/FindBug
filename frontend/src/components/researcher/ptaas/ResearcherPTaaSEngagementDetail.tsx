@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Textarea from '@/components/ui/Textarea';

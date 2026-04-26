@@ -7,7 +7,7 @@ import { useApiMutation } from '@/hooks/useApiMutation';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface ProgramCreateModalProps {
   onClose: () => void;
@@ -25,11 +25,9 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
     rules: '',
   });
 
-  const { mutate: createProgram, isLoading, error } = useApiMutation(
-    '/programs',
-    'POST',
-    {
-      onSuccess: async (program: any) => {
+  const createMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: async (program: any) => {
         // After program is created, add scopes
         if (formData.scope.trim()) {
           try {
@@ -72,8 +70,10 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
 
         onSuccess();
       },
+    onError: (error: any) => {
+      console.error('Program creation error:', error);
     }
-  );
+  });
 
   const handleSubmit = () => {
     // Remove scope, reward_tiers, and rules from the payload as they're handled separately
@@ -84,7 +84,7 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
       ? { ...programData, rules_of_engagement: rules }
       : programData;
     
-    createProgram(payload);
+    createMutation.mutate({ endpoint: '/programs', ...payload });
   };
 
   const isStepValid = () => {
@@ -271,9 +271,9 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
         </div>
 
         {/* Error Message */}
-        {error && (
+        {createMutation.error && (
           <div className="rounded-xl border border-[#f2c0bc] bg-[#fff2f1] p-4">
-            <p className="text-sm text-[#b42318]">{error.message || 'An error occurred'}</p>
+            <p className="text-sm text-[#b42318]">{createMutation.error.message || 'An error occurred'}</p>
           </div>
         )}
 
@@ -289,7 +289,7 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
               <Button
                 variant="secondary"
                 onClick={() => setStep(step - 1)}
-                disabled={isLoading}
+                disabled={createMutation.isLoading}
               >
                 Back
               </Button>
@@ -300,7 +300,7 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
             <Button
               variant="secondary"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={createMutation.isLoading}
             >
               Cancel
             </Button>
@@ -308,16 +308,16 @@ export default function ProgramCreateModal({ onClose, onSuccess }: ProgramCreate
             {step < 4 ? (
               <Button
                 onClick={() => setStep(step + 1)}
-                disabled={!isStepValid() || isLoading}
+                disabled={!isStepValid() || createMutation.isLoading}
               >
                 Next
               </Button>
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!isStepValid() || isLoading}
+                disabled={!isStepValid() || createMutation.isLoading}
               >
-                {isLoading ? 'Creating...' : 'Create Program'}
+                {createMutation.isLoading ? 'Creating...' : 'Create Program'}
               </Button>
             )}
           </div>

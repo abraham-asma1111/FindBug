@@ -7,7 +7,7 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import Button from '@/components/ui/Button';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatCurrency, getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import SectionCard from '@/components/dashboard/SectionCard';
 import type { ProgramScope } from '@/hooks/useResearcherEngagementsData';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import EngagementReportComposer from './EngagementReportComposer';
 import { formatStatusLabel } from './shared';
 import type { EngagementWorkflowItem } from './shared';

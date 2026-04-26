@@ -7,7 +7,7 @@ import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import {

@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { useApiMutation } from '@/hooks/useApiMutation';
 import Button from '@/components/ui/Button';
-import { FileText, Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Edit, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
+import TemplateCreateModal from '@/components/triage/templates/TemplateCreateModal';
+import TemplateEditModal from '@/components/triage/templates/TemplateEditModal';
 
 interface Template {
   id: string;
@@ -36,7 +40,12 @@ const categoryColors: Record<string, string> = {
 
 export default function TriageTemplatesPage() {
   const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const limit = 20;
 
   // Force dark mode for triage portal
@@ -48,9 +57,38 @@ export default function TriageTemplatesPage() {
   queryParams.append('limit', limit.toString());
   queryParams.append('offset', (page * limit).toString());
 
-  const { data, isLoading, error } = useApiQuery<TemplatesResponse>({
+  const { data, isLoading, error, refetch } = useApiQuery<TemplatesResponse>({
     endpoint: `/triage/templates?${queryParams.toString()}`,
   });
+
+  const handleRefresh = async () => {
+    await refetch();
+    setLastUpdated(new Date());
+  };
+
+  const handleEdit = (template: Template) => {
+    setSelectedTemplate(template);
+    setIsEditModalOpen(true);
+  };
+
+  const { mutate: deleteTemplate, isLoading: isDeleting } = useApiMutation({
+    method: 'DELETE',
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/triage/templates'] });
+      handleRefresh();
+    },
+    onError: (error: Error) => {
+      console.error('Delete error:', error);
+    },
+  });
+
+  const handleDelete = (templateId: string) => {
+    if (confirm('Are you sure you want to delete this template?')) {
+      deleteTemplate({ 
+        endpoint: `/triage/templates/${templateId}`
+      });
+    }
+  };
 
   const templates = data?.templates || [];
   const total = data?.total || 0;
@@ -87,10 +125,23 @@ export default function TriageTemplatesPage() {
                 </p>
               </div>
             </div>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              New Template
-            </Button>
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-[#94A3B8]">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </p>
+              <Button
+                onClick={handleRefresh}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+              >
+                Refresh
+              </Button>
+              <Button onClick={() => setIsCreateModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Template
+              </Button>
+            </div>
           </div>
 
           {/* Templates Grid */}
@@ -108,8 +159,8 @@ export default function TriageTemplatesPage() {
             <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
               <FileText className="mx-auto h-12 w-12 text-[#94A3B8]" />
               <p className="mt-4 text-[#94A3B8]">No templates found</p>
-              <Button className="mt-4 gap-2">
-                <Plus className="w-4 h-4" />
+              <Button className="mt-4" onClick={() => setIsCreateModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
                 Create First Template
               </Button>
             </div>
@@ -156,11 +207,21 @@ export default function TriageTemplatesPage() {
                   </p>
 
                   <div className="flex gap-2 pt-4 border-t border-[#334155]">
-                    <Button variant="outline" size="sm" className="flex-1 gap-2">
-                      <Edit className="w-4 h-4" />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleEdit(template)}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-2 text-[#EF4444]">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-[#EF4444]"
+                      onClick={() => handleDelete(template.id)}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -193,6 +254,20 @@ export default function TriageTemplatesPage() {
               </div>
             </div>
           )}
+
+          {/* Modals */}
+          <TemplateCreateModal
+            isOpen={isCreateModalOpen}
+            onClose={() => setIsCreateModalOpen(false)}
+          />
+          <TemplateEditModal
+            isOpen={isEditModalOpen}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setSelectedTemplate(null);
+            }}
+            template={selectedTemplate}
+          />
         </PortalShell>
       ) : null}
     </ProtectedRoute>

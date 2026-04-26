@@ -5,7 +5,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface AIRedTeamingInvitation {
   id: string;

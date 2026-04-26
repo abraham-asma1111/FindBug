@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/layout/Header';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 function VerifyOTPPageContent() {
   const router = useRouter();

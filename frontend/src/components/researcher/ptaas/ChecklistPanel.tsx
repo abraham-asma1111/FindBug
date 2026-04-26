@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Modal from '@/components/ui/Modal';

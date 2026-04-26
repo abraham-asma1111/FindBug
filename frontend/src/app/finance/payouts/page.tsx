@@ -1,12 +1,155 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import ProtectedRoute from '@/components/common/ProtectedRoute';
+import PortalShell from '@/components/portal/PortalShell';
+import { getPortalNavItems } from '@/lib/portal';
+import { useAuthStore } from '@/store/authStore';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import Button from '@/components/ui/Button';
+
 export default function FinancePayoutsPage() {
+  const user = useAuthStore((state) => state.user);
+  const searchParams = useSearchParams();
+  const statusFilter = searchParams.get('status') || 'all';
+
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
+  const endpoint = statusFilter === 'all' 
+    ? '/wallet/payouts' 
+    : `/wallet/payouts?status=${statusFilter}`;
+
+  const { data, isLoading } = useApiQuery<any>({
+    endpoint,
+  });
+
+  const payouts = data?.payouts || [];
+
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { bg: string; label: string }> = {
+      requested: { bg: 'bg-[#3B82F6]', label: 'REQUESTED' },
+      processing: { bg: 'bg-[#F59E0B]', label: 'PROCESSING' },
+      completed: { bg: 'bg-[#10B981]', label: 'COMPLETED' },
+      rejected: { bg: 'bg-[#EF4444]', label: 'REJECTED' },
+    };
+    const config = statusMap[status] || { bg: 'bg-[#94A3B8]', label: status.toUpperCase() };
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${config.bg} text-white`}>
+        {config.label}
+      </span>
+    );
+  };
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-        Payouts
-      </h1>
-      <p className="text-slate-600 dark:text-slate-400">
-        Approve and process researcher payouts
-      </p>
-    </div>
+    <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
+      {user ? (
+        <PortalShell
+          user={user}
+          title="Payouts"
+          subtitle="Manage researcher payouts"
+          navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Finance Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
+          hideTitle
+          hideSubtitle
+          hideThemeToggle={true}
+        >
+          {/* Hero Section */}
+          <section className="rounded-lg border border-[#334155] bg-[#1E293B] p-6 shadow-sm sm:p-8">
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#94A3B8]">
+                Payout Management
+              </p>
+              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#F8FAFC] sm:text-5xl">
+                Researcher Payouts
+              </h1>
+              <p className="mt-4 text-sm leading-7 text-[#94A3B8] sm:text-base">
+                Process payout requests from researchers to their payment methods.
+              </p>
+            </div>
+          </section>
+
+          {/* Filter Tabs */}
+          <div className="mt-6 flex gap-2 flex-wrap">
+            <Link href="/finance/payouts">
+              <Button 
+                variant={statusFilter === 'all' ? 'primary' : 'outline'} 
+                size="sm"
+                className={statusFilter === 'all' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
+              >
+                All
+              </Button>
+            </Link>
+            <Link href="/finance/payouts?status=requested">
+              <Button 
+                variant={statusFilter === 'requested' ? 'primary' : 'outline'} 
+                size="sm"
+                className={statusFilter === 'requested' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
+              >
+                Requested
+              </Button>
+            </Link>
+            <Link href="/finance/payouts?status=processing">
+              <Button 
+                variant={statusFilter === 'processing' ? 'primary' : 'outline'} 
+                size="sm"
+                className={statusFilter === 'processing' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
+              >
+                Processing
+              </Button>
+            </Link>
+            <Link href="/finance/payouts?status=completed">
+              <Button 
+                variant={statusFilter === 'completed' ? 'primary' : 'outline'} 
+                size="sm"
+                className={statusFilter === 'completed' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
+              >
+                Completed
+              </Button>
+            </Link>
+          </div>
+
+          {/* Payouts List */}
+          <div className="mt-6">
+            {isLoading ? (
+              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6 text-center">
+                <p className="text-[#94A3B8]">Loading payouts...</p>
+              </div>
+            ) : payouts.length === 0 ? (
+              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6 text-center">
+                <p className="text-[#94A3B8]">No payouts found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {payouts.map((payout: any) => (
+                  <Link key={payout.id} href={`/finance/payouts/${payout.id}`}>
+                    <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-4 hover:bg-[#334155] transition-colors cursor-pointer">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-[#F8FAFC] mb-1">
+                            Payout to {payout.researcher_name || 'Researcher'}
+                          </h3>
+                          <p className="text-sm text-[#94A3B8]">
+                            {payout.amount?.toLocaleString()} ETB • {payout.payment_method || 'Bank Transfer'} • {new Date(payout.requested_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          {getStatusBadge(payout.status)}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </PortalShell>
+      ) : null}
+    </ProtectedRoute>
   );
 }

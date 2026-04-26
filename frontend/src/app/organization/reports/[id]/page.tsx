@@ -10,13 +10,17 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
+import MediaViewer from '@/components/common/MediaViewer';
 import { useState } from 'react';
+import { Eye, Download } from 'lucide-react';
 
 export default function OrganizationReportDetailPage() {
   const params = useParams();
   const user = useAuthStore((state) => state.user);
   const reportId = params.id as string;
   const [commentText, setCommentText] = useState('');
+  const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false);
+  const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0);
 
   // Fetch report details
   const { data: report, isLoading, error } = useApiQuery(
@@ -47,6 +51,24 @@ export default function OrganizationReportDetailPage() {
   const handleAddComment = () => {
     if (!commentText.trim()) return;
     addCommentMutation.mutate({ comment_text: commentText });
+  };
+
+  const handleViewAttachment = (index: number) => {
+    setSelectedAttachmentIndex(index);
+    setIsMediaViewerOpen(true);
+  };
+
+  const handleDownloadAttachment = (attachment: any) => {
+    const link = document.createElement('a');
+    link.href = `/api/v1/files/serve/${attachment.storage_path}`;
+    link.download = attachment.original_filename || attachment.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const isMediaFile = (fileType: string) => {
+    return fileType?.startsWith('image/') || fileType?.startsWith('video/') || fileType === 'application/pdf';
   };
 
   if (isLoading) {
@@ -263,31 +285,103 @@ export default function OrganizationReportDetailPage() {
                 <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-slate-100">
                   Attachments ({report.attachments.length})
                 </h2>
-                <div className="space-y-3">
-                  {report.attachments.map((attachment: any) => (
-                    <div
-                      key={attachment.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-[#111111]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
-                            {attachment.filename}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-slate-400">
-                            {attachment.file_type} • {(attachment.file_size / 1024).toFixed(2)} KB
-                          </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {report.attachments.map((attachment: any, index: number) => {
+                    const isMedia = isMediaFile(attachment.file_type);
+                    const isImage = attachment.file_type?.startsWith('image/');
+                    const isVideo = attachment.file_type?.startsWith('video/');
+                    
+                    return (
+                      <div
+                        key={attachment.id}
+                        className="group relative rounded-lg border border-gray-200 bg-gray-50 overflow-hidden dark:border-gray-700 dark:bg-[#111111]"
+                      >
+                        {/* Preview Thumbnail */}
+                        {isImage && (
+                          <div className="aspect-video bg-gray-100 dark:bg-neutral-900 relative overflow-hidden">
+                            <img
+                              src={`/api/v1/files/serve/${attachment.storage_path}`}
+                              alt={attachment.filename}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                              <button
+                                onClick={() => handleViewAttachment(index)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-white p-3 shadow-lg hover:scale-110 transform"
+                              >
+                                <Eye className="h-5 w-5 text-gray-900" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {isVideo && (
+                          <div className="aspect-video bg-gray-100 dark:bg-neutral-900 relative overflow-hidden">
+                            <video
+                              src={`/api/v1/files/serve/${attachment.storage_path}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                              <button
+                                onClick={() => handleViewAttachment(index)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-white p-3 shadow-lg hover:scale-110 transform"
+                              >
+                                <Eye className="h-5 w-5 text-gray-900" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* File Info */}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <svg className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">
+                                  {attachment.filename}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-slate-400">
+                                  {attachment.file_type} • {(attachment.file_size / 1024).toFixed(2)} KB
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              {isMedia && (
+                                <button
+                                  onClick={() => handleViewAttachment(index)}
+                                  className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition"
+                                  title="View"
+                                >
+                                  <Eye className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDownloadAttachment(attachment)}
+                                className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-neutral-800 transition"
+                                title="Download"
+                              >
+                                <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <Button size="sm" variant="secondary">
-                        Download
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+                
+                {/* Media Viewer Modal */}
+                {report.attachments && report.attachments.length > 0 && (
+                  <MediaViewer
+                    attachments={report.attachments}
+                    initialIndex={selectedAttachmentIndex}
+                    isOpen={isMediaViewerOpen}
+                    onClose={() => setIsMediaViewerOpen(false)}
+                  />
+                )}
               </section>
             )}
 

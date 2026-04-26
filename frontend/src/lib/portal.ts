@@ -41,6 +41,8 @@ export interface PortalNavItem {
   label: string;
   badge?: string | number;
   children?: PortalNavItem[];
+  category?: string;
+  icon?: string;
 }
 
 export function getPortalNavItems(role: UserRole): PortalNavItem[] {
@@ -89,12 +91,13 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   // Finance Officer Desk
   if (role === 'finance_officer') {
     return [
-      { href: '/finance/dashboard', label: 'Dashboard' },
+      { href: '/finance/dashboard', label: 'Dashboard', category: 'MAIN' },
       { 
         href: '/finance/payments', 
         label: 'Payments',
+        category: 'PAYMENTS',
         children: [
-          { href: '/finance/payments?status=pending', label: 'Pending' },
+          { href: '/finance/payments?status=pending', label: 'Pending Approval' },
           { href: '/finance/payments?status=approved', label: 'Approved' },
           { href: '/finance/payments?status=completed', label: 'Completed' },
         ]
@@ -102,6 +105,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       { 
         href: '/finance/payouts', 
         label: 'Payouts',
+        category: 'PAYMENTS',
         children: [
           { href: '/finance/payouts?status=requested', label: 'Requested' },
           { href: '/finance/payouts?status=processing', label: 'Processing' },
@@ -111,15 +115,16 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       { 
         href: '/finance/kyc', 
         label: 'KYC',
+        category: 'PAYMENTS',
         children: [
           { href: '/finance/kyc?status=pending', label: 'Pending Review' },
           { href: '/finance/kyc?status=approved', label: 'Approved' },
           { href: '/finance/kyc?status=rejected', label: 'Rejected' },
         ]
       },
-      { href: '/finance/billing', label: 'Billing' },
-      { href: '/finance/reports', label: 'Financial Reports' },
-      { href: '/finance/analytics', label: 'Analytics' },
+      { href: '/finance/billing', label: 'Billing', category: 'REPORTS' },
+      { href: '/finance/reports', label: 'Financial Reports', category: 'REPORTS' },
+      { href: '/finance/analytics', label: 'Analytics', category: 'REPORTS' },
     ];
   }
 

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 export interface UseApiMutationOptions<TData, TVariables> {
+  method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   onSuccess?: (data: TData, variables: TVariables) => void;
   onError?: (error: Error, variables: TVariables) => void;
   onSettled?: (data: TData | null, error: Error | null, variables: TVariables) => void;
@@ -21,11 +22,9 @@ export interface UseApiMutationResult<TData, TVariables> {
 }
 
 export function useApiMutation<TData = any, TVariables = any>(
-  endpoint: string,
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'POST',
   options: UseApiMutationOptions<TData, TVariables> = {}
 ): UseApiMutationResult<TData, TVariables> {
-  const { onSuccess, onError, onSettled } = options;
+  const { onSuccess, onError, onSettled, method = 'POST' } = options;
 
   const [data, setData] = useState<TData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -49,17 +48,24 @@ export function useApiMutation<TData = any, TVariables = any>(
         setError(null);
         setIsSuccess(false);
 
+        // Extract endpoint from variables if provided
+        const { endpoint, ...data } = variables as any;
+        
+        if (!endpoint) {
+          throw new Error('Endpoint is required');
+        }
+
         let response: TData;
 
         switch (method) {
           case 'POST':
-            response = (await api.post<TData>(endpoint, variables)).data;
+            response = (await api.post<TData>(endpoint, data)).data;
             break;
           case 'PUT':
-            response = (await api.put<TData>(endpoint, variables)).data;
+            response = (await api.put<TData>(endpoint, data)).data;
             break;
           case 'PATCH':
-            response = (await api.patch<TData>(endpoint, variables)).data;
+            response = (await api.patch<TData>(endpoint, data)).data;
             break;
           case 'DELETE':
             response = (await api.delete<TData>(endpoint)).data;
@@ -126,7 +132,7 @@ export function useApiMutation<TData = any, TVariables = any>(
         setIsLoading(false);
       }
     },
-    [endpoint, method, onSuccess, onError, onSettled]
+    [method, onSuccess, onError, onSettled]
   );
 
   const mutateAsync = useCallback(

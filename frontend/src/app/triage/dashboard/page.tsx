@@ -65,7 +65,7 @@ export default function TriageDashboardPage() {
                 New Reports
               </p>
               <p className="mt-2 text-3xl font-bold text-[#EF4444]">
-                {stats?.by_status?.new || 0}
+                {stats?.status_breakdown?.new || 0}
               </p>
             </div>
             <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -73,7 +73,7 @@ export default function TriageDashboardPage() {
                 In Triage
               </p>
               <p className="mt-2 text-3xl font-bold text-[#F59E0B]">
-                {stats?.by_status?.triaged || 0}
+                {stats?.status_breakdown?.triaged || 0}
               </p>
             </div>
             <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -81,7 +81,7 @@ export default function TriageDashboardPage() {
                 Valid
               </p>
               <p className="mt-2 text-3xl font-bold text-[#3B82F6]">
-                {stats?.by_status?.valid || 0}
+                {stats?.status_breakdown?.valid || 0}
               </p>
             </div>
             <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -89,7 +89,7 @@ export default function TriageDashboardPage() {
                 Duplicates
               </p>
               <p className="mt-2 text-3xl font-bold text-[#94A3B8]">
-                {stats?.by_status?.duplicate || 0}
+                {stats?.status_breakdown?.duplicate || 0}
               </p>
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function TriageDashboardPage() {
                   Critical
                 </p>
                 <p className="mt-2 text-2xl font-bold text-[#EF4444]">
-                  {stats?.by_severity?.critical || 0}
+                  {stats?.severity_breakdown?.critical || 0}
                 </p>
               </div>
               <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -111,7 +111,7 @@ export default function TriageDashboardPage() {
                   High
                 </p>
                 <p className="mt-2 text-2xl font-bold text-[#F59E0B]">
-                  {stats?.by_severity?.high || 0}
+                  {stats?.severity_breakdown?.high || 0}
                 </p>
               </div>
               <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -119,7 +119,7 @@ export default function TriageDashboardPage() {
                   Medium
                 </p>
                 <p className="mt-2 text-2xl font-bold text-[#F59E0B]">
-                  {stats?.by_severity?.medium || 0}
+                  {stats?.severity_breakdown?.medium || 0}
                 </p>
               </div>
               <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -127,7 +127,7 @@ export default function TriageDashboardPage() {
                   Low
                 </p>
                 <p className="mt-2 text-2xl font-bold text-[#3B82F6]">
-                  {stats?.by_severity?.low || 0}
+                  {stats?.severity_breakdown?.low || 0}
                 </p>
               </div>
               <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -135,7 +135,7 @@ export default function TriageDashboardPage() {
                   Info
                 </p>
                 <p className="mt-2 text-2xl font-bold text-[#94A3B8]">
-                  {stats?.by_severity?.info || 0}
+                  {stats?.severity_breakdown?.info || 0}
                 </p>
               </div>
             </div>

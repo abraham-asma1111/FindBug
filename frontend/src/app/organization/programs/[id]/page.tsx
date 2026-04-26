@@ -36,50 +36,38 @@ export default function ProgramDetailPage() {
     enabled: activeTab === 'rewards',
   });
 
-  // Mutations
-  const { mutate: publishProgram, isLoading: isPublishing } = useApiMutation(
-    `/programs/${programId}/publish`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program published successfully!');
-        refetch();
-      },
-    }
-  );
+  // Mutations with useApiMutation
+  const publishMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      alert('Program published successfully!');
+      refetch();
+    },
+  });
 
-  const { mutate: pauseProgram, isLoading: isPausing } = useApiMutation(
-    `/programs/${programId}/pause`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program paused successfully!');
-        refetch();
-      },
-    }
-  );
+  const pauseMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      alert('Program paused successfully!');
+      refetch();
+    },
+  });
 
-  const { mutate: resumeProgram, isLoading: isResuming } = useApiMutation(
-    `/programs/${programId}/resume`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program resumed successfully!');
-        refetch();
-      },
-    }
-  );
+  const resumeMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      alert('Program resumed successfully!');
+      refetch();
+    },
+  });
 
-  const { mutate: closeProgram, isLoading: isClosing } = useApiMutation(
-    `/programs/${programId}/close`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program closed successfully!');
-        refetch();
-      },
-    }
-  );
+  const closeMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      alert('Program closed successfully!');
+      refetch();
+    },
+  });
 
   if (isLoading) {
     return (
@@ -379,32 +367,32 @@ export default function ProgramDetailPage() {
                 <div className="max-w-md space-y-4">
                   {program.status === 'draft' && (
                     <Button
-                      onClick={() => publishProgram({})}
-                      disabled={isPublishing}
+                      onClick={() => publishMutation.mutate({ endpoint: `/programs/${programId}/publish` })}
+                      disabled={publishMutation.isLoading}
                       className="w-full"
                     >
-                      {isPublishing ? 'Publishing...' : 'Publish Program'}
+                      {publishMutation.isLoading ? 'Publishing...' : 'Publish Program'}
                     </Button>
                   )}
 
                   {program.status === 'public' && (
                     <Button
-                      onClick={() => pauseProgram({})}
-                      disabled={isPausing}
+                      onClick={() => pauseMutation.mutate({ endpoint: `/programs/${programId}/pause` })}
+                      disabled={pauseMutation.isLoading}
                       variant="secondary"
                       className="w-full"
                     >
-                      {isPausing ? 'Pausing...' : 'Pause Program'}
+                      {pauseMutation.isLoading ? 'Pausing...' : 'Pause Program'}
                     </Button>
                   )}
 
                   {program.status === 'paused' && (
                     <Button
-                      onClick={() => resumeProgram({})}
-                      disabled={isResuming}
+                      onClick={() => resumeMutation.mutate({ endpoint: `/programs/${programId}/resume` })}
+                      disabled={resumeMutation.isLoading}
                       className="w-full"
                     >
-                      {isResuming ? 'Resuming...' : 'Resume Program'}
+                      {resumeMutation.isLoading ? 'Resuming...' : 'Resume Program'}
                     </Button>
                   )}
 
@@ -412,14 +400,14 @@ export default function ProgramDetailPage() {
                     <Button
                       onClick={() => {
                         if (confirm('Are you sure you want to close this program? This action cannot be undone.')) {
-                          closeProgram({});
+                          closeMutation.mutate({ endpoint: `/programs/${programId}/close` });
                         }
                       }}
-                      disabled={isClosing}
+                      disabled={closeMutation.isLoading}
                       variant="secondary"
                       className="w-full"
                     >
-                      {isClosing ? 'Closing...' : 'Close Program'}
+                      {closeMutation.isLoading ? 'Closing...' : 'Close Program'}
                     </Button>
                   )}
                 </div>

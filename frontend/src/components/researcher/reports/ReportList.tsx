@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import Spinner from '@/components/ui/Spinner';
 import Modal from '@/components/ui/Modal';
 
@@ -78,7 +78,8 @@ export default function ReportList() {
     vulnerability_type: '',
   });
 
-  const { data: reportsData, isLoading, isError, refetch } = useApiQuery<Report[]>('/reports/my-reports', {
+  const { data: reportsData, isLoading, isError, refetch } = useApiQuery<Report[]>({
+    endpoint: '/reports/my-reports',
     enabled: true,
   });
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { normalizeUser, type UserProfile } from '@/lib/portal';
 
 interface AuthState {

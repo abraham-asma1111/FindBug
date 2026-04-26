@@ -7,178 +7,228 @@ import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
-import { User, Search, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Search, AlertTriangle, User, TrendingUp, FileText, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
 
-interface Researcher {
+interface ResearcherData {
   id: string;
-  user_id: string;
+  username: string;
   email: string;
-  full_name: string;
   reputation_score: number;
   total_reports: number;
   valid_reports: number;
-  invalid_reports: number;
   duplicate_reports: number;
-  validity_rate: number;
-}
-
-interface ResearchersResponse {
-  researchers: Researcher[];
-  total: number;
-  limit: number;
-  offset: number;
+  invalid_reports: number;
+  spam_score: number;
 }
 
 export default function TriageResearchersPage() {
   const user = useAuthStore((state) => state.user);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('reports_count');
-  const [page, setPage] = useState(0);
-  const limit = 20;
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('total_reports');
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  // Force dark mode for triage portal
+  // Force dark mode
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  const queryParams = new URLSearchParams();
-  if (searchQuery) queryParams.append('search', searchQuery);
-  queryParams.append('sort_by', sortBy);
-  queryParams.append('limit', limit.toString());
-  queryParams.append('offset', (page * limit).toString());
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
 
-  const { data, isLoading, error } = useApiQuery<ResearchersResponse>({
-    endpoint: `/triage/researchers?${queryParams.toString()}`,
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const queryParams = new URLSearchParams({
+    sort_by: sortBy,
+    limit: '100',
   });
 
+  if (debouncedSearchQuery) {
+    queryParams.set('search', debouncedSearchQuery);
+  }
+
+  const { data, isLoading, error, refetch } = useApiQuery<{
+    researchers: ResearcherData[];
+    total: number;
+  }>({
+    endpoint: `/triage/researchers?${queryParams.toString()}`,
+    enabled: true,
+  });
+
+  useEffect(() => {
+    if (data) {
+      setLastUpdated(new Date());
+    }
+  }, [data]);
+
+  const handleRefresh = async () => {
+    await refetch();
+  };
   const researchers = data?.researchers || [];
-  const total = data?.total || 0;
-  const totalPages = Math.ceil(total / limit);
+
+  const getSpamBadgeColor = (score: number) => {
+    if (score >= 50) return 'bg-[#EF4444] text-white';
+    if (score >= 30) return 'bg-[#F59E0B] text-white';
+    return 'bg-[#10B981] text-white';
+  };
 
   return (
     <ProtectedRoute allowedRoles={['triage_specialist', 'admin', 'super_admin']}>
       {user ? (
         <PortalShell
           user={user}
-          title="Researchers"
-          subtitle="View researcher triage metrics"
+          title="Researcher Management"
+          subtitle="Monitor researchers and identify spam patterns"
           navItems={getPortalNavItems(user.role)}
           headerAlign="left"
           hideThemeToggle={true}
         >
-          {/* Search and Sort */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row">
+          {/* Search and Filters */}
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#94A3B8] w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search by name or email..."
+                placeholder="Search by username or email..."
                 value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setPage(0);
-                }}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#334155] bg-[#1E293B] text-[#F8FAFC] placeholder-[#94A3B8] focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent"
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-[#1E293B] border border-[#334155] rounded-lg text-[#F8FAFC] placeholder-[#94A3B8] focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setDebouncedSearchQuery('');
+                  }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#94A3B8] hover:text-[#F8FAFC]"
+                >
+                  ×
+                </button>
+              )}
             </div>
-            <select
-              value={sortBy}
-              onChange={(e) => {
-                setSortBy(e.target.value);
-                setPage(0);
-              }}
-              className="px-4 py-2 rounded-lg border border-[#334155] bg-[#1E293B] text-[#F8FAFC] focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent"
-            >
-              <option value="reports_count">Most Reports</option>
-              <option value="valid_reports">Most Valid</option>
-              <option value="invalid_reports">Most Invalid</option>
-            </select>
-          </div>
 
-          {/* Stats */}
-          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Total Researchers
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#F8FAFC]">
-                {total}
-              </p>
-            </div>
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Total Reports
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#3B82F6]">
-                {researchers.reduce((sum, r) => sum + r.total_reports, 0)}
-              </p>
-            </div>
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Valid Reports
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#3B82F6]">
-                {researchers.reduce((sum, r) => sum + r.valid_reports, 0)}
-              </p>
-            </div>
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Avg Validity
-              </p>
-              <p className="mt-2 text-2xl font-bold text-[#3B82F6]">
-                {researchers.length > 0
-                  ? Math.round(
-                      researchers.reduce((sum, r) => sum + r.validity_rate, 0) /
-                        researchers.length
-                    )
-                  : 0}
-                %
-              </p>
+            <div className="flex gap-2 items-center">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-4 py-2 bg-[#1E293B] border border-[#334155] rounded-lg text-[#F8FAFC] focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent"
+              >
+                <option value="total_reports">Most Reports</option>
+                <option value="duplicates">Most Duplicates</option>
+                <option value="spam_score">Highest Spam Score</option>
+              </select>
+              
+              <div className="flex items-center gap-2 ml-2">
+                <p className="text-xs text-[#94A3B8] whitespace-nowrap">
+                  {lastUpdated.toLocaleTimeString()}
+                </p>
+                <Button
+                  onClick={handleRefresh}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Researchers Table */}
-          <div className="bg-[#1E293B] rounded-lg border border-[#334155] overflow-hidden">
-            {isLoading ? (
-              <div className="p-8 text-center">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-600 border-t-slate-100"></div>
-                <p className="mt-4 text-[#94A3B8]">Loading researchers...</p>
+          {/* Stats Overview */}
+          {data && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
+                <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">Total Researchers</p>
+                <p className="mt-2 text-2xl font-bold text-[#F8FAFC]">{data.total}</p>
               </div>
-            ) : error ? (
-              <div className="p-8 text-center">
-                <AlertCircle className="mx-auto h-8 w-8 text-[#EF4444]" />
-                <p className="mt-4 text-[#EF4444]">Failed to load researchers</p>
+              <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
+                <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">High Spam Risk</p>
+                <p className="mt-2 text-2xl font-bold text-[#EF4444]">
+                  {researchers.filter((r) => r.spam_score >= 50).length}
+                </p>
               </div>
-            ) : researchers.length === 0 ? (
-              <div className="p-8 text-center">
-                <User className="mx-auto h-12 w-12 text-[#94A3B8]" />
-                <p className="mt-4 text-[#94A3B8]">No researchers found</p>
+              <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
+                <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">Medium Risk</p>
+                <p className="mt-2 text-2xl font-bold text-[#F59E0B]">
+                  {researchers.filter((r) => r.spam_score >= 30 && r.spam_score < 50).length}
+                </p>
               </div>
-            ) : (
+              <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
+                <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">Good Standing</p>
+                <p className="mt-2 text-2xl font-bold text-[#10B981]">
+                  {researchers.filter((r) => r.spam_score < 30).length}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Researchers List */}
+          {isLoading ? (
+            <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-600 border-t-slate-100"></div>
+              <p className="mt-4 text-[#94A3B8]">Loading researchers...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6">
+              <div className="flex gap-3">
+                <AlertTriangle className="h-5 w-5 text-[#EF4444] flex-shrink-0 mt-0.5" />
+                <p className="text-[#EF4444]">Failed to load researchers</p>
+              </div>
+            </div>
+          ) : researchers.length === 0 ? (
+            <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
+              <User className="w-12 h-12 text-[#94A3B8] mx-auto mb-3" />
+              <p className="text-[#94A3B8]">
+                {searchQuery ? 'No researchers match your search' : 'No researchers found'}
+              </p>
+              {searchQuery && (
+                <Button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setDebouncedSearchQuery('');
+                  }}
+                  variant="outline"
+                  className="mt-4"
+                >
+                  Clear Search
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="bg-[#1E293B] rounded-lg border border-[#334155] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="border-b border-[#334155] bg-[#0F172A]">
+                  <thead className="bg-[#0F172A] border-b border-[#334155]">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
                         Researcher
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
                         Reputation
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
                         Total Reports
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
                         Valid
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                        Invalid
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
                         Duplicates
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                        Validity Rate
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
+                        Invalid
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
+                        Spam Score
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">
+                        Actions
                       </th>
                     </tr>
                   </thead>
@@ -186,16 +236,16 @@ export default function TriageResearchersPage() {
                     {researchers.map((researcher) => (
                       <tr
                         key={researcher.id}
-                        className="hover:bg-[#334155] transition-colors"
+                        className="hover:bg-[#0F172A] transition-colors"
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-[#0F172A]">
-                              <User className="w-4 h-4 text-[#94A3B8]" />
+                            <div className="w-10 h-10 rounded-full bg-[#3B82F6] flex items-center justify-center">
+                              <User className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <p className="font-semibold text-[#F8FAFC]">
-                                {researcher.full_name || 'Unknown'}
+                              <p className="text-sm font-medium text-[#F8FAFC]">
+                                {researcher.username}
                               </p>
                               <p className="text-xs text-[#94A3B8]">
                                 {researcher.email}
@@ -203,78 +253,59 @@ export default function TriageResearchersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-[#F8FAFC]">
-                            {researcher.reputation_score}
-                          </span>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <TrendingUp className="w-4 h-4 text-[#10B981]" />
+                            <span className="text-sm font-medium text-[#F8FAFC]">
+                              {researcher.reputation_score}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-[#3B82F6]">
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-medium text-[#F8FAFC]">
                             {researcher.total_reports}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-[#3B82F6]">
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-medium text-[#10B981]">
                             {researcher.valid_reports}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-[#EF4444]">
-                            {researcher.invalid_reports}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-[#F59E0B]">
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-medium text-[#F59E0B]">
                             {researcher.duplicate_reports}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {researcher.validity_rate >= 70 ? (
-                              <TrendingUp className="w-4 h-4 text-[#3B82F6]" />
-                            ) : (
-                              <TrendingDown className="w-4 h-4 text-[#EF4444]" />
-                            )}
-                            <span
-                              className={`font-semibold ${
-                                researcher.validity_rate >= 70
-                                  ? 'text-[#3B82F6]'
-                                  : 'text-[#EF4444]'
-                              }`}
-                            >
-                              {researcher.validity_rate.toFixed(1)}%
-                            </span>
-                          </div>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-medium text-[#EF4444]">
+                            {researcher.invalid_reports}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${getSpamBadgeColor(researcher.spam_score)}`}>
+                            {researcher.spam_score}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Link href={`/triage/researchers/${researcher.id}`}>
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <FileText className="w-4 h-4" />
+                              View Reports
+                            </Button>
+                          </Link>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-between">
-              <p className="text-sm text-[#94A3B8]">
-                Page {page + 1} of {totalPages} ({total} total researchers)
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setPage(Math.max(0, page - 1))}
-                  disabled={page === 0}
-                  variant="outline"
-                >
-                  Previous
-                </Button>
-                <Button
-                  onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                  disabled={page === totalPages - 1}
-                  variant="outline"
-                >
-                  Next
-                </Button>
+              {/* Results Count */}
+              <div className="px-6 py-3 bg-[#0F172A] border-t border-[#334155]">
+                <p className="text-sm text-[#94A3B8]">
+                  Showing {researchers.length} of {data?.total || 0} researchers
+                  {debouncedSearchQuery && ` matching "${debouncedSearchQuery}"`}
+                </p>
               </div>
             </div>
           )}

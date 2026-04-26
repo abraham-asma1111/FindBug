@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { formatCurrency, formatDateTime } from '@/lib/portal';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface Program {
   id: string;

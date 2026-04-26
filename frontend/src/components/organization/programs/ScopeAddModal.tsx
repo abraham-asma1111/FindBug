@@ -19,16 +19,13 @@ export default function ScopeAddModal({ programId, onClose, onSuccess }: ScopeAd
   const [isInScope, setIsInScope] = useState(true);
   const [description, setDescription] = useState('');
 
-  const { mutate: addScope, isLoading, error } = useApiMutation(
-    `/programs/${programId}/scopes`,
-    'POST',
-    {
-      onSuccess: () => {
-        alert('Scope added successfully!');
-        onSuccess();
-      },
-    }
-  );
+  const { mutate: addScope, isLoading, error } = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      alert('Scope added successfully!');
+      onSuccess();
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +36,7 @@ export default function ScopeAddModal({ programId, onClose, onSuccess }: ScopeAd
     }
 
     addScope({
+      endpoint: `/programs/${programId}/scopes`,
       asset_type: assetType,
       asset_identifier: assetIdentifier.trim(),
       is_in_scope: isInScope,

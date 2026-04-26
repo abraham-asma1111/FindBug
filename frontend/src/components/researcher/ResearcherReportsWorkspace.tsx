@@ -6,7 +6,7 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import SectionCard from '@/components/dashboard/SectionCard';
 import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import {
   formatCompactNumber,
   formatCurrency,

@@ -4,12 +4,12 @@ import { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import SimpleTabs from '@/components/ui/SimpleTabs';
-import { useApiMutation } from '@/hooks/useApiMutation';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { formatCurrency, formatDateTime } from '@/lib/portal';
 import Card from '@/components/ui/Card';
 import RewardEditModal from './RewardEditModal';
 import ScopeAddModal from './ScopeAddModal';
+import { api } from '@/lib/api';
 
 interface Program {
   id: string;
@@ -38,6 +38,10 @@ export default function ProgramDetailModal({
   onUpdate,
   isArchived = false 
 }: ProgramDetailModalProps) {
+  console.log('ProgramDetailModal rendered with program:', program);
+  console.log('Program status:', program.status);
+  console.log('Is archived:', isArchived);
+  
   const [activeTab, setActiveTab] = useState('overview');
   const [showRewardEditModal, setShowRewardEditModal] = useState(false);
   const [showScopeAddModal, setShowScopeAddModal] = useState(false);
@@ -57,96 +61,128 @@ export default function ProgramDetailModal({
     enabled: activeTab === 'rewards',
   });
 
-  // Mutations
-  const { mutate: publishProgram, isLoading: isPublishing, error: publishError } = useApiMutation(
-    `/programs/${program.id}/publish`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program published successfully!');
-        onUpdate();
-        onClose();
-      },
-      onError: (error) => {
-        console.error('Publish error:', error);
-      }
-    }
-  );
+  // Direct API calls instead of useApiMutation
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
-  const { mutate: pauseProgram, isLoading: isPausing, error: pauseError } = useApiMutation(
-    `/programs/${program.id}/pause`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program paused successfully!');
-        onUpdate();
-        onClose();
-      },
-      onError: (error) => {
-        console.error('Pause error:', error);
-      }
+  const handlePublish = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
+    console.log('=== PUBLISH BUTTON CLICKED ===');
+    console.log('Program ID:', program.id);
+    console.log('Program status:', program.status);
+    
+    if (!program.id) {
+      alert('Error: Program ID is missing');
+      return;
     }
-  );
+    
+    try {
+      setIsPublishing(true);
+      const endpoint = `/programs/${program.id}/publish`;
+      console.log('Making API call to:', endpoint);
+      console.log('Full URL:', `${api.defaults.baseURL}${endpoint}`);
+      
+      const response = await api.post(endpoint);
+      console.log('Publish response:', response.data);
+      
+      alert('Program published successfully!');
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      console.error('=== PUBLISH ERROR ===');
+      console.error('Error object:', error);
+      console.error('Response:', error.response);
+      console.error('Response data:', error.response?.data);
+      alert(error.response?.data?.detail || 'Failed to publish program');
+    } finally {
+      setIsPublishing(false);
+      console.log('=== PUBLISH COMPLETE ===');
+    }
+  };
 
-  const { mutate: resumeProgram, isLoading: isResuming, error: resumeError } = useApiMutation(
-    `/programs/${program.id}/resume`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program resumed successfully!');
-        onUpdate();
-        onClose();
-      },
-      onError: (error) => {
-        console.error('Resume error:', error);
-      }
+  const handlePause = async () => {
+    try {
+      setIsPausing(true);
+      await api.post(`/programs/${program.id}/pause`);
+      alert('Program paused successfully!');
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      console.error('Pause error:', error);
+      alert(error.response?.data?.detail || 'Failed to pause program');
+    } finally {
+      setIsPausing(false);
     }
-  );
+  };
 
-  const { mutate: closeProgram, isLoading: isClosing, error: closeError } = useApiMutation(
-    `/programs/${program.id}/close`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program closed successfully!');
-        onUpdate();
-        onClose();
-      },
-      onError: (error) => {
-        console.error('Close error:', error);
-      }
+  const handleResume = async () => {
+    try {
+      setIsResuming(true);
+      await api.post(`/programs/${program.id}/resume`);
+      alert('Program resumed successfully!');
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      console.error('Resume error:', error);
+      alert(error.response?.data?.detail || 'Failed to resume program');
+    } finally {
+      setIsResuming(false);
     }
-  );
+  };
 
-  const { mutate: archiveProgram, isLoading: isArchiving, error: archiveError } = useApiMutation(
-    `/programs/${program.id}/archive`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program archived successfully!');
-        onUpdate();
-        onClose();
-      },
-      onError: (error) => {
-        console.error('Archive error:', error);
-      }
+  const handleClose = async () => {
+    if (!confirm('Are you sure you want to close this program? This action cannot be undone.')) {
+      return;
     }
-  );
+    try {
+      setIsClosing(true);
+      await api.post(`/programs/${program.id}/close`);
+      alert('Program closed successfully!');
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      console.error('Close error:', error);
+      alert(error.response?.data?.detail || 'Failed to close program');
+    } finally {
+      setIsClosing(false);
+    }
+  };
 
-  const { mutate: restoreProgram, isLoading: isRestoring, error: restoreError } = useApiMutation(
-    `/programs/${program.id}/restore`,
-    'POST',
-    { 
-      onSuccess: () => {
-        alert('Program restored successfully!');
-        onUpdate();
-        onClose();
-      },
-      onError: (error) => {
-        console.error('Restore error:', error);
-      }
+  const handleArchive = async () => {
+    try {
+      setIsArchiving(true);
+      await api.post(`/programs/${program.id}/archive`);
+      alert('Program archived successfully!');
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      console.error('Archive error:', error);
+      alert(error.response?.data?.detail || 'Failed to archive program');
+    } finally {
+      setIsArchiving(false);
     }
-  );
+  };
+
+  const handleRestore = async () => {
+    try {
+      setIsRestoring(true);
+      await api.post(`/programs/${program.id}/restore`);
+      alert('Program restored successfully!');
+      onUpdate();
+      onClose();
+    } catch (error: any) {
+      console.error('Restore error:', error);
+      alert(error.response?.data?.detail || 'Failed to restore program');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -312,38 +348,32 @@ export default function ProgramDetailModal({
     </div>
   );
 
-  const renderSettings = () => (
-    <div className="space-y-6">
-      {/* Display any mutation errors */}
-      {(publishError || pauseError || resumeError || closeError || archiveError || restoreError) && (
-        <div className="rounded-xl border border-[#f2c0bc] dark:border-red-900 bg-[#fff2f1] dark:bg-red-950 p-4">
-          <p className="text-sm text-[#b42318] dark:text-red-200">
-            {publishError?.message || 
-             pauseError?.message || 
-             resumeError?.message || 
-             closeError?.message || 
-             archiveError?.message || 
-             restoreError?.message}
-          </p>
-        </div>
-      )}
-
-      <div>
-        <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">Program Actions</h4>
-        <div className="space-y-3">
-          {program.status === 'draft' && (
-            <Button
-              onClick={() => publishProgram({})}
-              disabled={isPublishing}
-              className="w-full"
-            >
-              {isPublishing ? 'Publishing...' : 'Publish Program'}
-            </Button>
-          )}
+  const renderSettings = () => {
+    console.log('renderSettings called, program.status:', program.status);
+    console.log('Should show publish button:', program.status === 'draft');
+    
+    return (
+      <div className="space-y-6">
+        <div>
+          <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">Program Actions</h4>
+          <div className="space-y-3">
+            {program.status === 'draft' && (
+              <Button
+                type="button"
+                onClick={(e) => {
+                  console.log('Button clicked!');
+                  handlePublish(e);
+                }}
+                disabled={isPublishing}
+                className="w-full"
+              >
+                {isPublishing ? 'Publishing...' : 'Publish Program'}
+              </Button>
+            )}
 
           {program.status === 'public' && (
             <Button
-              onClick={() => pauseProgram({})}
+              onClick={handlePause}
               disabled={isPausing}
               variant="secondary"
               className="w-full"
@@ -354,7 +384,7 @@ export default function ProgramDetailModal({
 
           {program.status === 'paused' && (
             <Button
-              onClick={() => resumeProgram({})}
+              onClick={handleResume}
               disabled={isResuming}
               className="w-full"
             >
@@ -364,11 +394,7 @@ export default function ProgramDetailModal({
 
           {(program.status === 'public' || program.status === 'paused') && (
             <Button
-              onClick={() => {
-                if (confirm('Are you sure you want to close this program? This action cannot be undone.')) {
-                  closeProgram({});
-                }
-              }}
+              onClick={handleClose}
               disabled={isClosing}
               variant="secondary"
               className="w-full"
@@ -379,7 +405,7 @@ export default function ProgramDetailModal({
 
           {program.status === 'closed' && !isArchived && (
             <Button
-              onClick={() => archiveProgram({})}
+              onClick={handleArchive}
               disabled={isArchiving}
               variant="secondary"
               className="w-full"
@@ -390,7 +416,7 @@ export default function ProgramDetailModal({
 
           {isArchived && (
             <Button
-              onClick={() => restoreProgram({})}
+              onClick={handleRestore}
               disabled={isRestoring}
               className="w-full"
             >
@@ -407,6 +433,7 @@ export default function ProgramDetailModal({
       </div>
     </div>
   );
+};
 
   const renderContent = () => {
     switch (activeTab) {

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { CheckCircle, XCircle, AlertTriangle, FileText, Upload } from 'lucide-react';
 
 interface RetestCompletionModalProps {
@@ -94,11 +94,17 @@ export default function RetestCompletionModal({
       // Filter out empty URLs
       const validUrls = evidenceUrls.filter(url => url.trim() !== '');
 
-      await api.post(`/ptaas/retests/${retestId}/complete`, {
+      // Build request payload - only include retest_evidence if there are valid URLs
+      const payload: any = {
         retest_result: selectedResult,
-        retest_notes: retestNotes.trim(),
-        retest_evidence: validUrls.length > 0 ? validUrls : null
-      });
+        retest_notes: retestNotes.trim()
+      };
+      
+      if (validUrls.length > 0) {
+        payload.retest_evidence = validUrls;
+      }
+
+      await api.post(`/ptaas/retests/${retestId}/complete`, payload);
 
       if (onSuccess) {
         onSuccess();

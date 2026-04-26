@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 export interface UseApiQueryOptions<T> {
-  endpoint: string;
+  endpoint?: string;
   queryKey?: string[];
   enabled?: boolean;
   refetchInterval?: number;
@@ -22,11 +22,27 @@ export interface UseApiQueryResult<T> {
   refetch: () => Promise<void>;
 }
 
+// Overload signatures
+export function useApiQuery<T = any>(
+  endpoint: string,
+  options?: Omit<UseApiQueryOptions<T>, 'endpoint'>
+): UseApiQueryResult<T>;
 export function useApiQuery<T = any>(
   options: UseApiQueryOptions<T>
+): UseApiQueryResult<T>;
+
+// Implementation
+export function useApiQuery<T = any>(
+  endpointOrOptions: string | UseApiQueryOptions<T>,
+  optionsParam?: Omit<UseApiQueryOptions<T>, 'endpoint'>
 ): UseApiQueryResult<T> {
+  // Normalize parameters
+  const options: UseApiQueryOptions<T> = typeof endpointOrOptions === 'string'
+    ? { endpoint: endpointOrOptions, ...optionsParam }
+    : endpointOrOptions;
+
   const {
-    endpoint,
+    endpoint = '',
     queryKey = [],
     enabled = true,
     refetchInterval,
@@ -37,13 +53,15 @@ export function useApiQuery<T = any>(
   } = options;
 
   const [data, setData] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(enabled);
+  const [isLoading, setIsLoading] = useState<boolean>(enabled && !!endpoint);
   const [isError, setIsError] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState<number>(0);
 
   const fetchData = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || !endpoint) return;
+
+    console.log(`[useApiQuery] Fetching: ${endpoint}`);
 
     try {
       setIsLoading(true);
@@ -51,6 +69,7 @@ export function useApiQuery<T = any>(
       setError(null);
 
       const response = await api.get<T>(endpoint);
+      console.log(`[useApiQuery] Success:`, response.data);
       setData(response.data);
       setRetryCount(0);
 
@@ -111,7 +130,7 @@ export function useApiQuery<T = any>(
 
   // Refetch interval
   useEffect(() => {
-    if (!refetchInterval || !enabled) return;
+    if (!refetchInterval || !enabled || !endpoint) return;
 
     const interval = setInterval(() => {
       // Only refetch if not currently loading to prevent vibration
@@ -121,7 +140,7 @@ export function useApiQuery<T = any>(
     }, refetchInterval);
 
     return () => clearInterval(interval);
-  }, [refetchInterval, enabled, fetchData, isLoading]);
+  }, [refetchInterval, enabled, endpoint, fetchData, isLoading]);
 
   return {
     data,

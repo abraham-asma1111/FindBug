@@ -8,15 +8,17 @@ import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
-import Card from '@/components/ui/Card';
-import { ChevronRight, AlertCircle, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ChevronRight, AlertCircle, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 interface Report {
   id: string;
   report_number: string;
   program_id: string;
+  program_name?: string;  // Backend provides this
   researcher_id: string;
+  researcher_name?: string;  // Backend provides this
+  researcher_email?: string;  // Backend provides this
   title: string;
   description: string;
   status: string;
@@ -81,13 +83,26 @@ export default function TriageReportsPage() {
   queryParams.append('limit', limit.toString());
   queryParams.append('offset', (page * limit).toString());
 
-  const { data, isLoading, error } = useApiQuery<ReportsResponse>({
+  const { data, isLoading, error, refetch } = useApiQuery<ReportsResponse>({
     endpoint: `/triage/queue?${queryParams.toString()}`,
+  });
+
+  // Fetch statistics for accurate counts across all reports
+  const { data: stats, refetch: refetchStats } = useApiQuery<any>({
+    endpoint: '/triage/statistics',
   });
 
   const reports = data?.reports || [];
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
+
+  // Track last update time
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const handleRefresh = async () => {
+    await Promise.all([refetch(), refetchStats()]);
+    setLastUpdated(new Date());
+  };
 
   return (
     <ProtectedRoute allowedRoles={['triage_specialist', 'admin', 'super_admin']}>
@@ -101,60 +116,81 @@ export default function TriageReportsPage() {
           hideThemeToggle={true}
         >
           {/* Filters */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-[#94A3B8] mb-2">
-                Status
-              </label>
-              <Select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(0);
-                }}
-                options={[
-                  { value: '', label: 'All Statuses' },
-                  { value: 'new', label: 'New' },
-                  { value: 'triaged', label: 'Triaged' },
-                  { value: 'valid', label: 'Valid' },
-                  { value: 'invalid', label: 'Invalid' },
-                  { value: 'duplicate', label: 'Duplicate' },
-                  { value: 'resolved', label: 'Resolved' },
-                ]}
-              />
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end flex-1">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-[#94A3B8] mb-2">
+                  Status
+                </label>
+                <Select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  options={[
+                    { value: '', label: 'All Statuses' },
+                    { value: 'new', label: 'New' },
+                    { value: 'triaged', label: 'Triaged' },
+                    { value: 'valid', label: 'Valid' },
+                    { value: 'invalid', label: 'Invalid' },
+                    { value: 'duplicate', label: 'Duplicate' },
+                    { value: 'resolved', label: 'Resolved' },
+                  ]}
+                />
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-[#94A3B8] mb-2">
+                  Severity
+                </label>
+                <Select
+                  value={severityFilter}
+                  onChange={(e) => {
+                    setSeverityFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  options={[
+                    { value: '', label: 'All Severities' },
+                    { value: 'critical', label: 'Critical' },
+                    { value: 'high', label: 'High' },
+                    { value: 'medium', label: 'Medium' },
+                    { value: 'low', label: 'Low' },
+                    { value: 'info', label: 'Info' },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <Button
+                  onClick={() => {
+                    setStatusFilter('');
+                    setSeverityFilter('');
+                    setPage(0);
+                  }}
+                  variant="outline"
+                >
+                  Clear Filters
+                </Button>
+              </div>
             </div>
 
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-[#94A3B8] mb-2">
-                Severity
-              </label>
-              <Select
-                value={severityFilter}
-                onChange={(e) => {
-                  setSeverityFilter(e.target.value);
-                  setPage(0);
-                }}
-                options={[
-                  { value: '', label: 'All Severities' },
-                  { value: 'critical', label: 'Critical' },
-                  { value: 'high', label: 'High' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'low', label: 'Low' },
-                  { value: 'info', label: 'Info' },
-                ]}
-              />
-            </div>
-
-            <div>
+            {/* Refresh Button */}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-xs text-[#94A3B8]">
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </p>
+              </div>
               <Button
-                onClick={() => {
-                  setStatusFilter('');
-                  setSeverityFilter('');
-                  setPage(0);
-                }}
+                onClick={handleRefresh}
                 variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={isLoading}
               >
-                Clear Filters
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
               </Button>
             </div>
           </div>
@@ -166,7 +202,7 @@ export default function TriageReportsPage() {
                 Total Reports
               </p>
               <p className="mt-2 text-2xl font-bold text-[#F8FAFC]">
-                {total}
+                {stats?.total_reports || 0}
               </p>
             </div>
             <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -174,7 +210,7 @@ export default function TriageReportsPage() {
                 New
               </p>
               <p className="mt-2 text-2xl font-bold text-[#EF4444]">
-                {reports.filter((r) => r.status === 'new').length}
+                {stats?.status_breakdown?.new || 0}
               </p>
             </div>
             <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -182,7 +218,7 @@ export default function TriageReportsPage() {
                 Pending Triage
               </p>
               <p className="mt-2 text-2xl font-bold text-[#F59E0B]">
-                {reports.filter((r) => r.status === 'triaged').length}
+                {stats?.pending_triage || 0}
               </p>
             </div>
             <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -190,7 +226,7 @@ export default function TriageReportsPage() {
                 Duplicates
               </p>
               <p className="mt-2 text-2xl font-bold text-[#94A3B8]">
-                {reports.filter((r) => r.is_duplicate).length}
+                {stats?.status_breakdown?.duplicate || 0}
               </p>
             </div>
           </div>
@@ -218,6 +254,9 @@ export default function TriageReportsPage() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                         Report
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                        Researcher / Program
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                         Status
@@ -253,6 +292,16 @@ export default function TriageReportsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                              {report.researcher_name || 'Unknown Researcher'}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                              {report.program_name || 'Unknown Program'}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
                           <div className={`flex items-center gap-2 ${statusColors[report.status] || 'text-slate-600'}`}>
                             {statusIcons[report.status]}
                             <span className="text-sm font-medium capitalize">
@@ -279,7 +328,7 @@ export default function TriageReportsPage() {
                         <td className="px-6 py-4">
                           {report.bounty_amount ? (
                             <span className="font-semibold text-slate-900 dark:text-slate-100">
-                              ${report.bounty_amount.toLocaleString()}
+                              {report.bounty_amount.toLocaleString()} ETB
                             </span>
                           ) : (
                             <span className="text-slate-500 dark:text-slate-400">-</span>

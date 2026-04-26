@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button';
 import TriageFeedbackPanel from './TriageFeedbackPanel';
 import RetestSubmissionModal from './RetestSubmissionModal';
 import RetestCompletionModal from './RetestCompletionModal';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { 
   AlertCircle, CheckCircle, Clock, XCircle, 
   FileText, Code, Image, Video, Shield, 

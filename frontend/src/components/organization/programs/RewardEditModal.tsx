@@ -53,15 +53,12 @@ export default function RewardEditModal({
     }
   }, [existingRewards]);
 
-  const { mutate: saveRewards, isLoading, error } = useApiMutation(
-    `/programs/${programId}/rewards`,
-    'POST',
-    {
-      onSuccess: () => {
-        onSuccess();
-      },
-    }
-  );
+  const { mutate: saveRewards, isLoading, error } = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      onSuccess();
+    },
+  });
 
   const handleSubmit = () => {
     // Build tiers array from rewards
@@ -85,7 +82,10 @@ export default function RewardEditModal({
       return;
     }
 
-    saveRewards({ tiers });
+    saveRewards({ 
+      endpoint: `/programs/${programId}/rewards`,
+      tiers 
+    });
   };
 
   const updateReward = (severity: string, field: 'min' | 'max', value: string) => {

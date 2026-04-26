@@ -69,8 +69,12 @@ export default function ReportSubmissionForm() {
     }
   );
 
-  const { mutate: submitReport, isLoading } = useApiMutation('/reports', 'POST', {
+  const { mutate: submitReport, isLoading } = useApiMutation({
+    method: 'POST',
     onSuccess: async (response: any) => {
+      // Show success notification immediately
+      setSubmitSuccess(true);
+      
       // If we have files, upload them to the created report
       if (uploadedFiles.length > 0 && response.report_id) {
         try {
@@ -92,9 +96,10 @@ export default function ReportSubmissionForm() {
         }
       }
       
-      setSubmitSuccess(true);
+      // Reset form
       setCurrentStep(0);
       setUploadedFiles([]);
+      reset();
       setTimeout(() => setSubmitSuccess(false), 5000);
     },
   });
@@ -195,6 +200,7 @@ export default function ReportSubmissionForm() {
 
     // Submit report data (files will be uploaded in onSuccess callback)
     const reportData = {
+      endpoint: '/reports',
       program_id: data.program_id,
       title: data.title,
       description: data.description,

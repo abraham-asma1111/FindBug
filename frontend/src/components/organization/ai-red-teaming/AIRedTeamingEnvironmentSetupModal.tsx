@@ -7,7 +7,7 @@ import Textarea from '@/components/ui/Textarea';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import Checkbox from '@/components/ui/Checkbox';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface AIRedTeamingEnvironmentSetupModalProps {
   isOpen: boolean;

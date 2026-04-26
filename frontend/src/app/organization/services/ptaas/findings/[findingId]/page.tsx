@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { AlertCircle, CheckCircle, Clock, Flag, ArrowLeft, FileText, Image, Video } from 'lucide-react';
 
 interface Finding {

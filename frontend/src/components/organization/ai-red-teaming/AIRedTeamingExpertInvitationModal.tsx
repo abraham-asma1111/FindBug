@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
 import Checkbox from '@/components/ui/Checkbox';
 import Tabs from '@/components/ui/Tabs';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 
 interface Researcher {

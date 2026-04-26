@@ -79,9 +79,11 @@ export default function ResearcherMessagesPage() {
 
   // Send message mutation
   const sendMessageMutation = useApiMutation<any, {
+    endpoint: string;
     recipient_id: string;
     message_text: string;
-  }>('/messages', 'POST', {
+  }>({
+    method: 'POST',
     onSuccess: () => {
       setNewMessage('');
       refetchMessages();
@@ -90,7 +92,10 @@ export default function ResearcherMessagesPage() {
   });
 
   // Mark conversation as read mutation
-  const markAsReadMutation = useApiMutation<any, {}>(`/messages/conversation/${selectedConversation}/read-all`, 'POST', {
+  const markAsReadMutation = useApiMutation<any, {
+    endpoint: string;
+  }>({
+    method: 'POST',
     onSuccess: () => {
       refetchConversations();
     }
@@ -105,7 +110,9 @@ export default function ResearcherMessagesPage() {
     // Mark as read when opening conversation
     const conv = conversations.find(c => c.conversation_id === conversationId);
     if (conv && conv.unread_count > 0) {
-      markAsReadMutation.mutate({});
+      markAsReadMutation.mutate({
+        endpoint: `/messages/conversation/${conversationId}/read-all`
+      });
     }
   };
 
@@ -113,6 +120,7 @@ export default function ResearcherMessagesPage() {
     if (!newMessage.trim() || !selectedConv?.other_user) return;
     
     sendMessageMutation.mutate({
+      endpoint: '/messages',
       recipient_id: selectedConv.other_user.id,
       message_text: newMessage.trim()
     });
@@ -120,9 +128,11 @@ export default function ResearcherMessagesPage() {
 
   // Send message mutation for new conversations
   const sendNewMessageMutation = useApiMutation<any, {
+    endpoint: string;
     recipient_id: string;
     message_text: string;
-  }>('/messages', 'POST', {
+  }>({
+    method: 'POST',
     onSuccess: () => {
       setShowNewMessageModal(false);
       setSearchQuery('');
@@ -136,6 +146,7 @@ export default function ResearcherMessagesPage() {
     if (!newMessageText.trim() || !selectedUser) return;
     
     sendNewMessageMutation.mutate({
+      endpoint: '/messages',
       recipient_id: selectedUser.id,
       message_text: newMessageText.trim()
     });
@@ -491,9 +502,9 @@ export default function ResearcherMessagesPage() {
                       </Button>
                       <Button
                         onClick={handleStartNewConversation}
-                        disabled={!newMessageText.trim() || sendMessageMutation.isLoading}
+                        disabled={!newMessageText.trim() || sendNewMessageMutation.isLoading}
                       >
-                        {sendMessageMutation.isLoading ? <Spinner size="sm" /> : 'Send Message'}
+                        {sendNewMessageMutation.isLoading ? <Spinner size="sm" /> : 'Send Message'}
                       </Button>
                     </div>
                   </>

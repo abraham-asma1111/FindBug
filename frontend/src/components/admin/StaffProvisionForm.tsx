@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 const roleOptions = [
   { value: 'triage_specialist', label: 'Triage Specialist' },
