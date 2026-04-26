@@ -114,3 +114,27 @@ class DuplicateDetection(Base):
     report = relationship("VulnerabilityReport", foreign_keys=[report_id],
                           back_populates="duplicate_detections")
     original_report = relationship("VulnerabilityReport", foreign_keys=[duplicate_of])
+
+
+class TriageTemplate(Base):
+    """
+    Triage Template — Response templates for triage specialists
+    Pre-written messages for common triage scenarios (validation, rejection, duplicate, etc.)
+    """
+    __tablename__ = "triage_templates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    category = Column(String(50), nullable=False, index=True)
+    # validation | rejection | duplicate | need_info | resolved
+    
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    creator = relationship("User", foreign_keys=[created_by])

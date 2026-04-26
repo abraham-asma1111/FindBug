@@ -62,7 +62,7 @@ def get_public_profile(
 @router.get("", summary="List Users (Admin)")
 def list_users(
     role: Optional[str] = Query(None, description="Filter by role"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    user_status: Optional[str] = Query(None, description="Filter by status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -70,7 +70,7 @@ def list_users(
 ):
     """List all users (Admin only)."""
     service = UserService(db)
-    return service.list_users(role=role, status=status, skip=skip, limit=limit)
+    return service.list_users(role=role, status=user_status, skip=skip, limit=limit)
 
 
 @router.post("/{user_id}/deactivate", summary="Deactivate User (Admin)")

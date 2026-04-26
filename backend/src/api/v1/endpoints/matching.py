@@ -214,7 +214,7 @@ def get_my_invitations(
     
     Researcher views their invitations.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view invitations"
@@ -260,7 +260,7 @@ def respond_to_invitation(
     
     Researcher accepts or declines invitation.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can respond to invitations"
@@ -301,7 +301,7 @@ def get_program_recommendations(
     
     Researcher gets recommended programs based on skills.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can get recommendations"
@@ -554,7 +554,7 @@ def get_researcher_ptaas_recommendations(
     
     Returns engagements that match researcher's skills and experience.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can access recommendations"

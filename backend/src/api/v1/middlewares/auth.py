@@ -101,9 +101,8 @@ async def get_current_researcher(
     Raises:
         HTTPException: If user is not a researcher
     """
-    from src.domain.models.user import UserRole
-    
-    if current_user.role != UserRole.RESEARCHER:
+    # Case-insensitive role check
+    if current_user.role.upper() != "RESEARCHER":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Researcher access required"
@@ -122,15 +121,27 @@ async def get_current_organization(
     Raises:
         HTTPException: If user is not an organization
     """
-    from src.domain.models.user import UserRole
+    from sqlalchemy.orm import joinedload
     
-    if current_user.role != UserRole.ORGANIZATION:
+    # Case-insensitive role check (database has uppercase, enum has lowercase)
+    if current_user.role.upper() != "ORGANIZATION":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Organization access required"
         )
     
-    return current_user
+    # Eagerly load organization relationship
+    user_with_org = db.query(User).options(
+        joinedload(User.organization)
+    ).filter(User.id == current_user.id).first()
+    
+    if not user_with_org or not user_with_org.organization:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization profile not found"
+        )
+    
+    return user_with_org
 
 
 async def get_current_staff(
@@ -143,9 +154,9 @@ async def get_current_staff(
     Raises:
         HTTPException: If user is not staff
     """
-    from src.domain.models.user import UserRole
-    
-    if current_user.role not in [UserRole.STAFF, UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+    # Case-insensitive role check
+    role_upper = current_user.role.upper()
+    if role_upper not in ["STAFF", "ADMIN", "SUPER_ADMIN", "TRIAGE_SPECIALIST", "FINANCE_OFFICER"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Staff access required"

@@ -821,7 +821,7 @@ def get_ptaas_dashboard(
     service = PTaaSService(db)
     
     # Get user's engagements based on role
-    if current_user.role == "organization":
+    if current_user.is_organization():
         if not current_user.organization:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1291,10 +1291,16 @@ def complete_retest(
                 detail="Only assigned researcher or staff can complete retest"
             )
         
+        # Convert completion data to dict, handling Enum properly
+        completion_data = completion.model_dump()
+        if isinstance(completion_data.get('retest_result'), str):
+            # Already a string, no conversion needed
+            pass
+        
         return retest_service.complete_retest(
             retest_id,
             current_user.id,
-            completion.dict()
+            completion_data
         )
     except HTTPException:
         raise

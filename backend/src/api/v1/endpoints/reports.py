@@ -45,7 +45,7 @@ def search_reports(
     """
     service = ReportService(db)
     
-    if current_user.role == "researcher":
+    if current_user.is_researcher():
         # Researchers see their own reports
         reports = service.get_researcher_reports(
             researcher_id=current_user.researcher.id,
@@ -69,7 +69,7 @@ def search_reports(
             "offset": offset
         }
     
-    elif current_user.role == "organization":
+    elif current_user.is_organization():
         # Organizations see reports for their programs
         if program_id:
             # Filter by specific program
@@ -111,6 +111,8 @@ def search_reports(
                 "bounty_amount": float(r.bounty_amount) if r.bounty_amount else None,
                 "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
                 "program_id": str(r.program_id) if r.program_id else None,
+                "researcher_id": str(r.researcher_id) if r.researcher_id else None,
+                "is_duplicate": r.is_duplicate
             }
             for r in reports
         ]
@@ -154,7 +156,11 @@ def search_reports(
                     "status": r.status,
                     "assigned_severity": r.assigned_severity,
                     "submitted_at": r.submitted_at,
-                    "program_id": str(r.program_id)
+                    "program_id": str(r.program_id),
+                    "researcher_id": str(r.researcher_id) if r.researcher_id else None,
+                    "bounty_amount": float(r.bounty_amount) if r.bounty_amount else None,
+                    "is_duplicate": r.is_duplicate,
+                    "duplicate_of": str(r.duplicate_of) if r.duplicate_of else None
                 }
                 for r in reports
             ],
@@ -188,7 +194,7 @@ def submit_report(
     Only researchers can submit reports.
     Researcher must have joined the program first.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can submit vulnerability reports"
@@ -248,7 +254,7 @@ def upload_attachment(
     
     Max file size: 50MB
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can upload attachments"
@@ -339,7 +345,7 @@ def get_my_reports(
     
     Filter by status: new, triaged, valid, invalid, duplicate, resolved
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view their reports"
@@ -450,6 +456,16 @@ def get_report(
             "suggested_severity": report.suggested_severity,
             "vulnerability_type": report.vulnerability_type,
             "status": report.status,
+            "assigned_severity": report.assigned_severity,
+            "cvss_score": float(report.cvss_score) if report.cvss_score else None,
+            "vrt_category": report.vrt_category,
+            "bounty_amount": float(report.bounty_amount) if report.bounty_amount else None,
+            "is_duplicate": report.is_duplicate,
+            "duplicate_of": str(report.duplicate_of) if report.duplicate_of else None,
+            "triage_notes": report.triage_notes,
+            "triaged_at": report.triaged_at.isoformat() if report.triaged_at else None,
+            "triaged_by": str(report.triaged_by) if report.triaged_by else None,
+            "submitted_at": report.submitted_at.isoformat() if report.submitted_at else None,
             "created_at": report.submitted_at.isoformat() if report.submitted_at else None,
             "updated_at": report.updated_at.isoformat() if report.updated_at else None,
             "program": program_data,
@@ -550,7 +566,7 @@ def get_program_reports(
     
     Only organization owners can view reports for their programs.
     """
-    if current_user.role != "organization":
+    if not current_user.is_organization():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations can view program reports"
@@ -718,7 +734,7 @@ def get_organization_report_summary(
     
     Provides overview of all reports across programs or for a specific program.
     """
-    if current_user.role != "organization":
+    if not current_user.is_organization():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations can view report summaries"
@@ -746,7 +762,7 @@ def get_researcher_report_statistics(
     
     Provides overview of all submitted reports with status breakdown.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view their statistics"
@@ -807,7 +823,7 @@ def get_researcher_reports_timeline(
     
     Shows report submissions over time.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view their timeline"
@@ -945,7 +961,7 @@ def update_report(
     
     Researchers can only update their own reports.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can update reports"
@@ -1000,7 +1016,7 @@ def delete_report(
     Researchers can only delete their own reports.
     This is a soft delete (sets deleted_at timestamp).
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can delete reports"
@@ -1038,3 +1054,73 @@ def delete_report(
         "message": "Report deleted successfully",
         "report_id": str(report.id)
     }
+
+
+@router.get("/reports/{report_id}/attachments/{attachment_id}/download")
+def download_attachment(
+    report_id: UUID,
+    attachment_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Download an attachment file - FREQ-21.
+    
+    Returns the file content for download.
+    Researchers, organizations, and triage specialists can download attachments.
+    """
+    from fastapi.responses import FileResponse, StreamingResponse
+    from src.domain.models.report import ReportAttachment
+    import os
+    
+    service = ReportService(db)
+    
+    try:
+        # Verify access to report
+        report = service.get_report_by_id(
+            report_id=report_id,
+            user_id=current_user.id,
+            user_role=current_user.role
+        )
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Report not found"
+            )
+        
+        # Get attachment
+        attachment = db.query(ReportAttachment).filter(
+            ReportAttachment.id == attachment_id,
+            ReportAttachment.report_id == report_id
+        ).first()
+        
+        if not attachment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attachment not found"
+            )
+        
+        # Get file path from storage_path
+        # Files are stored in data/uploads/ directory
+        file_path = f"data/uploads/{attachment.storage_path}"
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found on disk"
+            )
+        
+        # Return file
+        return FileResponse(
+            path=file_path,
+            filename=attachment.original_filename or attachment.filename,
+            media_type=attachment.file_type
+        )
+    
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )

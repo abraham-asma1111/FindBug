@@ -56,7 +56,7 @@ def list_programs(
     offset: int = Query(0, ge=0),
     search: Optional[str] = Query(None, description="Search by program name or description"),
     program_type: Optional[str] = Query(None, description="Filter by type: bounty or vdp"),
-    status: Optional[str] = Query(None, description="Filter by status: draft, public, paused, closed"),
+    program_status: Optional[str] = Query(None, description="Filter by status: draft, public, paused, closed"),
     min_reward: Optional[float] = Query(None, description="Minimum reward amount"),
     max_reward: Optional[float] = Query(None, description="Maximum reward amount"),
     current_user: User = Depends(get_current_user),
@@ -71,12 +71,12 @@ def list_programs(
     """
     service = ProgramService(db)
     
-    if current_user.role == "organization":
+    if current_user.is_organization():
         programs = service.get_organization_programs(
             current_user.organization.id,
             search=search,
             program_type=program_type,
-            status=status
+            status=program_status
         )
     else:
         programs = service.search_public_programs(
@@ -93,7 +93,7 @@ def list_programs(
 
 @router.get("/my-programs", response_model=List[ProgramListResponse])
 def get_my_programs(
-    status: str = Query(None, description="Filter by status"),
+    program_status: str = Query(None, description="Filter by status"),
     current_user: User = Depends(require_organization),
     db: Session = Depends(get_db)
 ):
@@ -106,8 +106,27 @@ def get_my_programs(
     
     programs = service.get_organization_programs(
         current_user.organization.id,
-        status=status
+        status=program_status
     )
+    
+    return programs
+
+
+@router.get("/archived", response_model=List[ProgramListResponse])
+def get_archived_programs(
+    current_user: User = Depends(require_organization),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all archived programs for the current organization.
+    
+    Only organizations can access this endpoint.
+    """
+    # Get archived programs (those with deleted_at set)
+    programs = db.query(BountyProgram).filter(
+        BountyProgram.organization_id == current_user.organization.id,
+        BountyProgram.deleted_at.isnot(None)
+    ).order_by(BountyProgram.deleted_at.desc()).all()
     
     return programs
 
@@ -122,7 +141,7 @@ def get_my_participations(
     
     Only for researchers.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view participations"
@@ -155,11 +174,11 @@ def get_program(
     # Check access
     if program.visibility == "private":
         # Organization owner can access
-        if current_user.role == "organization" and program.organization_id == current_user.organization.id:
+        if current_user.is_organization() and program.organization_id == current_user.organization.id:
             return program
         
         # Invited researchers can access
-        if current_user.role == "researcher":
+        if current_user.is_researcher():
             invitation = service.program_repo.check_existing_invitation(
                 program_id, current_user.researcher.id
             )
@@ -275,7 +294,7 @@ def get_scopes(
     program = service.get_program(program_id)
     
     if program.visibility == "private":
-        if current_user.role == "organization" and program.organization_id != current_user.organization.id:
+        if current_user.is_organization() and program.organization_id != current_user.organization.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access this program"
@@ -330,7 +349,7 @@ def get_reward_tiers(
     program = service.get_program(program_id)
     
     if program.visibility == "private":
-        if current_user.role == "organization" and program.organization_id != current_user.organization.id:
+        if current_user.is_organization() and program.organization_id != current_user.organization.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access this program"
@@ -369,7 +388,7 @@ def invite_researcher(
 @router.get("/{program_id}/invitations", response_model=List[InvitationResponse])
 def get_program_invitations(
     program_id: UUID,
-    status: str = Query(None, description="Filter by status"),
+    invitation_status: str = Query(None, description="Filter by status"),
     current_user: User = Depends(require_organization),
     db: Session = Depends(get_db)
 ):
@@ -389,7 +408,7 @@ def get_program_invitations(
         )
     
     invitations = service.program_repo.get_invitations_by_program(
-        program_id, status=status
+        program_id, status=invitation_status
     )
     
     return invitations
@@ -397,7 +416,7 @@ def get_program_invitations(
 
 @router.get("/invitations/my-invitations", response_model=List[InvitationResponse])
 def get_my_invitations(
-    status: str = Query(None, description="Filter by status"),
+    invitation_status: str = Query(None, description="Filter by status"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -406,7 +425,7 @@ def get_my_invitations(
     
     Only researchers can access this endpoint.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view invitations"
@@ -415,7 +434,7 @@ def get_my_invitations(
     service = ProgramService(db)
     
     invitations = service.program_repo.get_invitations_by_researcher(
-        current_user.researcher.id, status=status
+        current_user.researcher.id, status=invitation_status
     )
     
     return invitations
@@ -433,7 +452,7 @@ def respond_to_invitation(
     
     Only the invited researcher can respond.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can respond to invitations"
@@ -452,6 +471,7 @@ def respond_to_invitation(
 
 @router.post("/{program_id}/join", status_code=status.HTTP_200_OK)
 @router.get("/{program_id}/join", status_code=status.HTTP_200_OK)
+@router.post("/programs/{program_id}/join", status_code=status.HTTP_200_OK)
 def join_program(
     program_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -463,17 +483,27 @@ def join_program(
     Only researchers can join programs.
     Private programs require invitation acceptance.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can join programs"
+        )
+    
+    # Get researcher profile
+    from src.domain.models.researcher import Researcher
+    researcher = db.query(Researcher).filter(Researcher.user_id == current_user.id).first()
+    
+    if not researcher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Researcher profile not found. Please complete your researcher profile first."
         )
     
     service = ProgramService(db)
     
     participation = service.join_program(
         program_id=program_id,
-        researcher_id=current_user.researcher.id
+        researcher_id=researcher.id
     )
     
     return {
@@ -709,24 +739,3 @@ def delete_program(
     db.commit()
     
     return {"message": "Program deleted successfully"}
-
-
-@router.get("/archived", response_model=List[ProgramListResponse])
-def get_archived_programs(
-    current_user: User = Depends(require_organization),
-    db: Session = Depends(get_db)
-):
-    """
-    Get all archived programs for the current organization.
-    
-    Only organizations can access this endpoint.
-    """
-    service = ProgramService(db)
-    
-    # Get archived programs (those with deleted_at set)
-    programs = db.query(BountyProgram).filter(
-        BountyProgram.organization_id == current_user.organization.id,
-        BountyProgram.deleted_at.isnot(None)
-    ).order_by(BountyProgram.deleted_at.desc()).all()
-    
-    return programs

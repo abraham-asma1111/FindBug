@@ -133,7 +133,7 @@ def get_my_reputation(
     
     Only researchers can access.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers have reputation scores"

@@ -95,3 +95,31 @@ class User(Base):
     data_exports = relationship("DataExport", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="user")
     payment_methods = relationship("PaymentMethod", back_populates="user", cascade="all, delete-orphan")
+    
+    def has_role(self, role_name: str) -> bool:
+        """
+        Check if user has a specific role (case-insensitive).
+        
+        Args:
+            role_name: Role to check (e.g., 'researcher', 'organization', 'admin')
+            
+        Returns:
+            True if user has the role, False otherwise
+        """
+        return self.role.lower() == role_name.lower()
+    
+    def is_researcher(self) -> bool:
+        """Check if user is a researcher."""
+        return self.has_role("researcher")
+    
+    def is_organization(self) -> bool:
+        """Check if user is an organization."""
+        return self.has_role("organization")
+    
+    def is_admin(self) -> bool:
+        """Check if user is an admin."""
+        return self.has_role("admin") or self.has_role("super_admin")
+    
+    def is_staff(self) -> bool:
+        """Check if user is staff (includes triage specialist, finance officer, etc.)."""
+        return self.has_role("staff") or self.has_role("triage_specialist") or self.has_role("finance_officer")

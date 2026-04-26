@@ -5,6 +5,15 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
+from enum import Enum
+
+
+class RetestResult(str, Enum):
+    """Enum for retest results"""
+    FIXED = "FIXED"
+    NOT_FIXED = "NOT_FIXED"
+    PARTIALLY_FIXED = "PARTIALLY_FIXED"
+    NEW_ISSUE = "NEW_ISSUE"
 
 
 # Retest Policy Schemas
@@ -82,9 +91,9 @@ class PTaaSRetestAssignment(BaseModel):
 
 
 class PTaaSRetestCompletion(BaseModel):
-    retest_result: str = Field(..., pattern="^(FIXED|NOT_FIXED|PARTIALLY_FIXED|NEW_ISSUE)$")
-    retest_notes: str = Field(..., min_length=20)
-    retest_evidence: Optional[List[str]] = Field(None, description="URLs to retest evidence")
+    retest_result: RetestResult = Field(..., description="Result of the retest")
+    retest_notes: str = Field(..., min_length=20, description="Detailed notes about the retest")
+    retest_evidence: Optional[List[str]] = Field(default=None, description="URLs to retest evidence")
 
 
 class PTaaSRetestEligibilityResponse(BaseModel):

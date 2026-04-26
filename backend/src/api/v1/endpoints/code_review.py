@@ -43,7 +43,7 @@ def create_engagement(
     - **repository_url**: URL to the code repository
     - **review_type**: Type of review (security, performance, etc.)
     """
-    if current_user.role != "organization":
+    if not current_user.is_organization():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations can create code review engagements"
@@ -88,7 +88,7 @@ def assign_reviewer(
             detail="Engagement not found"
         )
     
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
+    if current_user.is_organization() and engagement.organization_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to assign reviewers to this engagement"
@@ -120,7 +120,7 @@ def start_review(
             detail="Engagement not found"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
+    if current_user.is_researcher() and engagement.reviewer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to start this review"
@@ -162,7 +162,7 @@ def add_finding(
             detail="Engagement not found"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
+    if current_user.is_researcher() and engagement.reviewer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to add findings to this engagement"
@@ -222,7 +222,7 @@ def submit_report(
             detail="Engagement not found"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
+    if current_user.is_researcher() and engagement.reviewer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to submit this report"
@@ -255,13 +255,13 @@ def get_engagement(
         )
     
     # Check permissions
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
+    if current_user.is_organization() and engagement.organization_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this engagement"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
+    if current_user.is_researcher() and engagement.reviewer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this engagement"
@@ -272,18 +272,18 @@ def get_engagement(
 
 @router.get("/engagements", response_model=EngagementListResponse)
 def list_engagements(
-    status: Optional[ReviewStatusEnum] = None,
+    engagement_status: Optional[ReviewStatusEnum] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """List engagements for current user"""
     service = CodeReviewService(db)
     
-    status_value = ReviewStatus(status.value) if status else None
+    status_value = ReviewStatus(engagement_status.value) if engagement_status else None
     
-    if current_user.role == "organization":
+    if current_user.is_organization():
         engagements = service.get_organization_engagements(current_user.id, status_value)
-    elif current_user.role == "researcher":
+    elif current_user.is_researcher():
         engagements = service.get_reviewer_engagements(current_user.id, status_value)
     else:
         raise HTTPException(
@@ -316,13 +316,13 @@ def list_findings(
         )
     
     # Check permissions
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
+    if current_user.is_organization() and engagement.organization_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view findings for this engagement"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
+    if current_user.is_researcher() and engagement.reviewer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view findings for this engagement"
@@ -356,13 +356,13 @@ def get_engagement_stats(
         )
     
     # Check permissions
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
+    if current_user.is_organization() and engagement.organization_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view stats for this engagement"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
+    if current_user.is_researcher() and engagement.reviewer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view stats for this engagement"

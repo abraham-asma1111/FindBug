@@ -41,7 +41,7 @@ class ReportUpdate(BaseModel):
 class TriageUpdate(BaseModel):
     """Schema for triage specialist to update report."""
     status: Optional[str] = Field(None, pattern="^(new|triaged|valid|invalid|duplicate|resolved|closed)$")
-    assigned_severity: Optional[str] = Field(None, pattern="^(critical|high|medium|low)$")
+    assigned_severity: Optional[str] = Field(None, pattern="^(critical|high|medium|low|info)$")
     cvss_score: Optional[Decimal] = Field(None, ge=0.0, le=10.0)
     vrt_category: Optional[str] = Field(None, max_length=100)
     triage_notes: Optional[str] = None

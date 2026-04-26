@@ -17,10 +17,32 @@ depends_on = None
 
 
 def upgrade():
-    # Add missing fields to researchers table
-    op.add_column('researchers', sa.Column('total_reports', sa.Integer(), server_default='0', nullable=False))
-    op.add_column('researchers', sa.Column('verified_reports', sa.Integer(), server_default='0', nullable=False))
-    op.add_column('researchers', sa.Column('is_active', sa.Boolean(), server_default='true', nullable=False))
+    # Add missing fields to researchers table if they don't exist
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='researchers' AND column_name='total_reports'
+            ) THEN
+                ALTER TABLE researchers ADD COLUMN total_reports INTEGER DEFAULT 0 NOT NULL;
+            END IF;
+            
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='researchers' AND column_name='verified_reports'
+            ) THEN
+                ALTER TABLE researchers ADD COLUMN verified_reports INTEGER DEFAULT 0 NOT NULL;
+            END IF;
+            
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='researchers' AND column_name='is_active'
+            ) THEN
+                ALTER TABLE researchers ADD COLUMN is_active BOOLEAN DEFAULT true NOT NULL;
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade():

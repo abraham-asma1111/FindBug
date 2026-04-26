@@ -205,7 +205,7 @@ def get_my_performance(
     
     Only researchers can access.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can access this endpoint"
@@ -319,7 +319,7 @@ def get_researcher_analytics(
     
     Only researchers can access their own analytics.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can access researcher analytics"

@@ -107,7 +107,13 @@ class ReportRepository:
         description: str,
         limit: int = 10
     ) -> List[VulnerabilityReport]:
-        """Search for similar reports (duplicate detection)."""
+        """
+        Search for similar reports (duplicate detection).
+        
+        Note: This method returns all similar reports within the program.
+        The caller (TriageService.find_similar_reports) is responsible for
+        filtering out same-researcher reports to identify true duplicates.
+        """
         # Simple text similarity search
         # In production, use full-text search or ML-based similarity
         search_term = f"%{title}%"

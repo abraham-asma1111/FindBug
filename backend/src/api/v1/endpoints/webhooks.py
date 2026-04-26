@@ -32,7 +32,7 @@ def get_webhook_service(db: Session = Depends(get_db)) -> WebhookService:
 
 def get_organization_id(current_user: User, db: Session) -> str:
     """Get organization ID for current user"""
-    if current_user.role != "organization":
+    if not current_user.is_organization():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations can manage webhooks."

@@ -622,7 +622,7 @@ async def start_kyc_verification(
     5. Persona sends webhook with results
     """
     # Only researchers can do KYC
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="KYC verification is only for researchers"
@@ -690,7 +690,7 @@ async def get_kyc_status(
     db: Session = Depends(get_db)
 ):
     """Get KYC verification status"""
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="KYC status is only for researchers"

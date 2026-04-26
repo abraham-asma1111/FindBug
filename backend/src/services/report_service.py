@@ -407,7 +407,9 @@ class ReportService:
             is_safe=is_safe,
             scanned_at=datetime.utcnow()
         )
+        self.db.add(attachment)
         self.db.commit()
+        self.db.refresh(attachment)
         
         return attachment
     
