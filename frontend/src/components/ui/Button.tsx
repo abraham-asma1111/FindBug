@@ -1,8 +1,8 @@
 import { ButtonHTMLAttributes, forwardRef } from 'react';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'danger' | 'success' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'danger' | 'success' | 'warning' | 'secondary' | 'outline' | 'ghost';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   isLoading?: boolean;
 }
 
@@ -18,19 +18,22 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   }, ref) => {
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
     
+    // SecureCrowd Button System
     const variants = {
-      primary: 'bg-primary hover:bg-primary-hover text-white focus:ring-primary',
-      danger: 'bg-danger hover:bg-danger-hover text-white focus:ring-danger',
-      success: 'bg-success hover:bg-success-hover text-white focus:ring-success',
-      secondary: 'bg-slate-700 hover:bg-slate-600 text-white dark:bg-slate-700 dark:hover:bg-slate-600 focus:ring-slate-500',
-      outline: 'border-2 border-primary text-primary hover:bg-primary hover:text-white dark:hover:bg-primary focus:ring-primary',
-      ghost: 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 focus:ring-slate-500',
+      primary: 'bg-[#3B82F6] hover:bg-[#2563EB] text-white focus:ring-[#3B82F6]',
+      success: 'bg-[#10B981] hover:bg-[#059669] text-white focus:ring-[#10B981]',
+      danger: 'bg-[#EF4444] hover:bg-[#DC2626] text-white focus:ring-[#EF4444]',
+      warning: 'bg-[#F59E0B] hover:bg-[#D97706] text-white focus:ring-[#F59E0B]',
+      secondary: 'bg-[#64748B] hover:bg-[#475569] text-white focus:ring-[#64748B]',
+      outline: 'border border-[#334155] text-[#F8FAFC] hover:border-[#475569] hover:bg-[#1E293B] focus:ring-[#3B82F6]',
+      ghost: 'text-[#64748B] hover:text-[#94A3B8] hover:bg-[#1E293B] focus:ring-[#64748B]',
     };
     
     const sizes = {
+      xs: 'px-2 py-1 text-xs',
       sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-base',
-      lg: 'px-6 py-3 text-lg',
+      md: 'px-4 py-2 text-sm',
+      lg: 'px-6 py-3 text-base',
     };
     
     return (

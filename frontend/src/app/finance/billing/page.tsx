@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import Button from '@/components/ui/Button';
 
 export default function FinanceBillingPage() {
   const user = useAuthStore((state) => state.user);
@@ -16,90 +14,60 @@ export default function FinanceBillingPage() {
     document.documentElement.classList.add('dark');
   }, []);
 
-  const { data, isLoading } = useApiQuery<any>({
-    endpoint: '/subscription/organizations',
+  const { data: organizations } = useApiQuery<any>({
+    endpoint: '/organizations?limit=100',
   });
 
-  const subscriptions = data?.subscriptions || [];
-
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { bg: string; label: string }> = {
-      active: { bg: 'bg-[#10B981]', label: 'ACTIVE' },
-      trial: { bg: 'bg-[#3B82F6]', label: 'TRIAL' },
-      expired: { bg: 'bg-[#EF4444]', label: 'EXPIRED' },
-      cancelled: { bg: 'bg-[#94A3B8]', label: 'CANCELLED' },
-    };
-    const config = statusMap[status] || { bg: 'bg-[#94A3B8]', label: status.toUpperCase() };
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${config.bg} text-white`}>
-        {config.label}
-      </span>
-    );
-  };
+  const orgs = organizations?.organizations || [];
 
   return (
     <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
       {user ? (
         <PortalShell
           user={user}
-          title="Billing"
-          subtitle="Manage organization subscriptions"
+          title="Billing Management"
+          subtitle="Organization subscriptions and invoices"
           navItems={getPortalNavItems(user.role)}
-          headerAlign="center"
-          eyebrowText="Finance Portal"
-          eyebrowClassName="text-xl tracking-[0.18em]"
-          hideTitle
-          hideSubtitle
           hideThemeToggle={true}
         >
-          {/* Hero Section */}
-          <section className="rounded-lg border border-[#334155] bg-[#1E293B] p-6 shadow-sm sm:p-8">
-            <div className="text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#94A3B8]">
-                Billing Management
-              </p>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#F8FAFC] sm:text-5xl">
-                Organization Subscriptions
-              </h1>
-              <p className="mt-4 text-sm leading-7 text-[#94A3B8] sm:text-base">
-                Monitor and manage organization subscription plans and billing.
-              </p>
-            </div>
-          </section>
-
-          {/* Subscriptions List */}
-          <div className="mt-6">
-            {isLoading ? (
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6 text-center">
-                <p className="text-[#94A3B8]">Loading subscriptions...</p>
-              </div>
-            ) : subscriptions.length === 0 ? (
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6 text-center">
-                <p className="text-[#94A3B8]">No subscriptions found</p>
+          <div className="bg-[#1E293B] rounded-lg p-6 border border-[#334155] mb-6">
+            <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Organization Subscriptions</h2>
+            
+            {orgs.length === 0 ? (
+              <div className="text-center py-8 text-[#94A3B8]">
+                <p>No organizations found</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {subscriptions.map((subscription: any) => (
-                  <Link key={subscription.id} href={`/finance/billing/${subscription.id}`}>
-                    <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-4 hover:bg-[#334155] transition-colors cursor-pointer">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-[#F8FAFC] mb-1">
-                            {subscription.organization_name || 'Organization'}
-                          </h3>
-                          <p className="text-sm text-[#94A3B8]">
-                            {subscription.plan_name || 'Plan'} • {subscription.amount?.toLocaleString()} ETB/month • Expires {new Date(subscription.expires_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          {getStatusBadge(subscription.status)}
-                        </div>
+                {orgs.map((org: any) => (
+                  <div key={org.id} className="bg-[#0F172A] rounded-lg p-4 border border-[#334155]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-[#F8FAFC]">{org.company_name || org.name}</h3>
+                        <p className="text-sm text-[#94A3B8]">
+                          {org.subscription_type || 'Free'} Plan
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-[#10B981]">
+                          ${org.subscription_amount || 0}/month
+                        </p>
+                        <p className="text-xs text-[#94A3B8]">
+                          {org.subscription_status || 'Active'}
+                        </p>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="bg-[#1E293B] rounded-lg p-6 border border-[#334155]">
+            <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Recent Invoices</h2>
+            <div className="text-center py-8 text-[#94A3B8]">
+              <p>No recent invoices</p>
+            </div>
           </div>
         </PortalShell>
       ) : null}

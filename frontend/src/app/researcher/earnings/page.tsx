@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -9,11 +9,21 @@ import { useAuthStore } from '@/store/authStore';
 import WalletBalance from '@/components/researcher/earnings/WalletBalance';
 import TransactionList from '@/components/researcher/earnings/TransactionList';
 import PayoutMethods from '@/components/researcher/earnings/PayoutMethods';
-import KYCStatus from '@/components/researcher/earnings/KYCStatus';
+import TwoStepKYCVerification from '@/components/kyc/TwoStepKYCVerification';
 
 export default function EarningsPage() {
   const user = useAuthStore((state) => state.user);
   const [activeTab, setActiveTab] = useState('overview');
+
+  const handleVerificationSuccess = useCallback(() => {
+    console.log('Verification completed successfully');
+    // Don't reload the page, just log success
+    // The KYC status will be updated on next page visit
+  }, []);
+
+  const handleVerificationError = useCallback((error: string) => {
+    console.error('Verification error:', error);
+  }, []);
 
   return (
     <ProtectedRoute allowedRoles={['researcher']}>
@@ -109,13 +119,12 @@ export default function EarningsPage() {
           )}
 
           {activeTab === 'kyc' && (
-            <SectionCard
-              title="KYC Verification"
-              description="Complete your identity verification to enable withdrawals"
-              headerAlign="center"
-            >
-              <KYCStatus />
-            </SectionCard>
+            <div className="max-w-4xl mx-auto">
+              <TwoStepKYCVerification 
+                onComplete={handleVerificationSuccess}
+              />
+              />
+            </div>
           )}
         </PortalShell>
       ) : null}

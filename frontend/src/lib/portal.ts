@@ -91,7 +91,11 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   // Finance Officer Desk
   if (role === 'finance_officer') {
     return [
-      { href: '/finance/dashboard', label: 'Dashboard', category: 'MAIN' },
+      // OVERVIEW
+      { href: '/finance/dashboard', label: 'Dashboard', category: 'OVERVIEW' },
+      { href: '/finance/analytics', label: 'Analytics', category: 'OVERVIEW' },
+      
+      // PAYMENTS
       { 
         href: '/finance/payments', 
         label: 'Payments',
@@ -114,7 +118,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       },
       { 
         href: '/finance/kyc', 
-        label: 'KYC',
+        label: 'KYC Verification',
         category: 'PAYMENTS',
         children: [
           { href: '/finance/kyc?status=pending', label: 'Pending Review' },
@@ -122,9 +126,19 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
           { href: '/finance/kyc?status=rejected', label: 'Rejected' },
         ]
       },
-      { href: '/finance/billing', label: 'Billing', category: 'REPORTS' },
+      
+      // FINANCIAL OPERATIONS
+      { href: '/finance/organizations', label: 'Organizations', category: 'FINANCIAL OPERATIONS' },
+      { href: '/finance/transactions', label: 'Transactions', category: 'FINANCIAL OPERATIONS' },
+      { href: '/finance/billing', label: 'Invoices & Billing', category: 'FINANCIAL OPERATIONS' },
+      
+      // REPORTS
       { href: '/finance/reports', label: 'Financial Reports', category: 'REPORTS' },
-      { href: '/finance/analytics', label: 'Analytics', category: 'REPORTS' },
+      { href: '/finance/reports/payouts', label: 'Payout Reports', category: 'REPORTS' },
+      
+      // SETTINGS
+      { href: '/finance/settings/payment-methods', label: 'Payment Methods', category: 'SETTINGS' },
+      { href: '/finance/settings/fees', label: 'Fee & Commission', category: 'SETTINGS' },
     ];
   }
 

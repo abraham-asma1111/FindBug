@@ -28,12 +28,18 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
     search: '',
   });
 
-  const { data: transactionsData, isLoading, isError } = useApiQuery<{ transactions: Transaction[]; total: number }>(
+  const { data: transactionsData, isLoading, isError, error } = useApiQuery<{ transactions: Transaction[]; total: number }>(
     `/wallet/transactions?limit=${limit}&offset=0`,
-    { enabled: true }
+    { 
+      enabled: true,
+      retry: 0, // Don't retry on errors
+    }
   );
 
   const transactions = transactionsData?.transactions || [];
+
+  // Check for KYC error
+  const isKycError = error && (error as any).message?.includes('KYC verification required');
 
   const filteredTransactions = transactions.filter(transaction => {
     if (filters.type && transaction.transaction_type !== filters.type) return false;
@@ -103,6 +109,24 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
     return (
       <div className="flex justify-center items-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (isKycError) {
+    return (
+      <div className="rounded-2xl bg-[#fff2f1] border border-[#f2c0bc] p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#fef2f2] flex items-center justify-center">
+          <svg className="w-8 h-8 text-[#ef2330]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#b42318] mb-2">
+          KYC Verification Required
+        </p>
+        <p className="text-sm text-[#6d6760] mb-4">
+          You need to complete KYC verification before you can view transactions.
+        </p>
       </div>
     );
   }

@@ -34,7 +34,7 @@ export default function PayoutMethods() {
     `/payment-methods/${user?.id || ''}`,
     { 
       enabled: !!user?.id,
-      retry: 0 // Disable retries to prevent continuous error callbacks
+      retry: 0, // Don't retry on errors
     }
   );
 

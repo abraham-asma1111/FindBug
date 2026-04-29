@@ -101,15 +101,15 @@ export default function PortalShell({
 
   return (
     <div className="min-h-screen bg-[#f5f1ec] dark:bg-[#0a0e1a] text-[#2d2a26] dark:text-white">
-      <div className="grid min-h-screen lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="border-b border-[#ddd4cb] dark:border-[#1e293b] bg-[#faf6f1] dark:bg-[#020617] px-6 py-8 text-[#2d2a26] dark:text-[#F8FAFC] lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      <div className="grid min-h-screen lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="border-b border-[#ddd4cb] dark:border-[#1e293b] bg-[#faf6f1] dark:bg-[#020617] px-5 py-8 text-[#2d2a26] dark:text-[#F8FAFC] lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="space-y-8">
             <div>
               <Link
                 href="/"
-                className="inline-flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.25em] text-[#9d1f1f] dark:text-red-400"
+                className="inline-flex items-center gap-2.5 text-sm font-semibold uppercase tracking-[0.25em] text-[#9d1f1f] dark:text-red-400"
               >
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fde9e7] dark:bg-red-900/30 text-lg text-[#c3272f] dark:text-red-400">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-[#fde9e7] dark:bg-red-900/30 text-base text-[#c3272f] dark:text-red-400">
                   F
                 </span>
                 FindBug
@@ -117,18 +117,18 @@ export default function PortalShell({
             </div>
 
             <div>
-              <p className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-[#8b8177] dark:text-[#94A3B8]">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-[#8b8177] dark:text-[#94A3B8]">
                 {getPortalName(user.role)}
               </p>
-              <nav className="space-y-2">
+              <nav className="space-y-1.5">
                 {groupedItems.map(([category, items]) => (
                   <div key={category}>
                     {category !== 'MAIN' && (
-                      <p className="mt-6 mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#8b8177] dark:text-[#64748B]">
+                      <p className="mt-5 mb-2.5 text-xs font-bold uppercase tracking-[0.18em] text-[#8b8177] dark:text-[#64748B]">
                         {category}
                       </p>
                     )}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {items.map((item) => {
                         const isActive = isActiveRoute(item.href);
                         const isExpanded = expandedItems.has(item.href);
@@ -145,13 +145,13 @@ export default function PortalShell({
                                 }`}>
                                   <Link
                                     href={item.href}
-                                    className="flex-1 px-5 py-3.5 text-base font-bold"
+                                    className="flex-1 px-4 py-3 text-base font-bold"
                                   >
                                     {item.label}
                                   </Link>
                                   <button
                                     onClick={() => toggleExpanded(item.href)}
-                                    className="px-4 py-3.5"
+                                    className="px-3 py-3"
                                   >
                                     <svg
                                       className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -164,7 +164,7 @@ export default function PortalShell({
                                   </button>
                                 </div>
                                 {isExpanded && item.children && (
-                                  <div className="mt-1 ml-4 space-y-1">
+                                  <div className="mt-1 ml-3 space-y-1">
                                     {item.children.map((child) => {
                                       const isChildActive = isActiveRoute(child.href);
                                       return (
@@ -187,7 +187,7 @@ export default function PortalShell({
                             ) : (
                               <Link
                                 href={item.href}
-                                className={`block px-5 py-3.5 rounded-lg text-base font-bold transition ${
+                                className={`block px-4 py-3 rounded-lg text-base font-bold transition ${
                                   isActive
                                     ? 'bg-[#fde9e7] dark:bg-[#2563EB] text-[#9d1f1f] dark:text-[#F8FAFC]'
                                     : 'text-[#4f4943] dark:text-[#94A3B8] hover:bg-white dark:hover:bg-[#334155] hover:text-[#2d2a26] dark:hover:text-[#F8FAFC]'

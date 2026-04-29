@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 
 export interface UseApiQueryOptions<T> {
@@ -43,7 +43,6 @@ export function useApiQuery<T = any>(
 
   const {
     endpoint = '',
-    queryKey = [],
     enabled = true,
     refetchInterval,
     onSuccess,
@@ -53,13 +52,25 @@ export function useApiQuery<T = any>(
   } = options;
 
   const [data, setData] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(enabled && !!endpoint);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isError, setIsError] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
-  const [retryCount, setRetryCount] = useState<number>(0);
+  
+  // Use ref for retry count to avoid triggering re-renders
+  const retryCountRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
+
+  // Stable callbacks using refs
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    onErrorRef.current = onError;
+  }, [onSuccess, onError]);
 
   const fetchData = useCallback(async () => {
-    if (!enabled || !endpoint) return;
+    if (!enabled || !endpoint || !isMountedRef.current) return;
 
     console.log(`[useApiQuery] Fetching: ${endpoint}`);
 
@@ -69,14 +80,19 @@ export function useApiQuery<T = any>(
       setError(null);
 
       const response = await api.get<T>(endpoint);
+      
+      if (!isMountedRef.current) return;
+      
       console.log(`[useApiQuery] Success:`, response.data);
       setData(response.data);
-      setRetryCount(0);
+      retryCountRef.current = 0;
 
-      if (onSuccess) {
-        onSuccess(response.data);
+      if (onSuccessRef.current) {
+        onSuccessRef.current(response.data);
       }
     } catch (err) {
+      if (!isMountedRef.current) return;
+      
       let errorMessage = 'An error occurred';
       
       // Extract error message from various error formats
@@ -108,39 +124,53 @@ export function useApiQuery<T = any>(
       setIsError(true);
       setError(error);
 
-      if (onError) {
-        onError(error);
+      if (onErrorRef.current) {
+        onErrorRef.current(error);
       }
 
-      // Retry logic
-      if (retryCount < retry) {
+      // Retry logic - only if retry is enabled
+      if (retry > 0 && retryCountRef.current < retry) {
+        const currentRetry = retryCountRef.current;
+        retryCountRef.current += 1;
+        
         setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-        }, retryDelay * (retryCount + 1));
+          if (isMountedRef.current) {
+            fetchData();
+          }
+        }, retryDelay * (currentRetry + 1));
       }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [endpoint, enabled, onSuccess, onError, retry, retryDelay, retryCount]);
+  }, [endpoint, enabled, retry, retryDelay]);
 
-  // Initial fetch
+  // Initial fetch - only runs when endpoint or enabled changes
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (enabled && endpoint) {
+      retryCountRef.current = 0;
+      fetchData();
+    }
+  }, [endpoint, enabled, fetchData]);
 
   // Refetch interval
   useEffect(() => {
     if (!refetchInterval || !enabled || !endpoint) return;
 
     const interval = setInterval(() => {
-      // Only refetch if not currently loading to prevent vibration
-      if (!isLoading) {
-        fetchData();
-      }
+      fetchData();
     }, refetchInterval);
 
     return () => clearInterval(interval);
-  }, [refetchInterval, enabled, endpoint, fetchData, isLoading]);
+  }, [refetchInterval, enabled, endpoint, fetchData]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   return {
     data,

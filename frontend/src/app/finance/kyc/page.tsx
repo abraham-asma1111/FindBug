@@ -1,153 +1,141 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
-import { useApiQuery } from '@/hooks/useApiQuery';
+import TransactionTable from '@/components/finance/TransactionTable';
 import Button from '@/components/ui/Button';
+import { useApiQuery } from '@/hooks/useApiQuery';
 
 export default function FinanceKYCPage() {
   const user = useAuthStore((state) => state.user);
   const searchParams = useSearchParams();
-  const statusFilter = searchParams.get('status') || 'all';
+  const statusFilter = searchParams.get('status') || 'pending';
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  const endpoint = statusFilter === 'all' 
-    ? '/kyc/verifications' 
-    : `/kyc/verifications?status=${statusFilter}`;
-
   const { data, isLoading } = useApiQuery<any>({
-    endpoint,
+    endpoint: `/kyc/verifications?status=${statusFilter}&limit=1000`,
   });
 
   const verifications = data?.verifications || [];
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { bg: string; label: string }> = {
-      pending: { bg: 'bg-[#F59E0B]', label: 'PENDING' },
-      approved: { bg: 'bg-[#10B981]', label: 'APPROVED' },
-      rejected: { bg: 'bg-[#EF4444]', label: 'REJECTED' },
-      under_review: { bg: 'bg-[#3B82F6]', label: 'UNDER REVIEW' },
-    };
-    const config = statusMap[status] || { bg: 'bg-[#94A3B8]', label: status.toUpperCase() };
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${config.bg} text-white`}>
-        {config.label}
-      </span>
-    );
-  };
+  const filteredVerifications = verifications.filter((kyc: any) => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        kyc.user_name?.toLowerCase().includes(query) ||
+        kyc.id?.toLowerCase().includes(query)
+      );
+    }
+    return true;
+  });
+
+  const columns = [
+    {
+      key: 'id',
+      label: 'KYC ID',
+      sortable: true,
+      render: (value: any) => (
+        <span className="font-semibold text-[#F8FAFC]">#{value.slice(0, 8)}</span>
+      ),
+    },
+    {
+      key: 'user_name',
+      label: 'Researcher',
+      sortable: true,
+      render: (value: any) => <span className="text-[#F8FAFC]">{value || 'Unknown'}</span>,
+    },
+    {
+      key: 'document_type',
+      label: 'Document Type',
+      sortable: true,
+      render: (value: any) => (
+        <span className="text-[#94A3B8] capitalize">{value?.replace('_', ' ') || '-'}</span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (value: any) => {
+        const colors: Record<string, string> = {
+          pending: 'bg-[#F59E0B]',
+          approved: 'bg-[#10B981]',
+          rejected: 'bg-[#EF4444]',
+        };
+        return (
+          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${colors[value] || 'bg-[#94A3B8]'} text-white`}>
+            {value}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'submitted_at',
+      label: 'Submitted',
+      sortable: true,
+      render: (value: any) => <span className="text-[#94A3B8]">{new Date(value).toLocaleDateString()}</span>,
+    },
+  ];
 
   return (
     <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
       {user ? (
         <PortalShell
           user={user}
-          title="KYC Management"
-          subtitle="Manage KYC verification requests"
+          title="KYC Verification"
+          subtitle={`${filteredVerifications.length} verifications`}
           navItems={getPortalNavItems(user.role)}
-          headerAlign="center"
-          eyebrowText="Finance Portal"
-          eyebrowClassName="text-xl tracking-[0.18em]"
-          hideTitle
-          hideSubtitle
           hideThemeToggle={true}
         >
-          {/* Hero Section */}
-          <section className="rounded-lg border border-[#334155] bg-[#1E293B] p-6 shadow-sm sm:p-8">
-            <div className="text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#94A3B8]">
-                KYC Verification
-              </p>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#F8FAFC] sm:text-5xl">
-                Identity Verification
-              </h1>
-              <p className="mt-4 text-sm leading-7 text-[#94A3B8] sm:text-base">
-                Review and approve KYC documents for researcher identity verification.
-              </p>
-            </div>
-          </section>
-
-          {/* Filter Tabs */}
-          <div className="mt-6 flex gap-2 flex-wrap">
-            <Link href="/finance/kyc">
-              <Button 
-                variant={statusFilter === 'all' ? 'primary' : 'outline'} 
-                size="sm"
-                className={statusFilter === 'all' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
-              >
-                All
-              </Button>
-            </Link>
+          <div className="mb-6 flex gap-2">
             <Link href="/finance/kyc?status=pending">
-              <Button 
-                variant={statusFilter === 'pending' ? 'primary' : 'outline'} 
-                size="sm"
-                className={statusFilter === 'pending' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
-              >
+              <Button variant={statusFilter === 'pending' ? 'warning' : 'secondary'} size="sm">
                 Pending Review
               </Button>
             </Link>
             <Link href="/finance/kyc?status=approved">
-              <Button 
-                variant={statusFilter === 'approved' ? 'primary' : 'outline'} 
-                size="sm"
-                className={statusFilter === 'approved' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
-              >
+              <Button variant={statusFilter === 'approved' ? 'success' : 'secondary'} size="sm">
                 Approved
               </Button>
             </Link>
             <Link href="/finance/kyc?status=rejected">
-              <Button 
-                variant={statusFilter === 'rejected' ? 'primary' : 'outline'} 
-                size="sm"
-                className={statusFilter === 'rejected' ? 'bg-[#EF2330] hover:bg-[#DC2026]' : ''}
-              >
+              <Button variant={statusFilter === 'rejected' ? 'danger' : 'secondary'} size="sm">
                 Rejected
               </Button>
             </Link>
           </div>
 
-          {/* KYC List */}
-          <div className="mt-6">
-            {isLoading ? (
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6 text-center">
-                <p className="text-[#94A3B8]">Loading KYC verifications...</p>
-              </div>
-            ) : verifications.length === 0 ? (
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6 text-center">
-                <p className="text-[#94A3B8]">No KYC verifications found</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {verifications.map((verification: any) => (
-                  <Link key={verification.id} href={`/finance/kyc/${verification.id}`}>
-                    <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-4 hover:bg-[#334155] transition-colors cursor-pointer">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-[#F8FAFC] mb-1">
-                            {verification.researcher_name || 'Researcher'}
-                          </h3>
-                          <p className="text-sm text-[#94A3B8]">
-                            {verification.document_type || 'ID Document'} • {new Date(verification.submitted_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          {getStatusBadge(verification.status)}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
+          <div className="mb-6">
+            <input
+              type="text"
+              placeholder="Search by researcher or KYC ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 bg-[#1E293B] border border-[#334155] rounded-lg text-[#F8FAFC] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+            />
           </div>
+
+          {isLoading ? (
+            <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
+              <p className="text-[#94A3B8]">Loading KYC verifications...</p>
+            </div>
+          ) : (
+            <TransactionTable
+              data={filteredVerifications}
+              columns={columns}
+              selectable={false}
+              linkPrefix="/finance/kyc"
+            />
+          )}
         </PortalShell>
       ) : null}
     </ProtectedRoute>

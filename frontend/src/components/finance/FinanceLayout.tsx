@@ -1,19 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, ReactNode } from 'react';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
+import PortalShell from '@/components/portal/PortalShell';
+import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
-import FinanceSidebar from './FinanceSidebar';
-import FinanceHeader from './FinanceHeader';
 
 interface FinanceLayoutProps {
   title: string;
   subtitle?: string;
-  headerActions?: React.ReactNode;
-  children: React.ReactNode;
+  children: ReactNode;
+  headerActions?: ReactNode;
 }
 
-export default function FinanceLayout({ title, subtitle, headerActions, children }: FinanceLayoutProps) {
+export default function FinanceLayout({ title, subtitle, children, headerActions }: FinanceLayoutProps) {
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
@@ -23,15 +23,20 @@ export default function FinanceLayout({ title, subtitle, headerActions, children
   return (
     <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
       {user ? (
-        <div className="min-h-screen bg-[#0F172A]">
-          <div className="flex">
-            <FinanceSidebar />
-            <div className="flex-1">
-              <FinanceHeader title={title} subtitle={subtitle} actions={headerActions} />
-              <main className="p-8">{children}</main>
+        <PortalShell
+          user={user}
+          title={title}
+          subtitle={subtitle || ''}
+          navItems={getPortalNavItems(user.role)}
+          hideThemeToggle={true}
+        >
+          {headerActions && (
+            <div className="mb-6 flex justify-end">
+              {headerActions}
             </div>
-          </div>
-        </div>
+          )}
+          {children}
+        </PortalShell>
       ) : null}
     </ProtectedRoute>
   );

@@ -20,7 +20,10 @@ export default function WalletBalance() {
 
   const { data: balanceData, isLoading, refetch } = useApiQuery<WalletBalanceData>(
     '/wallet/balance',
-    { enabled: true }
+    { 
+      enabled: true,
+      retry: 0, // Don't retry on errors
+    }
   );
 
   const { mutate: requestWithdrawal, isLoading: isWithdrawing } = useApiMutation(

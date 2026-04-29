@@ -148,6 +148,12 @@ export default function TriageReportDetailPage() {
     enabled: !!reportId,
   });
 
+  // Fetch payment status for this report
+  const { data: paymentData } = useApiQuery<any>({
+    endpoint: `/payments/bounty?report_id=${reportId}`,
+    enabled: !!reportId,
+  });
+
   // Initialize form when report loads
   useEffect(() => {
     if (report) {
@@ -903,6 +909,58 @@ export default function TriageReportDetailPage() {
                 </div>
               </div>
 
+              {/* Payment Status Card - Cross-Portal Integration */}
+              {paymentData?.payments && paymentData.payments.length > 0 && (
+                <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6">
+                  <h3 className="text-lg font-semibold text-[#F8FAFC] mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Payment Status
+                  </h3>
+                  {paymentData.payments.map((payment: any) => (
+                    <div key={payment.payment_id} className="p-4 bg-[#0F172A] rounded-lg border border-[#334155]">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-[#F8FAFC]">
+                          Payment ID: {payment.transaction_id || payment.payment_id.slice(0, 8)}
+                        </span>
+                        <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
+                          payment.status === 'completed' ? 'bg-[#10B981] text-white' :
+                          payment.status === 'processing' ? 'bg-[#F59E0B] text-white' :
+                          payment.status === 'pending' ? 'bg-[#F59E0B] text-white' :
+                          'bg-[#94A3B8] text-white'
+                        }`}>
+                          {payment.status}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-[#94A3B8] text-xs mb-1">Researcher Amount</p>
+                          <p className="text-[#F8FAFC] font-semibold">${payment.researcher_amount.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[#94A3B8] text-xs mb-1">Commission</p>
+                          <p className="text-[#F8FAFC] font-semibold">${payment.commission_amount.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[#94A3B8] text-xs mb-1">Payment Method</p>
+                          <p className="text-[#F8FAFC]">{payment.payment_method || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[#94A3B8] text-xs mb-1">Created</p>
+                          <p className="text-[#F8FAFC]">{new Date(payment.created_at).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <Link href={`/finance/payments/${payment.payment_id}`}>
+                        <Button variant="outline" size="sm" className="w-full mt-3">
+                          View in Finance Portal →
+                        </Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Report Info Grid */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
@@ -913,6 +971,11 @@ export default function TriageReportDetailPage() {
                   {!reportData.bounty_amount && (
                     <p className="mt-1 text-xs text-[#94A3B8]">
                       Assign severity to calculate
+                    </p>
+                  )}
+                  {paymentData?.payments && paymentData.payments.length > 0 && (
+                    <p className="mt-1 text-xs text-[#10B981]">
+                      ✓ Payment initiated
                     </p>
                   )}
                 </div>

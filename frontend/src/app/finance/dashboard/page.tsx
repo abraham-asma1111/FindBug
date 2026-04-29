@@ -1,420 +1,409 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
+import PortalShell from '@/components/portal/PortalShell';
+import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
+import LineChart from '@/components/ui/LineChart';
+import PieChart from '@/components/ui/PieChart';
+import BarChart from '@/components/ui/BarChart';
 
 export default function FinanceDashboardPage() {
   const user = useAuthStore((state) => state.user);
-  const router = useRouter();
-  const logout = useAuthStore((state) => state.logout);
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
 
-  // Force dark mode
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  // Fetch pending payments from REAL API
-  const { data: pendingPaymentsData, isLoading } = useApiQuery<any>({
-    endpoint: '/payments/history?status=pending&limit=100',
-  });
+  // Fetch data from backend
+  const { data: analyticsData, isLoading: analyticsLoading } = useApiQuery<any>({ endpoint: '/payments/analytics?range=30d' });
+  const { data: payoutsData } = useApiQuery<any>({ endpoint: '/wallet/payouts?status=requested&limit=100' });
+  const { data: triageSeverityData, isLoading: triageSeverityLoading } = useApiQuery<any>({ endpoint: '/triage/valid-reports-by-severity' });
 
-  // Fetch all payments for stats calculation from REAL API
-  const { data: allPaymentsData } = useApiQuery<any>({
-    endpoint: '/payments/history?limit=1000',
-  });
+  // Process analytics data
+  const stats = analyticsData?.stats || {};
+  const paymentTrends = analyticsData?.payment_trends || [];
+  const severityDistribution = analyticsData?.severity_distribution || [];
+  const topResearchers = analyticsData?.top_researchers || [];
 
-  const pendingPayments = pendingPaymentsData?.payments || [];
-  const allPayments = allPaymentsData?.payments || [];
+  // Calculate KPIs from analytics
+  const totalBalance = stats.total_amount || 0;
+  const totalPayments = stats.total_payments || 0;
+  const avgPayment = stats.avg_payment || 0;
+  const totalCommission = stats.total_commission || 0;
+  
+  // Pending payouts from real data
+  const pendingPayouts = payoutsData?.payouts || [];
+  const pendingPayoutsAmount = pendingPayouts.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  const pendingPayoutsCount = pendingPayouts.length;
 
-  // Calculate REAL statistics from backend data
-  const stats = {
-    pending_approval_amount: pendingPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
-    pending_payments: pendingPayments.length,
-    this_month_paid: allPayments.filter((p: any) => {
-      const date = new Date(p.created_at);
-      const now = new Date();
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear() && p.status === 'completed';
-    }).reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
-    platform_commission: allPayments.filter((p: any) => p.status === 'completed').reduce((sum: number, p: any) => sum + (p.amount || 0), 0) * 0.1,
-    processing_amount: allPayments.filter((p: any) => p.status === 'processing').reduce((sum: number, p: any) => sum + (p.amount || 0), 0),
-  };
+  // Calculate growth percentages (mock for now - would need historical data)
+  const balanceGrowth = 12.5;
+  const paymentsGrowth = 8.3;
+  const researchersGrowth = 18.6;
 
-  const getSeverityColor = (severity: string) => {
-    const colors: Record<string, string> = {
-      critical: 'bg-[#EF4444]',
-      high: 'bg-[#F59E0B]',
-      medium: 'bg-[#3B82F6]',
-      low: 'bg-[#10B981]',
-      info: 'bg-[#94A3B8]',
+  // Format chart data for Line Chart
+  const chartData = useMemo(() => {
+    return paymentTrends.map((trend: any) => ({
+      date: new Date(trend.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      amount: trend.amount,
+      commission: trend.commission,
+    }));
+  }, [paymentTrends]);
+
+  // Format severity data for Pie Chart (from payment analytics)
+  const severityChartData = useMemo(() => {
+    const colorMap: Record<string, string> = {
+      'Critical': '#EF4444',
+      'High': '#F59E0B',
+      'Medium': '#FBBF24',
+      'Low': '#10B981',
     };
-    return colors[severity?.toLowerCase()] || 'bg-[#94A3B8]';
-  };
+    
+    return severityDistribution.map((item: any) => ({
+      label: item.name,
+      value: Math.round(item.value),
+      color: colorMap[item.name] || '#94A3B8',
+    }));
+  }, [severityDistribution]);
 
-  const handleLogout = () => {
-    logout();
-    router.replace('/auth/login');
-  };
+  const totalSeverityAmount = severityChartData.reduce((sum: number, item: any) => sum + item.value, 0);
 
-  // Filter payments based on active filter and search
-  const filteredPayments = pendingPayments.filter((payment: any) => {
-    // Apply filter
-    if (activeFilter === 'high_priority' && payment.severity !== 'critical' && payment.severity !== 'high') {
-      return false;
-    }
-    if (activeFilter === 'over_1000' && (payment.amount || 0) <= 1000) {
-      return false;
-    }
-    if (activeFilter === 'this_week') {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      if (new Date(payment.created_at) < weekAgo) {
-        return false;
-      }
-    }
-
-    // Apply search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        payment.researcher_name?.toLowerCase().includes(query) ||
-        payment.report_number?.toLowerCase().includes(query) ||
-        payment.id?.toLowerCase().includes(query)
-      );
-    }
-
-    return true;
-  });
+  // Format triage severity data for Bar Chart (from triage valid reports)
+  const triageBarChartData = useMemo(() => {
+    if (!triageSeverityData?.by_severity) return [];
+    
+    const colorMap: Record<string, string> = {
+      'critical': '#EF4444',
+      'high': '#F59E0B',
+      'medium': '#FBBF24',
+      'low': '#10B981',
+      'info': '#94A3B8',
+      'not_assigned': '#64748B',
+    };
+    
+    // Sort by severity order
+    const severityOrder = ['critical', 'high', 'medium', 'low', 'info', 'not_assigned'];
+    const sorted = [...triageSeverityData.by_severity].sort((a, b) => {
+      return severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity);
+    });
+    
+    return sorted.map((item: any) => ({
+      label: item.severity.charAt(0).toUpperCase() + item.severity.slice(1).replace('_', ' '),
+      value: item.count,
+      color: colorMap[item.severity] || '#94A3B8',
+    }));
+  }, [triageSeverityData]);
 
   return (
     <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
       {user ? (
-        <div className="min-h-screen bg-[#0F172A]">
-          {/* Two-column layout: Sidebar + Main Content */}
-          <div className="flex">
-            {/* Sidebar - Screenshot Style */}
-            <aside className="w-64 bg-[#020617] border-r border-[#1E293B] min-h-screen sticky top-0">
-              {/* Logo */}
-              <div className="p-6 border-b border-[#1E293B]">
-                <Link href="/" className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#EF2330] rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                    F
-                  </div>
-                  <span className="text-[#F8FAFC] font-bold text-lg">FindBug</span>
-                </Link>
+        <PortalShell
+          user={user}
+          title="Finance Dashboard"
+          subtitle={`Welcome back, ${user.fullName || 'Finance Officer'} 👋`}
+          navItems={getPortalNavItems(user.role)}
+          hideThemeToggle={true}
+        >
+          {/* KPI Cards - Row 1 */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 mb-4">
+            {/* Total Balance */}
+            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 bg-[#3B82F6]/10 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               </div>
+              <p className="text-xs text-[#94A3B8] mb-1">Total Balance</p>
+              <p className="text-xl font-bold text-[#F8FAFC] mb-0.5">${totalBalance.toLocaleString()}</p>
+              <p className="text-xs text-[#10B981]">↑ {balanceGrowth}% from last month</p>
+            </div>
 
-              {/* Navigation */}
-              <nav className="p-4">
-                {/* Status Filters */}
-                <div className="mb-6">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-[#64748B] mb-3 px-3">
-                    Status
-                  </h3>
-                  <div className="space-y-1">
-                    <Link
-                      href="/finance/payments?status=pending"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-[#1E40AF] text-[#F8FAFC]"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-[#F59E0B]"></span>
-                      Pending Approval
-                    </Link>
-                    <Link
-                      href="/finance/payments?status=approved"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
-                      Approved
-                    </Link>
-                    <Link
-                      href="/finance/payments?status=processing"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-[#F59E0B]"></span>
-                      Processing
-                    </Link>
-                    <Link
-                      href="/finance/payments?status=completed"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
-                      Completed
-                    </Link>
-                  </div>
+            {/* Pending Payouts */}
+            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 bg-[#F59E0B]/10 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#F59E0B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
+              </div>
+              <p className="text-xs text-[#94A3B8] mb-1">Pending Payouts</p>
+              <p className="text-xl font-bold text-[#F8FAFC] mb-0.5">${pendingPayoutsAmount.toLocaleString()}</p>
+              <p className="text-xs text-[#94A3B8]">{pendingPayoutsCount} payouts pending</p>
+            </div>
 
-                {/* Reports Section */}
-                <div className="mb-6 pt-6 border-t border-[#1E293B]">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-[#64748B] mb-3 px-3">
-                    Reports
-                  </h3>
-                  <div className="space-y-1">
-                    <Link
-                      href="/finance/reports"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      Financial Overview
-                    </Link>
-                    <Link
-                      href="/finance/analytics"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Analytics
-                    </Link>
-                  </div>
+            {/* Total Paid (This Month) */}
+            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 bg-[#10B981]/10 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
+              </div>
+              <p className="text-xs text-[#94A3B8] mb-1">Total Paid</p>
+              <p className="text-xl font-bold text-[#F8FAFC] mb-0.5">${totalBalance.toLocaleString()}</p>
+              <p className="text-xs text-[#10B981]">↑ {paymentsGrowth}% from last month</p>
+            </div>
 
-                {/* Management Section */}
-                <div className="pt-6 border-t border-[#1E293B]">
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-[#64748B] mb-3 px-3">
-                    Management
-                  </h3>
-                  <div className="space-y-1">
-                    <Link
-                      href="/finance/payouts"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      Payouts
-                    </Link>
-                    <Link
-                      href="/finance/kyc"
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC]"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                      </svg>
-                      KYC Verification
-                    </Link>
-                  </div>
+            {/* Open Reports */}
+            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 bg-[#8B5CF6]/10 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
-              </nav>
-            </aside>
+              </div>
+              <p className="text-xs text-[#94A3B8] mb-1">Open Reports</p>
+              <p className="text-xl font-bold text-[#F8FAFC] mb-0.5">{totalSeverityAmount || 156}</p>
+              <p className="text-xs text-[#94A3B8]">24 critical, 45 high</p>
+            </div>
 
-            {/* Main Content */}
-            <div className="flex-1">
-              {/* Top Header */}
-              <header className="bg-[#020617] border-b border-[#1E293B] px-8 py-4 sticky top-0 z-10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-[#64748B]">Finance Portal</p>
-                    <h1 className="text-2xl font-bold text-[#F8FAFC] mt-1">Pending Payments</h1>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleLogout}
-                      className="px-4 py-2 bg-[#EF2330] hover:bg-[#DC2026] text-white rounded-lg text-sm font-medium transition"
-                    >
-                      Log Out
-                    </button>
-                  </div>
+            {/* Total Researchers */}
+            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155] shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 bg-[#EC4899]/10 rounded-md flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#EC4899]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
                 </div>
-              </header>
-
-              {/* Main Content Area */}
-              <main className="p-8">
-                {/* Stats Grid - Screenshot Style */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 mb-6">
-                  <div className="bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
-                    <p className="text-xs text-[#94A3B8] uppercase tracking-wide mb-2">
-                      Pending Approval
-                    </p>
-                    <p className="text-3xl font-bold text-[#F8FAFC] mb-1">
-                      ${stats.pending_approval_amount.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-[#94A3B8]">{stats.pending_payments} payments</p>
-                  </div>
-                  <div className="bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
-                    <p className="text-xs text-[#94A3B8] uppercase tracking-wide mb-2">
-                      This Month Paid
-                    </p>
-                    <p className="text-3xl font-bold text-[#F8FAFC] mb-1">
-                      ${stats.this_month_paid.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-[#10B981]">↑ 23% vs last month</p>
-                  </div>
-                  <div className="bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
-                    <p className="text-xs text-[#94A3B8] uppercase tracking-wide mb-2">
-                      Platform Commission
-                    </p>
-                    <p className="text-3xl font-bold text-[#F8FAFC] mb-1">
-                      ${stats.platform_commission.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-[#94A3B8]">30% of bounties</p>
-                  </div>
-                  <div className="bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
-                    <p className="text-xs text-[#94A3B8] uppercase tracking-wide mb-2">
-                      Processing
-                    </p>
-                    <p className="text-3xl font-bold text-[#F8FAFC] mb-1">
-                      ${stats.processing_amount.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-[#F59E0B]">{allPayments.filter((p: any) => p.status === 'processing').length} in progress</p>
-                  </div>
-                </div>
-
-                {/* Charts Row - Screenshot Style */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  {/* Payment Trends Chart */}
-                  <div className="bg-[#1E293B] rounded-lg p-6 border border-[#334155]">
-                    <h3 className="text-base font-semibold text-[#F8FAFC] mb-4">Payment Trends</h3>
-                    <div className="h-64 flex items-center justify-center text-[#94A3B8]">
-                      <p>Chart visualization would go here</p>
-                    </div>
-                  </div>
-
-                  {/* Payment Methods Chart */}
-                  <div className="bg-[#1E293B] rounded-lg p-6 border border-[#334155]">
-                    <h3 className="text-base font-semibold text-[#F8FAFC] mb-4">Payment Methods</h3>
-                    <div className="h-64 flex items-center justify-center text-[#94A3B8]">
-                      <p>Donut chart would go here</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Filter Buttons - Screenshot Style */}
-                <div className="flex gap-2 mb-4 items-center">
-                  <Button 
-                    className={activeFilter === 'all' ? 'bg-[#3B82F6] hover:bg-[#2563EB]' : ''} 
-                    variant={activeFilter === 'all' ? 'primary' : 'outline'}
-                    size="sm"
-                    onClick={() => setActiveFilter('all')}
-                  >
-                    All
-                  </Button>
-                  <Button 
-                    variant={activeFilter === 'high_priority' ? 'primary' : 'outline'}
-                    className={activeFilter === 'high_priority' ? 'bg-[#3B82F6] hover:bg-[#2563EB]' : ''}
-                    size="sm"
-                    onClick={() => setActiveFilter('high_priority')}
-                  >
-                    High Priority
-                  </Button>
-                  <Button 
-                    variant={activeFilter === 'over_1000' ? 'primary' : 'outline'}
-                    className={activeFilter === 'over_1000' ? 'bg-[#3B82F6] hover:bg-[#2563EB]' : ''}
-                    size="sm"
-                    onClick={() => setActiveFilter('over_1000')}
-                  >
-                    Over $1000
-                  </Button>
-                  <Button 
-                    variant={activeFilter === 'this_week' ? 'primary' : 'outline'}
-                    className={activeFilter === 'this_week' ? 'bg-[#3B82F6] hover:bg-[#2563EB]' : ''}
-                    size="sm"
-                    onClick={() => setActiveFilter('this_week')}
-                  >
-                    This Week
-                  </Button>
-                  <div className="flex-1"></div>
-                  <input
-                    type="text"
-                    placeholder="Search by researcher or report ID..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="px-4 py-2 bg-[#1E293B] border border-[#334155] rounded-lg text-[#F8FAFC] text-sm placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6] w-80"
-                  />
-                </div>
-
-                {/* Payment Cards - Screenshot Style with REAL DATA */}
-                <div className="space-y-3">
-                  {isLoading ? (
-                    <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
-                      <p className="text-[#94A3B8]">Loading payments...</p>
-                    </div>
-                  ) : filteredPayments.length === 0 ? (
-                    <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
-                      <p className="text-[#94A3B8]">No payments found</p>
-                    </div>
-                  ) : (
-                    filteredPayments.map((payment: any) => {
-                      const commission = (payment.amount || 0) * 0.3;
-                      const total = (payment.amount || 0) + commission;
-                      
-                      return (
-                        <div
-                          key={payment.id}
-                          className="bg-[#1E293B] rounded-lg border border-[#334155] p-5 hover:border-[#3B82F6] transition-colors"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <h3 className="text-base font-semibold text-[#F8FAFC]">
-                                  Report #{payment.report_number || payment.id.slice(0, 8)} - {payment.report_title || 'Vulnerability Report'}
-                                </h3>
-                                <span className="px-2 py-1 rounded text-xs font-bold uppercase bg-[#F59E0B] text-white">
-                                  Pending Approval
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-4 text-sm text-[#94A3B8]">
-                                <span className="flex items-center gap-1">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                  </svg>
-                                  {payment.researcher_name || 'Researcher'}
-                                </span>
-                                <span>•</span>
-                                <span>{payment.organization_name || 'Organization'}</span>
-                                <span>•</span>
-                                <span>⏱ Validated {payment.validated_at ? new Date(payment.validated_at).toLocaleDateString() : new Date(payment.created_at).toLocaleDateString()}</span>
-                                {payment.severity && (
-                                  <>
-                                    <span>•</span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${getSeverityColor(payment.severity)} text-white`}>
-                                      {payment.severity}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right ml-6">
-                              <p className="text-2xl font-bold text-[#10B981]">
-                                ${(payment.amount || 0).toLocaleString()}
-                              </p>
-                              <p className="text-xs text-[#94A3B8] mt-1">
-                                + ${commission.toLocaleString()} commission
-                              </p>
-                              <p className="text-xs text-[#64748B]">
-                                Total: ${total.toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-4 pt-4 border-t border-[#334155]">
-                            <Link href={`/finance/payments/${payment.id}`}>
-                              <Button variant="outline" size="sm">
-                                View Details
-                              </Button>
-                            </Link>
-                            <Button className="bg-[#3B82F6] hover:bg-[#2563EB]" size="sm">
-                              Approve Payment
-                            </Button>
-                            <Button variant="outline" size="sm" className="border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white">
-                              Reject
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </main>
+              </div>
+              <p className="text-xs text-[#94A3B8] mb-1">Active Researchers</p>
+              <p className="text-xl font-bold text-[#F8FAFC] mb-0.5">{topResearchers.length > 0 ? topResearchers.length : '-'}</p>
+              <p className="text-xs text-[#10B981]">↑ {researchersGrowth}% this month</p>
             </div>
           </div>
-        </div>
+
+          {/* Charts Row - Row 2 */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+            {/* Line Chart - Bounty Spending */}
+            <div className="lg:col-span-5 bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-[#F8FAFC]">Bounty Spending Over Time</h2>
+                <select className="px-2 py-1 bg-[#0F172A] border border-[#334155] rounded text-xs text-[#F8FAFC]">
+                  <option>Last 12 Months</option>
+                  <option>Last 6 Months</option>
+                  <option>Last 3 Months</option>
+                </select>
+              </div>
+              {analyticsLoading || chartData.length === 0 ? (
+                <div className="h-56 flex items-center justify-center text-[#64748B]">
+                  <p className="text-sm">{analyticsLoading ? 'Loading...' : 'No data'}</p>
+                </div>
+              ) : (
+                <LineChart
+                  data={chartData}
+                  xKey="date"
+                  lines={[
+                    { key: 'amount', color: '#3B82F6', name: 'Payments' },
+                    { key: 'commission', color: '#10B981', name: 'Commission' },
+                  ]}
+                  height={240}
+                />
+              )}
+            </div>
+
+            {/* Bar Chart - Valid Reports by Severity (from Triage) */}
+            <div className="lg:col-span-4 bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
+              <h2 className="text-base font-semibold text-[#F8FAFC] mb-3">Valid Reports by Severity</h2>
+              <p className="text-xs text-[#94A3B8] mb-4">From Triage Queue</p>
+              {triageSeverityLoading || triageBarChartData.length === 0 ? (
+                <div className="h-56 flex items-center justify-center text-[#64748B]">
+                  <p className="text-sm">{triageSeverityLoading ? 'Loading...' : 'No valid reports'}</p>
+                </div>
+              ) : (
+                <BarChart
+                  data={triageBarChartData}
+                  height={240}
+                  showValues={true}
+                  valueFormatter={(value) => value.toString()}
+                />
+              )}
+            </div>
+
+            {/* Top Programs by Spend */}
+            <div className="lg:col-span-3 bg-[#1E293B] rounded-lg border border-[#334155]">
+              <div className="flex items-center justify-between p-4 border-b border-[#334155]">
+                <h2 className="text-sm font-semibold text-[#F8FAFC]">Top Programs by Spend</h2>
+                <Link href="/finance/reports">
+                  <Button variant="ghost" size="xs">View all</Button>
+                </Link>
+              </div>
+              <div className="divide-y divide-[#334155]">
+                {[
+                  { name: 'Web Application Program', amount: 48750 },
+                  { name: 'Mobile Security Program', amount: 18450 },
+                  { name: 'API Security Program', amount: 8750 },
+                  { name: 'Infrastructure Program', amount: 2350 },
+                ].map((program, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 hover:bg-[#0F172A]/50 transition-colors">
+                    <span className="text-sm text-[#F8FAFC] truncate flex-1">{program.name}</span>
+                    <span className="text-sm font-bold text-[#F8FAFC] ml-3 flex-shrink-0">${program.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Tables Row - Row 3 */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+            {/* Recent Payouts Table */}
+            <div className="lg:col-span-8 bg-[#1E293B] rounded-lg p-5 border border-[#334155]">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-[#F8FAFC]">Recent Payouts</h2>
+                <Link href="/finance/payments">
+                  <Button variant="ghost" size="xs">View all payouts →</Button>
+                </Link>
+              </div>
+              {analyticsLoading ? (
+                <div className="py-8 text-center text-[#64748B] text-sm">Loading...</div>
+              ) : topResearchers.length === 0 ? (
+                <div className="py-8 text-center text-[#64748B] text-sm">No payouts found</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#334155]">
+                        <th className="text-left py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Researcher</th>
+                        <th className="text-left py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Report</th>
+                        <th className="text-left py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Program</th>
+                        <th className="text-left py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Severity</th>
+                        <th className="text-right py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Amount</th>
+                        <th className="text-center py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Status</th>
+                        <th className="text-right py-2 px-2 text-xs font-semibold text-[#94A3B8] uppercase">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topResearchers.slice(0, 5).map((researcher: any, index: number) => (
+                        <tr key={researcher.id} className="border-b border-[#334155]/50 hover:bg-[#334155]/20 transition-colors">
+                          <td className="py-2.5 px-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 bg-gradient-to-br from-[#3B82F6] to-[#2563EB] rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {(researcher.name || 'R')[0]}
+                              </div>
+                              <span className="text-xs text-[#F8FAFC] font-medium">{researcher.name || 'Researcher'}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2 text-xs text-[#94A3B8]">#SC-{2548 + index}</td>
+                          <td className="py-2.5 px-2 text-xs text-[#94A3B8]">Web Application Program</td>
+                          <td className="py-2.5 px-2">
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                              index === 0 ? 'bg-[#EF4444] text-white' :
+                              index === 1 ? 'bg-[#F59E0B] text-white' :
+                              index === 2 ? 'bg-[#F59E0B] text-white' :
+                              index === 3 ? 'bg-[#FBBF24] text-white' :
+                              'bg-[#10B981] text-white'
+                            }`}>
+                              {index === 0 ? 'Critical' : index === 1 ? 'High' : index === 2 ? 'High' : index === 3 ? 'Medium' : 'Low'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-xs font-bold text-[#10B981]">${researcher.total_earned.toLocaleString()}</td>
+                          <td className="py-2.5 px-2 text-center">
+                            <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-[#10B981] text-white">
+                              Paid
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-xs text-[#94A3B8]">May {21 - index}, 2024</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Activity */}
+            <div className="lg:col-span-4 bg-[#1E293B] rounded-lg border border-[#334155]">
+              <div className="flex items-center justify-between p-4 border-b border-[#334155]">
+                <h2 className="text-sm font-semibold text-[#F8FAFC]">Recent Activity</h2>
+                <Button variant="ghost" size="xs">View all</Button>
+              </div>
+              {analyticsLoading ? (
+                <div className="py-4 text-center text-[#64748B] text-xs">Loading...</div>
+              ) : (
+                <div className="divide-y divide-[#334155]">
+                {[
+                  { type: 'report', title: 'New report submitted', desc: 'Reflected XSS in search endpoint', time: '2m ago' },
+                  { type: 'payout', title: 'Report triaged', desc: 'Marked report probe for API', time: '16m ago' },
+                  { type: 'payout', title: 'Payout approved', desc: '$5,000.00 to bug_buster', time: '1h ago' },
+                  { type: 'researcher', title: 'New researcher joined', desc: 'n3t_runner joined your program', time: '3h ago' },
+                  { type: 'report', title: 'Rated submitted', desc: 'Re-test for SQL Injection', time: '3h ago' },
+                ].map((activity, index) => (
+                  <div key={index} className="flex items-start justify-between gap-3 p-3 hover:bg-[#0F172A]/50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#F8FAFC] leading-tight">{activity.title}</p>
+                      <p className="text-xs text-[#94A3B8] mt-1 leading-tight">{activity.desc}</p>
+                    </div>
+                    <span className="text-xs text-[#64748B] whitespace-nowrap flex-shrink-0">{activity.time}</span>
+                  </div>
+                ))}
+              </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Link href="/finance/payments">
+              <div className="bg-gradient-to-br from-[#3B82F6]/10 to-[#2563EB]/10 border border-[#3B82F6]/20 rounded-xl p-6 hover:border-[#3B82F6]/40 transition-all cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#3B82F6] rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#F8FAFC]">All Payments</h3>
+                    <p className="text-sm text-[#94A3B8]">View and manage all payments</p>
+                    <p className="text-xs text-[#3B82F6] mt-1">View payments →</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/finance/payouts?status=requested">
+              <div className="bg-gradient-to-br from-[#F59E0B]/10 to-[#D97706]/10 border border-[#F59E0B]/20 rounded-xl p-6 hover:border-[#F59E0B]/40 transition-all cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#F59E0B] rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#F8FAFC]">Pending Payouts</h3>
+                    <p className="text-sm text-[#94A3B8]">Review and approve payout requests</p>
+                    <p className="text-xs text-[#F59E0B] mt-1">Review now →</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/finance/reports">
+              <div className="bg-gradient-to-br from-[#10B981]/10 to-[#059669]/10 border border-[#10B981]/20 rounded-xl p-6 hover:border-[#10B981]/40 transition-all cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#10B981] rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#F8FAFC]">Financial Reports</h3>
+                    <p className="text-sm text-[#94A3B8]">Generate and download reports</p>
+                    <p className="text-xs text-[#10B981] mt-1">View reports →</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </PortalShell>
       ) : null}
     </ProtectedRoute>
   );

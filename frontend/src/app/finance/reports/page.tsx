@@ -1,23 +1,48 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
-import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
+import { useApiMutation } from '@/hooks/useApiMutation';
 
 export default function FinanceReportsPage() {
   const user = useAuthStore((state) => state.user);
+  const [reportType, setReportType] = useState('payments');
+  const [dateRange, setDateRange] = useState('30d');
+  const [format, setFormat] = useState('json');
+  const [generatedReport, setGeneratedReport] = useState<any>(null);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
   }, []);
 
-  const { data: stats } = useApiQuery<any>({
-    endpoint: '/finance/statistics',
+  const generateMutation = useApiMutation({
+    method: 'GET',
+    onSuccess: (data) => {
+      setGeneratedReport(data);
+    },
   });
+
+  const handleGenerateReport = async () => {
+    const endpoints: Record<string, string> = {
+      payments: `/finance/reports/payments?format=${format}`,
+      payouts: `/finance/reports/payouts?format=${format}`,
+      financial_summary: `/finance/reports/financial-summary`,
+      tax: `/finance/reports/tax?year=2024&format=${format}`,
+    };
+
+    const endpoint = endpoints[reportType];
+    if (endpoint) {
+      if (format === 'csv') {
+        window.open(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, '_blank');
+      } else {
+        await generateMutation.mutateAsync({ endpoint, data: {} });
+      }
+    }
+  };
 
   return (
     <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
@@ -25,124 +50,80 @@ export default function FinanceReportsPage() {
         <PortalShell
           user={user}
           title="Financial Reports"
-          subtitle="View financial analytics and reports"
+          subtitle="Generate and export financial reports"
           navItems={getPortalNavItems(user.role)}
-          headerAlign="center"
-          eyebrowText="Finance Portal"
-          eyebrowClassName="text-xl tracking-[0.18em]"
-          hideTitle
-          hideSubtitle
           hideThemeToggle={true}
         >
-          {/* Hero Section */}
-          <section className="rounded-lg border border-[#334155] bg-[#1E293B] p-6 shadow-sm sm:p-8">
-            <div className="text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#94A3B8]">
-                Financial Reports
-              </p>
-              <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#F8FAFC] sm:text-5xl">
-                Revenue & Analytics
-              </h1>
-              <p className="mt-4 text-sm leading-7 text-[#94A3B8] sm:text-base">
-                Comprehensive financial reports and analytics for platform operations.
-              </p>
-            </div>
-          </section>
+          <div className="bg-[#1E293B] rounded-lg p-6 border border-[#334155] mb-6">
+            <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Generate Report</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#F8FAFC] mb-2">
+                  Report Type
+                </label>
+                <select
+                  value={reportType}
+                  onChange={(e) => setReportType(e.target.value)}
+                  className="w-full px-4 py-2 bg-[#0F172A] border border-[#334155] rounded-lg text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                >
+                  <option value="payments">Payments Report</option>
+                  <option value="payouts">Payouts Report</option>
+                  <option value="financial_summary">Financial Summary</option>
+                  <option value="tax">Tax Report</option>
+                </select>
+              </div>
 
-          {/* Financial Summary */}
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Total Revenue
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[#10B981]">
-                {stats?.total_revenue?.toLocaleString() || 0} ETB
-              </p>
-            </div>
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Total Payouts
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[#EF4444]">
-                {stats?.total_payouts?.toLocaleString() || 0} ETB
-              </p>
-            </div>
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Commission Earned
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[#3B82F6]">
-                {stats?.commission_earned?.toLocaleString() || 0} ETB
-              </p>
-            </div>
-            <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
-              <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">
-                Active Subscriptions
-              </p>
-              <p className="mt-2 text-3xl font-bold text-[#F59E0B]">
-                {stats?.active_subscriptions || 0}
-              </p>
+              <div>
+                <label className="block text-sm font-medium text-[#F8FAFC] mb-2">
+                  Date Range
+                </label>
+                <select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  className="w-full px-4 py-2 bg-[#0F172A] border border-[#334155] rounded-lg text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                >
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="90d">Last 90 Days</option>
+                  <option value="1y">Last Year</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#F8FAFC] mb-2">
+                  Format
+                </label>
+                <select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="w-full px-4 py-2 bg-[#0F172A] border border-[#334155] rounded-lg text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                >
+                  <option value="json">JSON (View Online)</option>
+                  <option value="csv">CSV (Download)</option>
+                </select>
+              </div>
+
+              <Button 
+                onClick={handleGenerateReport} 
+                className="w-full"
+                disabled={generateMutation.isLoading}
+              >
+                {generateMutation.isLoading ? 'Generating...' : 'Generate Report'}
+              </Button>
             </div>
           </div>
 
-          {/* Report Actions */}
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Generate Reports</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6">
-                <h3 className="font-semibold text-[#F8FAFC] mb-2">Payment Report</h3>
-                <p className="text-sm text-[#94A3B8] mb-4">
-                  Export detailed payment transactions and history
-                </p>
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  className="bg-[#EF2330] hover:bg-[#DC2026]"
-                >
-                  Export CSV
-                </Button>
-              </div>
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6">
-                <h3 className="font-semibold text-[#F8FAFC] mb-2">Payout Report</h3>
-                <p className="text-sm text-[#94A3B8] mb-4">
-                  Export researcher payout transactions
-                </p>
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  className="bg-[#EF2330] hover:bg-[#DC2026]"
-                >
-                  Export CSV
-                </Button>
-              </div>
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6">
-                <h3 className="font-semibold text-[#F8FAFC] mb-2">Revenue Report</h3>
-                <p className="text-sm text-[#94A3B8] mb-4">
-                  Export revenue and commission breakdown
-                </p>
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  className="bg-[#EF2330] hover:bg-[#DC2026]"
-                >
-                  Export CSV
-                </Button>
-              </div>
-              <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-6">
-                <h3 className="font-semibold text-[#F8FAFC] mb-2">Subscription Report</h3>
-                <p className="text-sm text-[#94A3B8] mb-4">
-                  Export organization subscription data
-                </p>
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  className="bg-[#EF2330] hover:bg-[#DC2026]"
-                >
-                  Export CSV
-                </Button>
+          {generatedReport && (
+            <div className="bg-[#1E293B] rounded-lg p-6 border border-[#334155]">
+              <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Report Results</h2>
+              <div className="bg-[#0F172A] rounded p-4 overflow-auto max-h-96">
+                <pre className="text-xs text-[#F8FAFC]">
+                  {JSON.stringify(generatedReport, null, 2)}
+                </pre>
               </div>
             </div>
-          </div>
+          )}
         </PortalShell>
       ) : null}
     </ProtectedRoute>
