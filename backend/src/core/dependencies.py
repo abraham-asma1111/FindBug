@@ -93,7 +93,7 @@ def get_current_verified_user(
     Return current user only if email is verified.
     Raises 403 if email not verified.
     """
-    if not current_user.email_verified:
+    if not current_user.email_verified_at:
         raise ForbiddenException("Email verification required.")
     return current_user
 
@@ -169,8 +169,8 @@ def require_triage(current_user=Depends(get_current_user)):
 
 
 def require_financial(current_user=Depends(get_current_user)):
-    """Shortcut: require financial_officer, staff, or admin."""
-    allowed = {UserRole.FINANCIAL_OFFICER, UserRole.STAFF, UserRole.ADMIN}
+    """Shortcut: require finance_officer, staff, or admin."""
+    allowed = {UserRole.FINANCE_OFFICER, UserRole.STAFF, UserRole.ADMIN}
     if current_user.role not in allowed:
         raise ForbiddenException("Financial officer access required.")
     return current_user

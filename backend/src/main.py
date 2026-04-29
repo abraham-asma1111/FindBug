@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration
+from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration, finance_reports, finance_settings, persona_kyc, sms_verification
 from src.api.v1.endpoints import simulation_gateway
 from src.core.database import get_database_status
 
@@ -80,12 +80,16 @@ app.include_router(simulation_gateway.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(vrt.router, prefix="/api/v1")
 app.include_router(kyc.router, prefix="/api/v1")
+app.include_router(persona_kyc.router, prefix="/api/v1")
+app.include_router(sms_verification.router, prefix="/api/v1")
 app.include_router(security.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 app.include_router(email_templates.router, prefix="/api/v1")
 app.include_router(data_exports.router, prefix="/api/v1")
 app.include_router(compliance.router, prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")
+app.include_router(finance_reports.router, prefix="/api/v1")
+app.include_router(finance_settings.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(wallet.router, prefix="/api/v1")
 app.include_router(recommendations.router, prefix="/api/v1")

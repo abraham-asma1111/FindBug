@@ -839,6 +839,65 @@ async def create_triage_template(
         )
 
 
+@router.get("/triage/valid-reports-by-severity", status_code=status.HTTP_200_OK)
+def get_valid_reports_by_severity(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get valid reports grouped by severity for Finance Dashboard.
+    
+    Returns count and percentage of valid reports by severity level.
+    Used for Finance Dashboard bar chart visualization.
+    
+    Only finance officers, triage specialists, and admins can access.
+    """
+    from src.core.dependencies import require_financial
+    
+    # Check if user has finance or triage access
+    user_role = role_of(current_user).value
+    if user_role not in ['finance_officer', 'triage_specialist', 'admin', 'super_admin']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only finance officers, triage specialists, and admins can access this data"
+        )
+    
+    # Query valid reports grouped by severity
+    severity_stats = db.query(
+        func.coalesce(
+            VulnerabilityReport.assigned_severity,
+            VulnerabilityReport.suggested_severity
+        ).label('severity'),
+        func.count(VulnerabilityReport.id).label('count')
+    ).filter(
+        VulnerabilityReport.status == 'valid'
+    ).group_by(
+        'severity'
+    ).order_by(
+        func.count(VulnerabilityReport.id).desc()
+    ).all()
+    
+    total = sum(stat.count for stat in severity_stats)
+    
+    # Format data for bar chart
+    by_severity = []
+    for stat in severity_stats:
+        severity = stat.severity or 'not_assigned'
+        count = stat.count
+        percentage = round((count / total * 100) if total > 0 else 0, 1)
+        
+        by_severity.append({
+            'severity': severity,
+            'count': count,
+            'percentage': percentage
+        })
+    
+    return {
+        'total': total,
+        'by_severity': by_severity
+    }
+
+
 @router.get("/triage/templates/{template_id}", status_code=status.HTTP_200_OK)
 def get_triage_template(
     template_id: UUID,

@@ -10,7 +10,7 @@ from src.core.database import get_db
 from src.core.security import SecurityAudit
 from src.services.payment_service import PaymentService
 from src.domain.models.user import User
-from src.core.dependencies import get_current_user, get_current_verified_user, require_admin
+from src.core.dependencies import get_current_user, get_current_verified_user, require_admin, require_financial
 from src.api.v1.schemas.payments import (
     BountyPaymentCreateRequest,
     BountyPaymentResponse,
@@ -33,6 +33,207 @@ router = APIRouter(prefix="/payments", tags=["Payments"])
 def get_payment_service(db: Session = Depends(get_db)) -> PaymentService:
     """Dependency to get PaymentService instance"""
     return PaymentService(db)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PAYMENT LIST & APPROVAL ENDPOINTS (Finance Portal)
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/history",
+    summary="List Payment History",
+    description="List all bounty payments with filters (Finance Officer/Admin only)"
+)
+async def list_payment_history(
+    status: Optional[str] = None,
+    researcher_id: Optional[str] = None,
+    organization_id: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(require_financial),
+    payment_service: PaymentService = Depends(get_payment_service),
+    db: Session = Depends(get_db)
+):
+    """
+    List all bounty payments with enriched data (Finance Officer/Admin only).
+    
+    Returns payments with researcher, organization, and report details.
+    """
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.organization import Organization
+    from src.domain.models.report import VulnerabilityReport
+    
+    try:
+        # Convert string IDs to UUID if provided
+        researcher_uuid = UUID(researcher_id) if researcher_id else None
+        organization_uuid = UUID(organization_id) if organization_id else None
+        
+        payments, total = payment_service.list_bounty_payments(
+            status=status,
+            researcher_id=researcher_uuid,
+            organization_id=organization_uuid,
+            skip=skip,
+            limit=limit
+        )
+        
+        # Enrich with related data
+        enriched_payments = []
+        for payment in payments:
+            # Get researcher
+            researcher = db.query(Researcher).filter(Researcher.id == payment.researcher_id).first()
+            # Get organization
+            organization = db.query(Organization).filter(Organization.id == payment.organization_id).first()
+            # Get report
+            report = db.query(VulnerabilityReport).filter(VulnerabilityReport.id == payment.report_id).first()
+            
+            enriched_payments.append({
+                "payment_id": str(payment.payment_id),
+                "transaction_id": payment.transaction_id,
+                "report_id": str(payment.report_id),
+                "report_title": report.title if report else None,
+                "report_severity": report.severity if report else None,
+                "researcher_id": str(payment.researcher_id),
+                "researcher_name": researcher.username if researcher else "Unknown",
+                "organization_id": str(payment.organization_id),
+                "organization_name": organization.company_name if organization else "Unknown",
+                "researcher_amount": float(payment.researcher_amount),
+                "commission_amount": float(payment.commission_amount),
+                "total_amount": float(payment.total_amount),
+                "status": payment.status,
+                "payment_method": payment.payment_method,
+                "kyc_verified": payment.kyc_verified,
+                "approved_at": payment.approved_at.isoformat() if payment.approved_at else None,
+                "payout_deadline": payment.payout_deadline.isoformat() if payment.payout_deadline else None,
+                "created_at": payment.created_at.isoformat(),
+                "failure_reason": payment.failure_reason
+            })
+        
+        return {
+            "payments": enriched_payments,
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list payments: {str(e)}"
+        )
+
+
+@router.post(
+    "/{payment_id}/approve",
+    summary="Approve Payment",
+    description="Approve bounty payment and credit researcher wallet (Finance Officer/Admin only)"
+)
+async def approve_payment(
+    payment_id: str,
+    request: Request,
+    current_user: User = Depends(require_financial),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """
+    Approve bounty payment (Finance Officer/Admin only).
+    
+    This action:
+    1. Verifies KYC
+    2. Approves payment
+    3. Credits researcher wallet
+    4. Sets payout deadline (30 days)
+    """
+    try:
+        payment = payment_service.approve_bounty_payment(
+            payment_id=UUID(payment_id),
+            approved_by=current_user.id
+        )
+        
+        # Log security event
+        SecurityAudit.log_security_event(
+            "PAYMENT_APPROVED",
+            str(current_user.id),
+            {
+                "payment_id": payment_id,
+                "amount": float(payment.researcher_amount)
+            },
+            request
+        )
+        
+        return {
+            "message": "Payment approved and wallet credited successfully",
+            "payment_id": str(payment.payment_id),
+            "status": payment.status,
+            "researcher_amount": float(payment.researcher_amount),
+            "payout_deadline": payment.payout_deadline.isoformat() if payment.payout_deadline else None
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Payment approval failed: {str(e)}"
+        )
+
+
+@router.post(
+    "/{payment_id}/reject",
+    summary="Reject Payment",
+    description="Reject bounty payment (Finance Officer/Admin only)"
+)
+async def reject_payment(
+    payment_id: str,
+    reason: str,
+    request: Request,
+    current_user: User = Depends(require_financial),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """
+    Reject bounty payment (Finance Officer/Admin only).
+    """
+    try:
+        payment = payment_service.reject_bounty_payment(
+            payment_id=UUID(payment_id),
+            rejected_by=current_user.id,
+            reason=reason
+        )
+        
+        # Log security event
+        SecurityAudit.log_security_event(
+            "PAYMENT_REJECTED",
+            str(current_user.id),
+            {
+                "payment_id": payment_id,
+                "reason": reason
+            },
+            request
+        )
+        
+        return {
+            "message": "Payment rejected",
+            "payment_id": str(payment.payment_id),
+            "status": payment.status,
+            "failure_reason": payment.failure_reason
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Payment rejection failed: {str(e)}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -817,4 +1018,439 @@ async def get_payment_history(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get payment history: {str(e)}"
+        )
+
+
+@router.get(
+    "/analytics",
+    summary="Get Payment Analytics",
+    description="Get payment analytics and trends (Finance Officer/Admin only)"
+)
+async def get_payment_analytics(
+    range: str = "30d",
+    current_user: User = Depends(require_admin),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """
+    Get payment analytics and trends (finance officer/admin only).
+    
+    Range options: 7d, 30d, 90d, 1y
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func
+        from src.domain.models.bounty_payment import BountyPayment
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.organization import Organization
+        from src.domain.models.report import VulnerabilityReport
+        
+        # Calculate date range
+        range_days = {
+            '7d': 7,
+            '30d': 30,
+            '90d': 90,
+            '1y': 365
+        }.get(range, 30)
+        
+        start_date = datetime.utcnow() - timedelta(days=range_days)
+        
+        # Get stats
+        payments = payment_service.db.query(BountyPayment).filter(
+            BountyPayment.created_at >= start_date
+        ).all()
+        
+        total_payments = len(payments)
+        total_amount = sum(float(p.researcher_amount) for p in payments)
+        total_commission = sum(float(p.commission_amount) for p in payments)
+        avg_payment = total_amount / total_payments if total_payments > 0 else 0
+        
+        # Payment trends (daily aggregation)
+        trends = payment_service.db.query(
+            func.date(BountyPayment.created_at).label('date'),
+            func.sum(BountyPayment.researcher_amount).label('amount'),
+            func.sum(BountyPayment.commission_amount).label('commission')
+        ).filter(
+            BountyPayment.created_at >= start_date
+        ).group_by(
+            func.date(BountyPayment.created_at)
+        ).all()
+        
+        payment_trends = [
+            {
+                'date': str(t.date),
+                'amount': float(t.amount or 0),
+                'commission': float(t.commission or 0)
+            }
+            for t in trends
+        ]
+        
+        # Severity distribution
+        severity_dist = {}
+        for p in payments:
+            # Get report severity
+            report = payment_service.db.query(VulnerabilityReport).filter(VulnerabilityReport.id == p.report_id).first()
+            if report:
+                severity = report.severity or 'unknown'
+                severity_dist[severity] = severity_dist.get(severity, 0) + float(p.researcher_amount)
+        
+        severity_distribution = [
+            {'name': k.capitalize(), 'value': v}
+            for k, v in severity_dist.items()
+        ]
+        
+        # Monthly comparison
+        monthly = payment_service.db.query(
+            func.date_trunc('month', BountyPayment.created_at).label('month'),
+            func.sum(BountyPayment.researcher_amount).label('amount'),
+            func.count(BountyPayment.payment_id).label('count')
+        ).filter(
+            BountyPayment.created_at >= start_date
+        ).group_by(
+            func.date_trunc('month', BountyPayment.created_at)
+        ).all()
+        
+        monthly_comparison = [
+            {
+                'month': str(m.month)[:7],  # YYYY-MM format
+                'amount': float(m.amount or 0),
+                'count': int(m.count or 0)
+            }
+            for m in monthly
+        ]
+        
+        # Top researchers
+        top_researchers = payment_service.db.query(
+            Researcher.id,
+            Researcher.username,
+            func.count(BountyPayment.payment_id).label('report_count'),
+            func.sum(BountyPayment.researcher_amount).label('total_earned'),
+            func.avg(BountyPayment.researcher_amount).label('avg_payment')
+        ).join(
+            BountyPayment, BountyPayment.researcher_id == Researcher.id
+        ).filter(
+            BountyPayment.created_at >= start_date
+        ).group_by(
+            Researcher.id, Researcher.username
+        ).order_by(
+            func.sum(BountyPayment.researcher_amount).desc()
+        ).limit(10).all()
+        
+        # Top organizations
+        top_organizations = payment_service.db.query(
+            Organization.id,
+            Organization.name,
+            func.count(BountyPayment.payment_id).label('report_count'),
+            func.sum(BountyPayment.total_amount).label('total_spent'),
+            func.sum(BountyPayment.commission_amount).label('total_commission')
+        ).join(
+            VulnerabilityReport, VulnerabilityReport.organization_id == Organization.id
+        ).join(
+            BountyPayment, BountyPayment.report_id == VulnerabilityReport.id
+        ).filter(
+            BountyPayment.created_at >= start_date
+        ).group_by(
+            Organization.id, Organization.name
+        ).order_by(
+            func.sum(BountyPayment.total_amount).desc()
+        ).limit(10).all()
+        
+        return {
+            'stats': {
+                'total_payments': total_payments,
+                'total_amount': total_amount,
+                'avg_payment': avg_payment,
+                'total_commission': total_commission
+            },
+            'payment_trends': payment_trends,
+            'severity_distribution': severity_distribution,
+            'monthly_comparison': monthly_comparison,
+            'top_researchers': [
+                {
+                    'id': str(r.id),
+                    'name': r.username,
+                    'report_count': r.report_count,
+                    'total_earned': float(r.total_earned or 0),
+                    'avg_payment': float(r.avg_payment or 0)
+                }
+                for r in top_researchers
+            ],
+            'top_organizations': [
+                {
+                    'id': str(o.id),
+                    'name': o.name,
+                    'report_count': o.report_count,
+                    'total_spent': float(o.total_spent or 0),
+                    'total_commission': float(o.total_commission or 0)
+                }
+                for o in top_organizations
+            ]
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get payment analytics: {str(e)}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PAYMENT DETAIL ENDPOINT
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/bounty/{payment_id}",
+    response_model=BountyPaymentResponse,
+    summary="Get Payment Details",
+    description="Get detailed payment information (Admin only)"
+)
+async def get_payment_details(
+    payment_id: str,
+    current_user: User = Depends(require_admin),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """Get detailed payment information."""
+    try:
+        payment = payment_service.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == UUID(payment_id)
+        ).first()
+        
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found"
+            )
+        
+        return BountyPaymentResponse(
+            payment_id=str(payment.payment_id),
+            transaction_id=payment.transaction_id,
+            report_id=str(payment.report_id),
+            researcher_id=str(payment.researcher_id),
+            researcher_amount=float(payment.researcher_amount),
+            commission_amount=float(payment.commission_amount),
+            total_amount=float(payment.total_amount),
+            status=payment.status,
+            payment_method=payment.payment_method,
+            payment_gateway=payment.payment_gateway,
+            gateway_transaction_id=payment.gateway_transaction_id,
+            payout_deadline=payment.payout_deadline.isoformat() if payment.payout_deadline else None,
+            created_at=payment.created_at.isoformat(),
+            approved_at=payment.approved_at.isoformat() if payment.approved_at else None,
+            completed_at=payment.completed_at.isoformat() if payment.completed_at else None
+        )
+    
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment ID format"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get payment details: {str(e)}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# FINANCE PORTAL ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/history",
+    summary="List All Payments for Finance Portal",
+    description="Get paginated list of all bounty payments (Finance Officer only)"
+)
+async def list_payments_for_finance(
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(require_admin),
+    payment_service: PaymentService = Depends(get_payment_service),
+    db: Session = Depends(get_db)
+):
+    """
+    List all bounty payments for finance portal with filters.
+    Returns enriched data with researcher, organization, and report info.
+    """
+    try:
+        from src.domain.models.bounty_payment import BountyPayment
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.organization import Organization
+        from src.domain.models.report import VulnerabilityReport
+        
+        query = db.query(
+            BountyPayment,
+            Researcher.username.label('researcher_name'),
+            Organization.name.label('organization_name'),
+            VulnerabilityReport.title.label('report_title'),
+            VulnerabilityReport.severity.label('severity')
+        ).join(
+            Researcher, BountyPayment.researcher_id == Researcher.id
+        ).join(
+            Organization, BountyPayment.organization_id == Organization.id
+        ).join(
+            VulnerabilityReport, BountyPayment.report_id == VulnerabilityReport.id
+        )
+        
+        if status:
+            query = query.filter(BountyPayment.status == status)
+        
+        total = query.count()
+        payments = query.offset(skip).limit(limit).all()
+        
+        return {
+            'payments': [
+                {
+                    'id': str(p.BountyPayment.payment_id),
+                    'payment_id': str(p.BountyPayment.payment_id),
+                    'transaction_id': p.BountyPayment.transaction_id,
+                    'report_id': str(p.BountyPayment.report_id),
+                    'researcher_id': str(p.BountyPayment.researcher_id),
+                    'researcher_name': p.researcher_name,
+                    'organization_name': p.organization_name,
+                    'report_title': p.report_title,
+                    'severity': p.severity,
+                    'researcher_amount': float(p.BountyPayment.researcher_amount),
+                    'commission_amount': float(p.BountyPayment.commission_amount),
+                    'total_amount': float(p.BountyPayment.total_amount),
+                    'status': p.BountyPayment.status,
+                    'payment_method': p.BountyPayment.payment_method,
+                    'created_at': p.BountyPayment.created_at.isoformat(),
+                    'completed_at': p.BountyPayment.completed_at.isoformat() if p.BountyPayment.completed_at else None,
+                    'payout_deadline': p.BountyPayment.payout_deadline.isoformat() if p.BountyPayment.payout_deadline else None
+                }
+                for p in payments
+            ],
+            'total': total,
+            'skip': skip,
+            'limit': limit
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch payments: {str(e)}"
+        )
+
+
+@router.post(
+    "/{payment_id}/approve",
+    summary="Approve Payment",
+    description="Approve a pending bounty payment (Finance Officer only)"
+)
+async def approve_payment(
+    payment_id: str,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """Approve a pending bounty payment."""
+    try:
+        from src.domain.models.bounty_payment import BountyPayment
+        
+        payment = payment_service.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == UUID(payment_id)
+        ).first()
+        
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found"
+            )
+        
+        if payment.status != 'pending':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot approve payment with status: {payment.status}"
+            )
+        
+        payment.status = 'approved'
+        payment.approved_by = current_user.id
+        payment_service.db.commit()
+        
+        # Log security event
+        SecurityAudit.log_security_event(
+            "PAYMENT_APPROVED",
+            str(current_user.id),
+            {"payment_id": payment_id},
+            request
+        )
+        
+        return {
+            'message': 'Payment approved successfully',
+            'payment_id': payment_id,
+            'status': 'approved'
+        }
+    
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment ID format"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to approve payment: {str(e)}"
+        )
+
+
+@router.post(
+    "/{payment_id}/reject",
+    summary="Reject Payment",
+    description="Reject a pending bounty payment (Finance Officer only)"
+)
+async def reject_payment(
+    payment_id: str,
+    reason: str,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    payment_service: PaymentService = Depends(get_payment_service)
+):
+    """Reject a pending bounty payment."""
+    try:
+        from src.domain.models.bounty_payment import BountyPayment
+        
+        payment = payment_service.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == UUID(payment_id)
+        ).first()
+        
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found"
+            )
+        
+        if payment.status != 'pending':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot reject payment with status: {payment.status}"
+            )
+        
+        payment.status = 'rejected'
+        payment.rejection_reason = reason
+        payment_service.db.commit()
+        
+        # Log security event
+        SecurityAudit.log_security_event(
+            "PAYMENT_REJECTED",
+            str(current_user.id),
+            {"payment_id": payment_id, "reason": reason},
+            request
+        )
+        
+        return {
+            'message': 'Payment rejected successfully',
+            'payment_id': payment_id,
+            'status': 'rejected',
+            'reason': reason
+        }
+    
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid payment ID format"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reject payment: {str(e)}"
         )

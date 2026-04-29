@@ -37,8 +37,11 @@ class PaymentService:
     def __init__(self, db: Session):
         self.db = db
         
-        # Platform commission rate (BR-06: 30%)
-        self.commission_rate = Decimal("0.30")
+        # Platform commission rates
+        # Organization pays 30% commission on top of bounty
+        self.org_commission_rate = Decimal("0.30")
+        # Researcher pays 15% commission from their bounty
+        self.researcher_commission_rate = Decimal("0.15")
         
         # Payout deadline (BR-08: 30 days)
         self.payout_deadline_days = 30
@@ -53,15 +56,22 @@ class PaymentService:
     def create_bounty_payment(
         self,
         report_id: UUID,
-        researcher_amount: Decimal,
+        bounty_amount: Decimal,
         approved_by: UUID
     ) -> BountyPayment:
         """
-        Create bounty payment with 30% commission (BR-06).
+        Create bounty payment with dual commission structure:
+        - Organization pays 30% commission on top of bounty
+        - Researcher pays 15% commission from their bounty
+        
+        Example: $1,000 bounty
+        - Organization pays: $1,000 + $300 (30%) = $1,300 total
+        - Researcher gets: $1,000 - $150 (15%) = $850 in wallet
+        - Platform revenue: $300 + $150 = $450 (34.6% of org payment)
         
         Args:
             report_id: Report ID
-            researcher_amount: Amount for researcher
+            bounty_amount: Base bounty amount (what researcher earns before commission)
             approved_by: User ID who approved
             
         Returns:
@@ -75,9 +85,17 @@ class PaymentService:
         if not report:
             raise NotFoundException("Report not found")
         
-        # Calculate commission (BR-06: 30%)
-        commission_amount = researcher_amount * self.commission_rate
-        total_amount = researcher_amount + commission_amount
+        # Calculate commissions (BR-06: Dual commission structure)
+        # Organization pays 30% commission on top of bounty
+        org_commission = bounty_amount * self.org_commission_rate
+        # Researcher pays 15% commission from their bounty
+        researcher_commission = bounty_amount * self.researcher_commission_rate
+        # Total platform revenue (30% from org + 15% from researcher)
+        total_commission = org_commission + researcher_commission
+        # Amount researcher receives in wallet (bounty - researcher commission)
+        researcher_net_amount = bounty_amount - researcher_commission
+        # Total amount organization pays (bounty + org commission)
+        total_org_payment = bounty_amount + org_commission
         
         # Generate transaction ID
         transaction_id = f"BP-{uuid.uuid4().hex[:12].upper()}"
@@ -88,13 +106,14 @@ class PaymentService:
             report_id=report_id,
             researcher_id=report.researcher_id,
             organization_id=report.program.organization_id,
-            researcher_amount=researcher_amount,
-            commission_amount=commission_amount,
-            total_amount=total_amount,
-            status="approved",
-            approved_by=approved_by,
-            approved_at=datetime.utcnow(),
-            payout_deadline=datetime.utcnow() + timedelta(days=self.payout_deadline_days)
+            researcher_amount=researcher_net_amount,  # What researcher gets in wallet
+            commission_amount=total_commission,  # Total platform revenue
+            total_amount=total_org_payment,  # What organization pays
+            status="pending",  # Start as pending, not approved
+            approved_by=None,
+            approved_at=None,
+            payout_deadline=None,  # Set when approved
+            kyc_verified=False
         )
         
         self.db.add(payment)
@@ -104,30 +123,214 @@ class PaymentService:
         # Create payment history
         self._add_payment_history(
             payment_id=payment.payment_id,
-            previous_status="pending",
-            new_status="approved",
+            previous_status="none",
+            new_status="pending",
             changed_by=approved_by,
-            notes="Bounty payment approved"
-        )
-        
-        # Create transaction record
-        self._create_transaction(
-            user_id=report.researcher.user_id,
-            type="bounty_payment",
-            amount=researcher_amount,
-            status="pending",
-            reference_id=payment.payment_id,
-            reference_type="bounty_payment"
+            notes="Bounty payment created"
         )
         
         logger.info("Bounty payment created", extra={
             "payment_id": str(payment.payment_id),
-            "researcher_amount": float(researcher_amount),
-            "commission": float(commission_amount),
-            "total": float(total_amount)
+            "researcher_amount": float(researcher_net_amount),
+            "commission": float(total_commission),
+            "total": float(total_org_payment)
         })
         
         return payment
+    
+    def approve_bounty_payment(
+        self,
+        payment_id: UUID,
+        approved_by: UUID
+    ) -> BountyPayment:
+        """
+        Approve bounty payment and credit researcher wallet.
+        
+        This is the Finance Officer's main action:
+        1. Verify KYC
+        2. Approve payment
+        3. Credit researcher wallet
+        4. Set payout deadline
+        
+        Args:
+            payment_id: Payment ID
+            approved_by: Finance Officer user ID
+            
+        Returns:
+            Updated BountyPayment
+        """
+        payment = self.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == payment_id
+        ).first()
+        
+        if not payment:
+            raise NotFoundException("Payment not found")
+        
+        if payment.status != "pending":
+            raise ValueError(f"Cannot approve payment with status: {payment.status}")
+        
+        # Check KYC verification (BR-08)
+        if not self._is_kyc_verified(payment.researcher_id):
+            raise ForbiddenException("KYC verification required before payment approval")
+        
+        # Update payment status
+        old_status = payment.status
+        payment.status = "approved"
+        payment.approved_by = approved_by
+        payment.approved_at = datetime.utcnow()
+        payment.payout_deadline = datetime.utcnow() + timedelta(days=self.payout_deadline_days)
+        payment.kyc_verified = True
+        payment.kyc_verified_at = datetime.utcnow()
+        
+        self.db.commit()
+        self.db.refresh(payment)
+        
+        # Add history
+        self._add_payment_history(
+            payment_id=payment_id,
+            previous_status=old_status,
+            new_status="approved",
+            changed_by=approved_by,
+            notes="Payment approved by Finance Officer"
+        )
+        
+        # Credit researcher wallet
+        from src.services.wallet_service import WalletService
+        wallet_service = WalletService(self.db)
+        
+        try:
+            wallet_service.credit_wallet(
+                owner_id=payment.researcher_id,
+                owner_type="researcher",
+                amount=payment.researcher_amount,
+                saga_id=payment.transaction_id,
+                reference_type="bounty_payment",
+                reference_id=payment.payment_id
+            )
+            
+            # Create transaction record
+            self._create_transaction(
+                user_id=payment.researcher.user_id,
+                type="bounty_payment",
+                amount=payment.researcher_amount,
+                status="completed",
+                reference_id=payment.payment_id,
+                reference_type="bounty_payment"
+            )
+            
+            logger.info("Bounty payment approved and wallet credited", extra={
+                "payment_id": str(payment_id),
+                "researcher_id": str(payment.researcher_id),
+                "amount": float(payment.researcher_amount)
+            })
+            
+        except Exception as e:
+            # Rollback payment approval if wallet credit fails
+            payment.status = old_status
+            payment.approved_by = None
+            payment.approved_at = None
+            payment.payout_deadline = None
+            payment.kyc_verified = False
+            payment.kyc_verified_at = None
+            self.db.commit()
+            
+            logger.error("Failed to credit wallet, payment approval rolled back", extra={
+                "payment_id": str(payment_id),
+                "error": str(e)
+            })
+            
+            raise ValueError(f"Failed to credit researcher wallet: {str(e)}")
+        
+        return payment
+    
+    def reject_bounty_payment(
+        self,
+        payment_id: UUID,
+        rejected_by: UUID,
+        reason: str
+    ) -> BountyPayment:
+        """
+        Reject bounty payment.
+        
+        Args:
+            payment_id: Payment ID
+            rejected_by: Finance Officer user ID
+            reason: Rejection reason
+            
+        Returns:
+            Updated BountyPayment
+        """
+        payment = self.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == payment_id
+        ).first()
+        
+        if not payment:
+            raise NotFoundException("Payment not found")
+        
+        if payment.status != "pending":
+            raise ValueError(f"Cannot reject payment with status: {payment.status}")
+        
+        old_status = payment.status
+        payment.status = "rejected"
+        payment.approved_by = rejected_by
+        payment.approved_at = datetime.utcnow()
+        payment.failure_reason = reason
+        
+        self.db.commit()
+        self.db.refresh(payment)
+        
+        # Add history
+        self._add_payment_history(
+            payment_id=payment_id,
+            previous_status=old_status,
+            new_status="rejected",
+            changed_by=rejected_by,
+            notes=f"Payment rejected: {reason}"
+        )
+        
+        logger.info("Bounty payment rejected", extra={
+            "payment_id": str(payment_id),
+            "reason": reason
+        })
+        
+        return payment
+    
+    def list_bounty_payments(
+        self,
+        status: Optional[str] = None,
+        researcher_id: Optional[UUID] = None,
+        organization_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 20
+    ) -> tuple[list[BountyPayment], int]:
+        """
+        List bounty payments with filters.
+        
+        Args:
+            status: Filter by status
+            researcher_id: Filter by researcher
+            organization_id: Filter by organization
+            skip: Pagination offset
+            limit: Maximum results
+            
+        Returns:
+            Tuple of (payments list, total count)
+        """
+        query = self.db.query(BountyPayment)
+        
+        if status:
+            query = query.filter(BountyPayment.status == status)
+        
+        if researcher_id:
+            query = query.filter(BountyPayment.researcher_id == researcher_id)
+        
+        if organization_id:
+            query = query.filter(BountyPayment.organization_id == organization_id)
+        
+        total = query.count()
+        payments = query.order_by(BountyPayment.created_at.desc()).offset(skip).limit(limit).all()
+        
+        return payments, total
     
     def process_bounty_payment(
         self,

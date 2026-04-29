@@ -1,6 +1,6 @@
 """create triage templates table
 
-Revision ID: 20260420_1200
+Revision ID: 2026_04_20_1200_create_triage_templates
 Revises: 2026_03_29_1400_create_vrt_tables
 Create Date: 2026-04-20 12:00:00.000000
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '20260420_1200'
-down_revision = '2026_03_29_1400'
+revision = '2026_04_20_1200_create_triage_templates'
+down_revision = '2026_03_29_1400_create_vrt_tables'
 branch_labels = None
 depends_on = None
 

@@ -1,54 +1,73 @@
 #!/usr/bin/env python3
-"""Create a finance officer user for testing"""
-
+"""
+Create Finance Officer User for Testing
+"""
+import sys
 from src.core.database import SessionLocal
 from src.domain.models.user import User
-from src.domain.models.staff_profiles import FinanceOfficer
+from src.domain.models.staff_profiles import FinancialOfficer
 from src.core.security import get_password_hash
-import uuid
 
-def create_finance_user():
+def create_finance_officer():
+    """Create a finance officer user for testing"""
+    
     db = SessionLocal()
     try:
-        # Check if user exists
-        existing = db.query(User).filter(User.email == 'finance@example.com').first()
-        if existing:
-            print(f"Finance user already exists: {existing.email}")
+        # Check if user already exists
+        existing_user = db.query(User).filter(User.email == "finance@findbug.com").first()
+        
+        if existing_user:
+            print("✅ Finance officer already exists!")
+            print(f"   Email: finance@findbug.com")
+            print(f"   Password: Finance123!")
+            print(f"   Role: {existing_user.role}")
             return
         
-        # Create user
-        user = User(
-            id=uuid.uuid4(),
-            email='finance@example.com',
-            hashed_password=get_password_hash('Password123!'),
-            full_name='Finance Officer',
-            role='finance_officer',
-            is_active=True,
-            is_verified=True
+        # Create finance officer user
+        finance_user = User(
+            email="finance@findbug.com",
+            password_hash=get_password_hash("Finance123!"),
+            role="finance_officer",
+            is_verified=True,
+            mfa_enabled=False,
+            is_active=True
         )
-        db.add(user)
+        
+        db.add(finance_user)
         db.flush()
         
-        # Create finance officer profile
-        finance_profile = FinanceOfficer(
-            id=uuid.uuid4(),
-            user_id=user.id,
-            department='Finance',
-            permissions=['payment_approval', 'payout_processing', 'kyc_verification']
+        # Create financial officer profile
+        finance_profile = FinancialOfficer(
+            user_id=finance_user.id,
+            department="finance",
+            approval_limit=100000.00  # 100,000 ETB approval limit
         )
-        db.add(finance_profile)
         
+        db.add(finance_profile)
         db.commit()
-        print(f"✅ Finance user created successfully!")
-        print(f"Email: finance@example.com")
-        print(f"Password: Password123!")
-        print(f"Role: finance_officer")
+        
+        print("✅ Finance officer created successfully!")
+        print(f"   Email: finance@findbug.com")
+        print(f"   Password: Finance123!")
+        print(f"   Role: finance_officer")
+        print(f"   User ID: {finance_user.id}")
+        print(f"   Approval Limit: 100,000 ETB")
+        print(f"\n🔐 Login at: http://localhost:3000")
+        print(f"\n📋 Test the Finance Portal:")
+        print(f"   1. Login with the credentials above")
+        print(f"   2. You'll be redirected to /finance/dashboard")
+        print(f"   3. Check the sidebar structure matches specification")
+        print(f"   4. Navigate through all pages")
         
     except Exception as e:
         db.rollback()
-        print(f"❌ Error: {e}")
+        print(f"❌ Error creating finance officer: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
     finally:
         db.close()
 
-if __name__ == '__main__':
-    create_finance_user()
+if __name__ == "__main__":
+    print("Creating Finance Officer User...")
+    create_finance_officer()

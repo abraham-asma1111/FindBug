@@ -419,6 +419,119 @@ class EmailService:
         except Exception as e:
             print(f"❌ Failed to send MFA code: {e}")
             return False
+    
+    @staticmethod
+    def send_kyc_verification_code(email: str, code: str, user_name: str = "User") -> bool:
+        """
+        Send KYC verification code via email (replaces SMS)
+        
+        Args:
+            email: User email address
+            code: 6-digit verification code
+            user_name: User's first name for personalization
+            
+        Returns:
+            True if sent successfully
+        """
+        try:
+            # Check if mock mode is enabled
+            smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+            
+            if smtp_mock_mode:
+                print(f"\n{'='*60}")
+                print(f"📧 MOCK MODE: KYC VERIFICATION EMAIL")
+                print(f"{'='*60}")
+                print(f"To: {email}")
+                print(f"User: {user_name}")
+                print(f"Subject: Your KYC Verification Code - FindBug Platform")
+                print(f"\n🔐 VERIFICATION CODE: {code}")
+                print(f"\nThis code expires in 10 minutes.")
+                print(f"{'='*60}\n")
+                return True
+            
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@findbugplatform.com')
+            
+            if not smtp_user or not smtp_password:
+                print("⚠️  SMTP credentials not configured. Email not sent.")
+                return False
+            
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = 'Your KYC Verification Code - FindBug Platform'
+            msg['From'] = smtp_from
+            msg['To'] = email
+            
+            text_body = f"""
+            Hi {user_name},
+            
+            Your KYC verification code is: {code}
+            
+            This code will expire in 10 minutes.
+            
+            If you didn't request this code, please ignore this email.
+            
+            Best regards,
+            FindBug Platform Team
+            Bahir Dar University
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: #7C3AED; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">🔐 KYC Verification Code</h1>
+                  </div>
+                  
+                  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none;">
+                    <h2 style="color: #7C3AED; margin-top: 0;">Hi {user_name},</h2>
+                    <p>Complete your KYC verification by entering this code:</p>
+                    
+                    <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #7C3AED;">
+                      <h1 style="color: #7C3AED; font-size: 42px; margin: 0; letter-spacing: 10px; font-family: monospace;">{code}</h1>
+                      <p style="color: #666; margin: 10px 0 0; font-size: 14px;">Enter this code to verify your identity</p>
+                    </div>
+                    
+                    <p style="color: #e74c3c; font-size: 14px; text-align: center;">
+                      ⏰ This code expires in 10 minutes
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                    
+                    <p style="color: #666; font-size: 14px;">
+                      If you didn't request this code, please ignore this email.
+                    </p>
+                  </div>
+                  
+                  <div style="background: #f1f3f4; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;">
+                    <p style="margin: 0;">FindBug Platform - Bug Bounty & Security Research</p>
+                    <p style="margin: 5px 0 0;">Bahir Dar University - Cyber Security Program</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            part1 = MIMEText(text_body, 'plain')
+            part2 = MIMEText(html_body, 'html')
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            print(f"✅ KYC verification code sent to {email}")
+            print(f"   Code: {code} (expires in 10 minutes)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send KYC verification email: {e}")
+            return False
 
     @staticmethod
     def send_password_reset_email(email: str, reset_token: str):
