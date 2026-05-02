@@ -199,8 +199,17 @@ class PaymentService:
         wallet_service = WalletService(self.db)
         
         try:
+            # Get researcher to access user_id
+            researcher = self.db.query(Researcher).filter(
+                Researcher.id == payment.researcher_id
+            ).first()
+            
+            if not researcher:
+                raise NotFoundException("Researcher not found")
+            
+            # Credit researcher wallet (using user_id, not researcher_id)
             wallet_service.credit_wallet(
-                owner_id=payment.researcher_id,
+                owner_id=researcher.user_id,
                 owner_type="researcher",
                 amount=payment.researcher_amount,
                 saga_id=payment.transaction_id,
@@ -208,7 +217,21 @@ class PaymentService:
                 reference_id=payment.payment_id
             )
             
-            # Create transaction record
+            # Credit platform wallet with commission
+            # Use a fixed platform owner_id (we'll use UUID with all zeros for platform)
+            from uuid import UUID as UUID_TYPE
+            platform_owner_id = UUID_TYPE('00000000-0000-0000-0000-000000000000')
+            
+            wallet_service.credit_wallet(
+                owner_id=platform_owner_id,
+                owner_type="platform",
+                amount=payment.commission_amount,
+                saga_id=payment.transaction_id,
+                reference_type="commission",
+                reference_id=payment.payment_id
+            )
+            
+            # Create transaction record for researcher
             self._create_transaction(
                 user_id=payment.researcher.user_id,
                 type="bounty_payment",
@@ -218,10 +241,21 @@ class PaymentService:
                 reference_type="bounty_payment"
             )
             
-            logger.info("Bounty payment approved and wallet credited", extra={
+            # Create transaction record for platform commission
+            self._create_transaction(
+                user_id=platform_owner_id,
+                type="commission",
+                amount=payment.commission_amount,
+                status="completed",
+                reference_id=payment.payment_id,
+                reference_type="bounty_payment"
+            )
+            
+            logger.info("Bounty payment approved, researcher and platform wallets credited", extra={
                 "payment_id": str(payment_id),
                 "researcher_id": str(payment.researcher_id),
-                "amount": float(payment.researcher_amount)
+                "researcher_amount": float(payment.researcher_amount),
+                "commission_amount": float(payment.commission_amount)
             })
             
         except Exception as e:
@@ -532,7 +566,8 @@ class PaymentService:
         approved_by: UUID
     ) -> PayoutRequest:
         """
-        Approve payout request.
+        Approve payout request and complete the payout.
+        This debits the researcher's wallet and marks the payout as completed.
         
         Args:
             payout_id: Payout request ID
@@ -551,19 +586,63 @@ class PaymentService:
         if payout.status != "pending":
             raise ValueError(f"Cannot approve payout with status: {payout.status}")
         
-        payout.status = "approved"
-        payout.processed_by = approved_by
-        payout.processed_at = datetime.utcnow()
+        # Get researcher to access user_id
+        researcher = self.db.query(Researcher).filter(
+            Researcher.id == payout.researcher_id
+        ).first()
         
-        self.db.commit()
-        self.db.refresh(payout)
+        if not researcher:
+            raise NotFoundException("Researcher not found")
         
-        logger.info("Payout request approved", extra={
-            "payout_id": str(payout_id),
-            "approved_by": str(approved_by)
-        })
+        # Debit wallet
+        from src.services.wallet_service import WalletService
+        wallet_service = WalletService(self.db)
         
-        return payout
+        try:
+            # Debit the researcher's wallet (from available balance, not reserved)
+            wallet_service.debit_wallet(
+                owner_id=researcher.user_id,
+                owner_type="researcher",
+                amount=payout.amount,
+                saga_id=str(payout.id),
+                from_reserved=False,  # Debit from available balance
+                reference_type="payout_request",
+                reference_id=payout.id
+            )
+            
+            # Mark payout as completed
+            payout.status = "completed"
+            payout.processed_by = approved_by
+            payout.processed_at = datetime.utcnow()
+            
+            self.db.commit()
+            self.db.refresh(payout)
+            
+            # Create transaction record
+            self._create_transaction(
+                user_id=researcher.user_id,
+                type="payout",
+                amount=payout.amount,
+                status="completed",
+                reference_id=payout.id,
+                reference_type="payout_request"
+            )
+            
+            logger.info("Payout request approved and completed", extra={
+                "payout_id": str(payout_id),
+                "approved_by": str(approved_by),
+                "amount": float(payout.amount)
+            })
+            
+            return payout
+            
+        except Exception as e:
+            self.db.rollback()
+            logger.error("Failed to process payout approval", extra={
+                "payout_id": str(payout_id),
+                "error": str(e)
+            })
+            raise ValueError(f"Failed to process payout: {str(e)}")
     
     def process_payout_request(
         self,

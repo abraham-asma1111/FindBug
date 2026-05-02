@@ -392,13 +392,17 @@ class WalletService:
         return [
             {
                 "transaction_id": str(tx.transaction_id),
-                "type": tx.transaction_type,
+                "transaction_type": tx.transaction_type,
                 "amount": float(tx.amount),
                 "balance_before": float(tx.balance_before),
                 "balance_after": float(tx.balance_after),
                 "description": tx.description,
-                "created_at": tx.created_at,
-                "compensated": tx.compensated
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+                "reference_type": tx.reference_type,
+                "reference_id": str(tx.reference_id) if tx.reference_id else None,
+                "saga_id": tx.saga_id,
+                "compensated": tx.compensated,
+                "status": "completed"
             }
             for tx in transactions
         ]

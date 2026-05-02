@@ -148,6 +148,110 @@ class EmailService:
         except Exception as e:
             print(f"❌ Failed to send verification email: {e}")
             return False
+    
+    @staticmethod
+    def send_registration_otp_email(email: str, otp: str, first_name: str = "User") -> bool:
+        """
+        Send registration OTP email
+        
+        Args:
+            email: User email address
+            otp: 6-digit OTP code
+            first_name: User's first name
+        """
+        try:
+            # Email configuration from environment
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@findbugplatform.com')
+            
+            if not smtp_user or not smtp_password:
+                print("⚠️  SMTP credentials not configured. Email not sent.")
+                return False
+            
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = 'Verify Your FindBug Account - Registration Code'
+            msg['From'] = smtp_from
+            msg['To'] = email
+            
+            # Email body
+            text_body = f"""
+            Welcome to FindBug Platform, {first_name}!
+            
+            Complete your registration by entering this verification code:
+            
+            VERIFICATION CODE: {otp}
+            
+            This code will expire in 10 minutes.
+            
+            If you didn't create this account, please ignore this email.
+            
+            Best regards,
+            FindBug Platform Team
+            Bahir Dar University
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: #7C3AED; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">🔒 Complete Your Registration</h1>
+                  </div>
+                  
+                  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none;">
+                    <h2 style="color: #7C3AED; margin-top: 0;">Welcome, {first_name}!</h2>
+                    <p>Thank you for registering with FindBug Platform.</p>
+                    <p>Complete your registration by entering this verification code:</p>
+                    
+                    <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #7C3AED;">
+                      <h1 style="color: #7C3AED; font-size: 36px; margin: 0; letter-spacing: 8px; font-family: monospace;">{otp}</h1>
+                      <p style="color: #666; margin: 10px 0 0; font-size: 14px;">Enter this code to verify your email</p>
+                    </div>
+                    
+                    <p style="color: #e74c3c; font-size: 14px; text-align: center;">
+                      ⏰ This code expires in 10 minutes
+                    </p>
+                    
+                    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                      If you didn't create this account, please ignore this email.
+                    </p>
+                  </div>
+                  
+                  <div style="background: #f1f3f4; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;">
+                    <p style="margin: 0;">FindBug Platform - Bug Bounty & Security Research</p>
+                    <p style="margin: 5px 0 0;">Bahir Dar University - Cyber Security Program</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            # Attach both plain text and HTML versions
+            part1 = MIMEText(text_body, 'plain')
+            part2 = MIMEText(html_body, 'html')
+            msg.attach(part1)
+            msg.attach(part2)
+            
+            # Send email
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+            
+            print(f"✅ Registration OTP sent to {email}")
+            print(f"   OTP: {otp} (expires in 10 minutes)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send registration OTP: {e}")
+            return False
+    
+    @staticmethod
+    def send_registration_verification_email(email: str, otp: str, token: str, user_type: str) -> bool:
         """
         Send registration verification email with OTP and backup link
         

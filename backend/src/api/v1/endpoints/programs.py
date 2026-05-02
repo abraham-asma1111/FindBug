@@ -234,10 +234,61 @@ def publish_program(
     Publish a program (make it public).
     
     Program must have at least one scope and reward tiers (for bounty programs).
+    Organization must have sufficient wallet balance (≥ critical tier reward).
     Supports both GET and POST methods.
     """
     service = ProgramService(db)
     
+    # Get program to check reward tiers
+    program = service.get_program(program_id)
+    
+    # Verify ownership
+    if program.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to publish this program"
+        )
+    
+    # Check wallet balance for bounty programs
+    if program.type == "bounty":
+        # Get reward tiers
+        tiers = service.program_repo.get_reward_tiers_by_program(program_id)
+        
+        if not tiers:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot publish bounty program without reward tiers"
+            )
+        
+        # Find critical tier (highest max_amount)
+        critical_tier = max(tiers, key=lambda t: t.max_amount)
+        critical_amount = critical_tier.max_amount
+        
+        # Check organization wallet balance
+        from src.services.wallet_service import WalletService
+        wallet_service = WalletService(db)
+        
+        try:
+            balance_info = wallet_service.get_balance(
+                owner_id=current_user.id,
+                owner_type="organization"
+            )
+            
+            current_balance = balance_info.get("balance", 0)
+            
+            if current_balance < critical_amount:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Insufficient wallet balance. You need at least {critical_amount} ETB (critical tier max reward) to publish this program. Current balance: {current_balance} ETB. Please recharge your wallet."
+                )
+        except Exception as e:
+            # If wallet doesn't exist or other error, block publish
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unable to verify wallet balance: {str(e)}. Please ensure your wallet is set up and has sufficient funds."
+            )
+    
+    # Proceed with publish
     program = service.publish_program(
         program_id,
         current_user.organization.id

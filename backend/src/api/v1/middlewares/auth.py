@@ -45,9 +45,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    # Get user from database
-    user_repo = UserRepository(db)
-    user = user_repo.get_by_id(user_id)
+    # Get user from database with eager loading of relationships
+    from sqlalchemy.orm import joinedload
+    from uuid import UUID
+    
+    user = db.query(User).options(
+        joinedload(User.researcher),
+        joinedload(User.organization),
+        joinedload(User.staff)
+    ).filter(User.id == UUID(user_id)).first()
     
     if not user:
         raise HTTPException(

@@ -321,19 +321,28 @@ async def get_kyc_verifications(
         if status:
             query = query.filter(KYCVerification.status == status)
         
-        verifications = query.order_by(KYCVerification.submitted_at.desc()).limit(limit).all()
+        verifications = query.order_by(KYCVerification.created_at.desc()).limit(limit).all()
         
         return {
             "verifications": [
                 {
                     "id": str(v.id),
                     "user_id": str(v.user_id),
-                    "user_name": v.user.full_name if v.user else "Unknown",
-                    "document_type": v.document_type,
-                    "document_number": v.document_number,
+                    "user": {
+                        "email": v.user.email if v.user else None,
+                        "full_name": (
+                            v.user.researcher.username if v.user and v.user.researcher and v.user.researcher.username else
+                            v.user.organization.name if v.user and v.user.organization and v.user.organization.name else
+                            v.user.staff.full_name if v.user and v.user.staff and v.user.staff.full_name else
+                            v.user.email.split('@')[0] if v.user and v.user.email else "Unknown"
+                        )
+                    },
+                    "email_verified": v.email_verified,
+                    "persona_verified": v.persona_verified_at is not None,
                     "status": v.status,
-                    "submitted_at": v.submitted_at.isoformat(),
-                    "reviewed_at": v.reviewed_at.isoformat() if v.reviewed_at else None,
+                    "created_at": v.created_at.isoformat(),
+                    "updated_at": v.updated_at.isoformat() if v.updated_at else None,
+                    "verified_at": v.verified_at.isoformat() if v.verified_at else None,
                     "rejection_reason": v.rejection_reason
                 }
                 for v in verifications
@@ -342,8 +351,9 @@ async def get_kyc_verifications(
         }
     
     except Exception as e:
+        from fastapi import status as http_status
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get KYC verifications: {str(e)}"
         )
 
@@ -378,17 +388,24 @@ async def get_kyc_details(
         return {
             "id": str(kyc.id),
             "user_id": str(kyc.user_id),
-            "user_name": kyc.user.full_name if kyc.user else "Unknown",
+            "user_name": (
+                kyc.user.researcher.username if kyc.user and kyc.user.researcher and kyc.user.researcher.username else
+                kyc.user.organization.name if kyc.user and kyc.user.organization and kyc.user.organization.name else
+                kyc.user.staff.full_name if kyc.user and kyc.user.staff and kyc.user.staff.full_name else
+                kyc.user.email.split('@')[0] if kyc.user and kyc.user.email else "Unknown"
+            ),
             "user_email": kyc.user.email if kyc.user else None,
             "document_type": kyc.document_type,
             "document_number": kyc.document_number,
-            "document_front_url": kyc.document_front_url,
-            "document_back_url": kyc.document_back_url,
-            "selfie_photo_url": kyc.selfie_photo_url,
+            "document_front_url": kyc.document_front if kyc.document_front else None,
+            "document_back_url": kyc.document_back if kyc.document_back else None,
+            "selfie_photo_url": kyc.selfie_photo if kyc.selfie_photo else None,
             "status": kyc.status,
-            "submitted_at": kyc.submitted_at.isoformat(),
-            "reviewed_at": kyc.reviewed_at.isoformat() if kyc.reviewed_at else None,
-            "reviewed_by": str(kyc.reviewed_by) if kyc.reviewed_by else None,
+            "email_verified": kyc.email_verified,
+            "persona_verified": kyc.persona_verified_at is not None,
+            "submitted_at": kyc.created_at.isoformat(),
+            "reviewed_at": kyc.verified_at.isoformat() if kyc.verified_at else None,
+            "reviewed_by": str(kyc.verified_by) if kyc.verified_by else None,
             "rejection_reason": kyc.rejection_reason,
             "expires_at": kyc.expires_at.isoformat() if kyc.expires_at else None
         }
@@ -558,7 +575,7 @@ async def start_persona_verification(
 @router.get(
     "/persona/status",
     summary="Get Persona KYC Status",
-    description="Get current Persona KYC verification status"
+    description="Get current Persona KYC verification status (ID verification only)"
 )
 async def get_persona_status(
     current_user: User = Depends(get_current_user),
@@ -567,10 +584,12 @@ async def get_persona_status(
     """
     Get Persona KYC status for current user.
     
+    IMPORTANT: This endpoint ONLY returns Persona ID verification status.
+    Email verification is completely separate - use /kyc/email/status instead.
+    
     Returns:
     - persona_status: created, pending, completed, failed
-    - phone_verified: true/false
-    - can_verify_phone: true/false
+    - status: overall KYC status (approved, pending, rejected)
     """
     try:
         from src.domain.models.kyc import KYCVerification
@@ -585,17 +604,14 @@ async def get_persona_status(
             return {
                 "status": "not_started",
                 "persona_status": None,
-                "email_verified": False,
-                "can_verify_email": False
+                "persona_inquiry_id": None
             }
         
+        # ONLY return Persona-related data - NO email fields
         return {
             "status": kyc.status,
             "persona_status": kyc.persona_status,
-            "persona_inquiry_id": kyc.persona_inquiry_id,
-            "email_verified": kyc.email_verified or False,
-            "email_address": kyc.email_address,
-            "can_verify_email": kyc.status == "approved" and not kyc.email_verified
+            "persona_inquiry_id": kyc.persona_inquiry_id
         }
     
     except Exception as e:
@@ -702,7 +718,7 @@ async def send_email_verification(
     - Email address must be valid
     - Rate limited to 3 attempts per hour
     """
-    # Get email from request body (parameter name kept as phone_number for compatibility)
+    # Get email from request body
     body = await request.json()
     email_address = body.get("email_address")
     
@@ -715,7 +731,7 @@ async def send_email_verification(
     try:
         result = await kyc_service.send_email_verification(
             user_id=current_user.id,
-            email_address=phone_number
+            email_address=email_address
         )
         
         # Log security event (non-blocking)
@@ -723,7 +739,7 @@ async def send_email_verification(
             SecurityAudit.log_security_event(
                 "EMAIL_VERIFICATION_SENT",
                 str(current_user.id),
-                {"email": result.get("email_address", phone_number)},
+                {"email": result.get("email_address", email_address)},
                 request
             )
         except Exception as log_error:
@@ -822,17 +838,22 @@ async def get_email_verification_status(
     Get email verification status.
     
     Returns:
-    - phone_verified: true/false (email verified status)
-    - phone_number: verified email address
-    - persona_approved: true/false
-    - can_verify_phone: true/false (can verify email)
+    - email_verified: true/false (email verified status)
+    - email_address: verified email address
+    - can_verify_email: true/false (can verify email)
     """
+    from src.core.logging import get_logger
+    logger = get_logger(__name__)
+    
     try:
+        logger.info(f"Getting email status for user {current_user.id}")
         result = kyc_service.get_email_verification_status(current_user.id)
+        logger.info(f"Email status result for user {current_user.id}: {result}")
         return result
     
     except Exception as e:
+        logger.error(f"Error getting email status: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get phone verification status: {str(e)}"
+            detail=f"Failed to get email verification status: {str(e)}"
         )

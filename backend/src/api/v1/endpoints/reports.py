@@ -1,6 +1,7 @@
 """Vulnerability Report API Endpoints - FREQ-06."""
 from typing import List, Optional, Type
 from uuid import UUID
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
@@ -98,8 +99,20 @@ def search_reports(
             reports = [r for r in reports if r.assigned_severity == severity]
         
         # Serialize reports
-        serialized_reports = [
-            {
+        serialized_reports = []
+        for r in reports:
+            # Get program info
+            program_data = None
+            if r.program_id:
+                from src.domain.models.program import BountyProgram
+                program = db.query(BountyProgram).filter(BountyProgram.id == r.program_id).first()
+                if program:
+                    program_data = {
+                        "id": str(program.id),
+                        "name": program.name
+                    }
+            
+            serialized_reports.append({
                 "id": str(r.id),
                 "report_number": r.report_number,
                 "title": r.title,
@@ -109,13 +122,13 @@ def search_reports(
                 "suggested_severity": r.suggested_severity,
                 "cvss_score": float(r.cvss_score) if r.cvss_score else None,
                 "bounty_amount": float(r.bounty_amount) if r.bounty_amount else None,
+                "bounty_status": r.bounty_status,
                 "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
                 "program_id": str(r.program_id) if r.program_id else None,
+                "program": program_data,
                 "researcher_id": str(r.researcher_id) if r.researcher_id else None,
                 "is_duplicate": r.is_duplicate
-            }
-            for r in reports
-        ]
+            })
         
         return {
             "reports": serialized_reports,
@@ -159,6 +172,7 @@ def search_reports(
                     "program_id": str(r.program_id),
                     "researcher_id": str(r.researcher_id) if r.researcher_id else None,
                     "bounty_amount": float(r.bounty_amount) if r.bounty_amount else None,
+                    "bounty_status": r.bounty_status,  # Add bounty_status field
                     "is_duplicate": r.is_duplicate,
                     "duplicate_of": str(r.duplicate_of) if r.duplicate_of else None
                 }
@@ -460,6 +474,7 @@ def get_report(
             "cvss_score": float(report.cvss_score) if report.cvss_score else None,
             "vrt_category": report.vrt_category,
             "bounty_amount": float(report.bounty_amount) if report.bounty_amount else None,
+            "bounty_status": report.bounty_status,  # Add bounty_status field
             "is_duplicate": report.is_duplicate,
             "duplicate_of": str(report.duplicate_of) if report.duplicate_of else None,
             "triage_notes": report.triage_notes,
@@ -1123,4 +1138,201 @@ def download_attachment(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
+        )
+
+
+@router.post("/reports/{report_id}/approve-bounty", status_code=status.HTTP_200_OK)
+def approve_bounty(
+    report_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve bounty payment for a valid report.
+    
+    This endpoint:
+    1. Validates the report is in 'valid' status
+    2. Calculates total cost (bounty + 30% commission)
+    3. Checks organization wallet balance
+    4. Deducts from organization wallet
+    5. Credits platform wallet
+    6. Creates bounty_payment record
+    7. Notifies Finance Officer
+    
+    Only organizations can approve bounties for their programs.
+    """
+    if not current_user.is_organization():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations can approve bounties"
+        )
+    
+    from src.services.payment_service import PaymentService
+    from src.services.wallet_service import WalletService
+    from src.domain.models.report import VulnerabilityReport
+    from decimal import Decimal
+    import uuid
+    
+    # Get report
+    report = db.query(VulnerabilityReport).filter(
+        VulnerabilityReport.id == report_id
+    ).first()
+    
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report not found"
+        )
+    
+    # Verify report belongs to organization's program
+    if report.program.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only approve bounties for your own programs"
+        )
+    
+    # Verify report is valid
+    if report.status != "valid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only valid reports can have bounties approved. Current status: {report.status}"
+        )
+    
+    # Verify bounty amount is set
+    if not report.bounty_amount or report.bounty_amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bounty amount must be set before approval"
+        )
+    
+    # Check if bounty already approved
+    from src.domain.models.bounty_payment import BountyPayment
+    existing_payment = db.query(BountyPayment).filter(
+        BountyPayment.report_id == report_id,
+        BountyPayment.status.in_(["approved", "processing", "completed"])
+    ).first()
+    
+    if existing_payment:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bounty has already been approved for this report"
+        )
+    
+    try:
+        # Calculate amounts (BR-06: 30% commission)
+        bounty_amount = Decimal(str(report.bounty_amount))
+        commission = bounty_amount * Decimal("0.30")
+        total_cost = bounty_amount + commission
+        
+        # Initialize services
+        wallet_service = WalletService(db)
+        payment_service = PaymentService(db)
+        
+        # Check organization wallet balance
+        org_wallet = wallet_service.get_or_create_wallet(
+            owner_id=current_user.id,  # Use user_id, not organization_id
+            owner_type="organization"
+        )
+        
+        if org_wallet.available_balance < total_cost:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient wallet balance. Required: {float(total_cost)} ETB, Available: {float(org_wallet.available_balance)} ETB"
+            )
+        
+        # Generate saga ID for transaction tracking
+        saga_id = f"BOUNTY-{uuid.uuid4().hex[:12].upper()}"
+        
+        # Step 1: Deduct from organization wallet
+        wallet_service.debit_wallet(
+            owner_id=current_user.id,  # Use user_id
+            owner_type="organization",
+            amount=total_cost,
+            saga_id=saga_id,
+            from_reserved=False,
+            reference_type="bounty_approval",
+            reference_id=report_id
+        )
+        
+        # Step 2: Credit platform wallet (entire amount goes to platform as queue)
+        # Get or create platform wallet (use first admin/finance user)
+        from src.domain.models.user import User as UserModel
+        platform_user = db.query(UserModel).filter(UserModel.role == "admin").first()
+        if not platform_user:
+            platform_user = db.query(UserModel).filter(UserModel.role == "finance_officer").first()
+        
+        if not platform_user:
+            # Rollback if no platform user found
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Platform wallet user not found. Please contact support."
+            )
+        
+        wallet_service.credit_wallet(
+            owner_id=platform_user.id,
+            owner_type="platform",
+            amount=total_cost,
+            saga_id=saga_id,
+            reference_type="bounty_approval",
+            reference_id=report_id
+        )
+        
+        # Step 3: Create bounty payment record
+        payment = payment_service.create_bounty_payment(
+            report_id=report_id,
+            bounty_amount=bounty_amount,
+            approved_by=current_user.id
+        )
+        
+        # Update payment to approved status
+        payment.status = "approved"
+        payment.approved_by = current_user.id
+        payment.approved_at = datetime.utcnow()
+        db.commit()
+        db.refresh(payment)
+        
+        # Step 4: Update report status
+        report.bounty_status = "approved"
+        db.commit()
+        
+        # TODO: Step 5: Send notification to Finance Officer
+        # This will be implemented when notification service is integrated
+        
+        logger.info("Bounty approved", extra={
+            "report_id": str(report_id),
+            "organization_id": str(current_user.organization.id),
+            "bounty_amount": float(bounty_amount),
+            "commission": float(commission),
+            "total_cost": float(total_cost),
+            "payment_id": str(payment.payment_id)
+        })
+        
+        return {
+            "message": "Bounty approved successfully",
+            "payment_id": str(payment.payment_id),
+            "transaction_id": payment.transaction_id,
+            "bounty_amount": float(bounty_amount),
+            "commission": float(commission),
+            "total_cost": float(total_cost),
+            "status": payment.status
+        }
+    
+    except ValueError as e:
+        # Rollback on error
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Rollback on error
+        db.rollback()
+        logger.error("Failed to approve bounty", extra={
+            "report_id": str(report_id),
+            "error": str(e)
+        })
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to approve bounty: {str(e)}"
         )

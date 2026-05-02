@@ -435,6 +435,8 @@ class KYCService:
         import httpx
         import os
         
+        logger.info(f"start_persona_verification called for user {user_id}, role: {user_role}")
+        
         # Get Persona configuration
         api_key = os.getenv("PERSONA_API_KEY")
         environment = os.getenv("PERSONA_ENVIRONMENT", "sandbox")
@@ -460,38 +462,61 @@ class KYCService:
         ).first()
         
         if existing:
+            logger.info(f"Found existing KYC record for user {user_id}: inquiry_id={existing.persona_inquiry_id}")
             return {
                 "inquiry_id": existing.persona_inquiry_id,
                 "template_id": existing.persona_template_id,
                 "status": "existing"
             }
         
-        # Create inquiry via Persona API
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"https://withpersona.com/api/v1/inquiries",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "Persona-Version": "2023-01-05"
-                },
-                json={
-                    "data": {
-                        "attributes": {
-                            "inquiry-template-id": template_id,
-                            "reference-id": str(user_id),
-                            "environment": environment
+        logger.info(f"No existing KYC found, creating new Persona inquiry for user {user_id}")
+        
+        # Create inquiry via Persona API with timeout
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:  # 30 second timeout
+                response = await client.post(
+                    f"https://withpersona.com/api/v1/inquiries",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "Persona-Version": "2023-01-05"
+                    },
+                    json={
+                        "data": {
+                            "attributes": {
+                                "inquiry-template-id": template_id,
+                                "reference-id": str(user_id),
+                                "environment": environment
+                            }
                         }
                     }
-                }
-            )
+                )
             
+            # Check response status
             if response.status_code != 201:
                 logger.error(f"Persona API error: {response.text}")
                 raise Exception(f"Failed to create Persona inquiry: {response.status_code}")
             
+            # Extract inquiry ID
             data = response.json()
             inquiry_id = data["data"]["id"]
+            
+        except httpx.ConnectTimeout:
+            logger.error("Persona API connection timeout")
+            raise Exception("Unable to connect to Persona verification service. Please try again later.")
+        except httpx.ReadTimeout:
+            logger.error("Persona API read timeout")
+            raise Exception("Persona verification service is taking too long to respond. Please try again later.")
+        except httpx.NetworkError as e:
+            logger.error(f"Persona API network error: {str(e)}")
+            raise Exception("Network error connecting to Persona. Please check your internet connection.")
+        except Exception as e:
+            # Re-raise if it's already our custom exception
+            if "Unable to connect" in str(e) or "taking too long" in str(e) or "Network error" in str(e) or "Failed to create" in str(e):
+                raise
+            # Otherwise wrap it
+            logger.error(f"Unexpected error creating Persona inquiry: {str(e)}")
+            raise Exception(f"Failed to initialize Persona verification: {str(e)}")
         
         # Create KYC record
         kyc = KYCVerification(
@@ -506,12 +531,13 @@ class KYCService:
         self.db.commit()
         self.db.refresh(kyc)
         
-        logger.info(f"Created Persona inquiry {inquiry_id} for user {user_id}")
+        logger.info(f"Created Persona inquiry {inquiry_id} for user {user_id}, KYC ID: {kyc.id}")
         
         return {
             "inquiry_id": inquiry_id,
             "template_id": template_id,
-            "status": "created"
+            "status": "created",
+            "kyc_id": str(kyc.id)  # Include KYC ID for debugging
         }
     
     async def verify_persona_inquiry(
@@ -535,34 +561,63 @@ class KYCService:
         if not api_key:
             raise ValueError("Persona API key missing")
         
-        # Fetch inquiry from Persona
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"https://withpersona.com/api/v1/inquiries/{inquiry_id}",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Persona-Version": "2023-01-05"
-                }
-            )
+        # Fetch inquiry from Persona with timeout
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:  # 30 second timeout
+                response = await client.get(
+                    f"https://withpersona.com/api/v1/inquiries/{inquiry_id}",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Persona-Version": "2023-01-05"
+                    }
+                )
             
+            # Check response status
             if response.status_code != 200:
                 logger.error(f"Persona API error: {response.text}")
                 raise Exception(f"Failed to fetch inquiry: {response.status_code}")
             
+            # Extract inquiry data
             data = response.json()
             inquiry_data = data["data"]
             attributes = inquiry_data["attributes"]
             
             status = attributes.get("status")
             reference_id = attributes.get("reference-id")
+            
+        except httpx.ConnectTimeout:
+            logger.error("Persona API connection timeout during verification")
+            raise Exception("Unable to connect to Persona verification service. Please try again later.")
+        except httpx.ReadTimeout:
+            logger.error("Persona API read timeout during verification")
+            raise Exception("Persona verification service is taking too long to respond. Please try again later.")
+        except httpx.NetworkError as e:
+            logger.error(f"Persona API network error during verification: {str(e)}")
+            raise Exception("Network error connecting to Persona. Please check your internet connection.")
+        except Exception as e:
+            # Re-raise if it's already our custom exception
+            if "Unable to connect" in str(e) or "taking too long" in str(e) or "Network error" in str(e) or "Failed to fetch" in str(e):
+                raise
+            # Otherwise wrap it
+            logger.error(f"Unexpected error verifying Persona inquiry: {str(e)}")
+            raise Exception(f"Failed to verify Persona inquiry: {str(e)}")
         
         # Find KYC record
+        logger.info(f"Looking for KYC record with inquiry_id: {inquiry_id}")
+        
         kyc = self.db.query(KYCVerification).filter(
             KYCVerification.persona_inquiry_id == inquiry_id
         ).first()
         
         if not kyc:
+            # Debug: Check all KYC records for this user
+            all_kyc = self.db.query(KYCVerification).all()
+            logger.error(f"KYC record not found for inquiry {inquiry_id}. Total KYC records in DB: {len(all_kyc)}")
+            for k in all_kyc:
+                logger.error(f"  - KYC ID: {k.id}, User: {k.user_id}, Inquiry: {k.persona_inquiry_id}")
             raise NotFoundException(f"KYC record not found for inquiry {inquiry_id}")
+        
+        logger.info(f"Found KYC record {kyc.id} for inquiry {inquiry_id}")
         
         # Update KYC status based on Persona status
         kyc.persona_status = status
@@ -652,16 +707,30 @@ class KYCService:
         """
         Send EMAIL verification code (replaces SMS).
         
-        INDEPENDENT: Can be tested without Persona KYC.
+        SECURITY: User can ONLY verify the email from their account registration.
+        This prevents email hijacking attacks.
         
         Args:
             user_id: User ID
-            email_address: Email address to verify (parameter name kept for compatibility)
+            email_address: Email address to verify (must match user's registered email)
             
         Returns:
             Dict with send status
         """
         from src.core.email_service import EmailService
+        
+        # CRITICAL SECURITY CHECK: Get the user's registered email
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise NotFoundException("User not found")
+        
+        # CRITICAL: User can ONLY verify their own registered email
+        # This prevents email hijacking where user A tries to verify user B's email
+        if email_address.lower() != user.email.lower():
+            raise ForbiddenException(
+                f"You can only verify your registered email address ({user.email}). "
+                f"To change your email, please update your account settings first."
+            )
         
         # Get or create KYC record
         kyc = self.db.query(KYCVerification).filter(
@@ -678,15 +747,15 @@ class KYCService:
             self.db.commit()
             self.db.refresh(kyc)
         
-        # Check if already verified
-        if kyc.email_verified:
-            raise ConflictException("Email already verified")
-        
-        # Validate email format
+        # CRITICAL: Validate email format FIRST before any other checks
         import re
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, phone_number):
+        if not re.match(email_pattern, email_address):
             raise ValueError("Invalid email address format")
+        
+        # Check if already verified (AFTER format validation)
+        if kyc.email_verified:
+            raise ConflictException("Email already verified")
         
         # Check rate limiting (max 3 attempts per hour)
         if kyc.email_verification_attempts >= 3:
@@ -714,7 +783,7 @@ class KYCService:
         # Send email with verification code
         try:
             email_sent = EmailService.send_kyc_verification_code(
-                email=phone_number,
+                email=email_address,
                 code=code,
                 user_name=user_name
             )
@@ -730,18 +799,18 @@ class KYCService:
         import hashlib
         code_hash = hashlib.sha256(code.encode()).hexdigest()
         
-        kyc.email_address = phone_number  # Store email in phone_number field
+        kyc.email_address = email_address
         kyc.email_verification_code = code_hash
         kyc.email_verification_code_expires = datetime.utcnow() + timedelta(minutes=10)
         kyc.email_verification_attempts += 1
         
         self.db.commit()
         
-        logger.info(f"Email verification code sent to {phone_number} for user {user_id}")
+        logger.info(f"Email verification code sent to {email_address} for user {user_id}")
         
         return {
             "success": True,
-            "email_address": phone_number,
+            "email_address": email_address,
             "expires_in_minutes": 10,
             "message": "Verification code sent to your email"
         }
@@ -771,11 +840,11 @@ class KYCService:
         if not kyc:
             raise NotFoundException("KYC record not found")
         
-        # Check if phone is already verified
+        # Check if email is already verified
         if kyc.email_verified:
             return {
                 "success": True,
-                "message": "Phone already verified",
+                "message": "Email already verified",
                 "email_address": kyc.email_address
             }
         
@@ -794,7 +863,7 @@ class KYCService:
         if code_hash != kyc.email_verification_code:
             raise ValueError("Invalid verification code")
         
-        # Mark phone as verified
+        # Mark email as verified
         kyc.email_verified = True
         kyc.email_verified_at = datetime.utcnow()
         kyc.email_verification_code = None
@@ -836,12 +905,15 @@ class KYCService:
             return {
                 "email_verified": False,
                 "email_address": None,
-                "can_verify_email": True  # Always allow SMS testing
+                "can_verify_email": True  # Always allow email verification
             }
         
+        # CRITICAL: Ensure email_verified is always a boolean, never None
+        email_verified = bool(kyc.email_verified) if kyc.email_verified is not None else False
+        
         return {
-            "email_verified": kyc.email_verified,
+            "email_verified": email_verified,
             "email_address": kyc.email_address,
             "email_verified_at": kyc.email_verified_at.isoformat() if kyc.email_verified_at else None,
-            "can_verify_email": not kyc.email_verified  # Can verify if not already verified
+            "can_verify_email": not email_verified  # Can verify if not already verified
         }

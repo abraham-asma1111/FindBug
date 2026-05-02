@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Column, String, DateTime, Numeric, Boolean,
-    ForeignKey, func, Index
+    ForeignKey, func, Index, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSON
 from sqlalchemy.orm import relationship
@@ -114,10 +114,12 @@ class Wallet(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
-    # Indexes
+    # Indexes and constraints
     __table_args__ = (
         Index('ix_wallets_owner_id', 'owner_id'),
         Index('ix_wallets_owner_type', 'owner_type'),
+        # Unique constraint to prevent duplicate wallets per owner
+        UniqueConstraint('owner_id', 'owner_type', name='uq_wallets_owner_id_owner_type'),
     )
 
 

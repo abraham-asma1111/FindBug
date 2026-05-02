@@ -96,6 +96,23 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="user")
     payment_methods = relationship("PaymentMethod", back_populates="user", cascade="all, delete-orphan")
     
+    def __init__(self, **kwargs):
+        """
+        Initialize User model with automatic enum-to-string conversion for role.
+        
+        This prevents the common error: "invalid input value for enum userrole"
+        by ensuring role is ALWAYS stored as a string value, not an enum object.
+        """
+        # Convert role enum to string if needed
+        if 'role' in kwargs:
+            role_value = kwargs['role']
+            if isinstance(role_value, UserRole):
+                kwargs['role'] = role_value.value
+            elif isinstance(role_value, enum.Enum):
+                kwargs['role'] = role_value.value
+        
+        super().__init__(**kwargs)
+    
     def has_role(self, role_name: str) -> bool:
         """
         Check if user has a specific role (case-insensitive).
