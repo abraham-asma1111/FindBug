@@ -21,6 +21,32 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  // Check if we're on a finance or triage portal page
+                  const path = window.location.pathname;
+                  const isFinanceOrTriage = path.startsWith('/finance') || path.startsWith('/triage');
+                  
+                  if (isFinanceOrTriage) {
+                    // Force dark mode for finance and triage portals
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    // For other pages, check localStorage
+                    const theme = localStorage.getItem('theme');
+                    if (theme === 'dark') {
+                      document.documentElement.classList.add('dark');
+                    }
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>

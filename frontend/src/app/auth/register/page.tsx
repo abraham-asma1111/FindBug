@@ -50,7 +50,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const result = await register({
+      await register({
         email: formData.email,
         password: formData.password,
         first_name: formData.firstName,
@@ -61,8 +61,8 @@ export default function RegisterPage() {
         phone_number: role === 'organization' ? formData.phoneNumber : undefined,
       });
       
-      // Registration initiated successfully - redirect to email verification page
-      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}&waiting=true`);
+      // Registration initiated successfully - redirect to OTP verification page
+      router.push(`/auth/verify-otp?email=${encodeURIComponent(formData.email)}`);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed. Please try again.');
     } finally {
@@ -86,7 +86,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-start justify-center p-8 bg-white dark:bg-[#111111] overflow-y-auto min-h-screen pt-24">
+        <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-start justify-center p-8 bg-white overflow-y-auto min-h-screen pt-24">
           <div className="max-w-2xl w-full py-4">
             <div className="mb-8 text-center">
               <h2 className="text-3xl font-bold text-black mb-4 mt-8">CREATE ACCOUNT</h2>

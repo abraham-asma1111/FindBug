@@ -13,12 +13,12 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useQueryClient } from '@tanstack/react-query';
 
-export default function KYCDetailPage() {
+export default function PaymentMethodDetailPage() {
   const user = useAuthStore((state) => state.user);
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const kycId = params.id as string;
+  const methodId = params.id as string;
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     type: 'approve' | 'reject';
@@ -33,40 +33,40 @@ export default function KYCDetailPage() {
     document.documentElement.classList.add('dark');
   }, []);
 
-  // Fetch KYC details
-  const { data: kyc, isLoading } = useApiQuery<any>({
-    endpoint: `/kyc/verifications/${kycId}`,
-    queryKey: [`/kyc/verifications/${kycId}`],
+  // Fetch payment method details
+  const { data: paymentMethod, isLoading } = useApiQuery<any>({
+    endpoint: `/payment-methods/details/${methodId}`,
+    queryKey: [`/payment-methods/details/${methodId}`],
   });
 
   const approveMutation = useApiMutation({
     method: 'POST',
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/kyc/verifications/${kycId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/payment-methods/details/${methodId}`] });
       setConfirmDialog({ isOpen: false, type: 'approve' });
-      router.push('/finance/kyc?status=approved');
+      router.push('/finance/payment-methods?status=approved');
     },
   });
 
   const rejectMutation = useApiMutation({
     method: 'POST',
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/kyc/verifications/${kycId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/payment-methods/details/${methodId}`] });
       setConfirmDialog({ isOpen: false, type: 'reject' });
-      router.push('/finance/kyc?status=rejected');
+      router.push('/finance/payment-methods?status=rejected');
     },
   });
 
   const handleConfirmAction = async (notes?: string) => {
     if (confirmDialog.type === 'approve') {
       await approveMutation.mutateAsync({
-        endpoint: `/kyc/verifications/${kycId}/approve`,
+        endpoint: `/payment-methods/${methodId}/approve`,
         data: {},
       });
     } else {
       await rejectMutation.mutateAsync({
-        endpoint: `/kyc/verifications/${kycId}/reject?reason=${encodeURIComponent(notes || '')}`,
-        data: {},
+        endpoint: `/payment-methods/${methodId}/reject`,
+        data: { reason: notes },
       });
     }
   };
@@ -77,13 +77,13 @@ export default function KYCDetailPage() {
         {user ? (
           <PortalShell
             user={user}
-            title="KYC Verification Details"
+            title="Payment Method Details"
             subtitle="Loading..."
             navItems={getPortalNavItems(user.role)}
             hideThemeToggle={true}
           >
             <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
-              <p className="text-[#94A3B8]">Loading KYC details...</p>
+              <p className="text-[#94A3B8]">Loading payment method details...</p>
             </div>
           </PortalShell>
         ) : null}
@@ -91,25 +91,25 @@ export default function KYCDetailPage() {
     );
   }
 
-  if (!kyc) {
+  if (!paymentMethod) {
     return (
       <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
         {user ? (
           <PortalShell
             user={user}
-            title="KYC Not Found"
-            subtitle="The KYC verification could not be found"
+            title="Payment Method Not Found"
+            subtitle="The payment method could not be found"
             navItems={getPortalNavItems(user.role)}
             hideThemeToggle={true}
           >
             <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
-              <p className="text-[#94A3B8] mb-4">KYC verification not found</p>
+              <p className="text-[#94A3B8] mb-4">Payment method not found</p>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push('/finance/kyc')}
+                onClick={() => router.push('/finance/payment-methods')}
               >
-                Back to KYC Verifications
+                Back to Payment Methods
               </Button>
             </div>
           </PortalShell>
@@ -132,35 +132,49 @@ export default function KYCDetailPage() {
     );
   };
 
+  const getKYCBadge = (kyc: any) => {
+    if (!kyc) {
+      return <span className="px-2 py-1 rounded text-xs font-bold bg-[#64748B] text-white">NO KYC</span>;
+    }
+    const isVerified = kyc.email_verified && kyc.persona_verified;
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-bold ${
+        isVerified ? 'bg-[#10B981]' : 'bg-[#F59E0B]'
+      } text-white`}>
+        {isVerified ? '✓ VERIFIED' : 'PARTIAL'}
+      </span>
+    );
+  };
+
   const timelineEvents = [
     {
-      id: `${kycId}-created`,
+      id: `${methodId}-created`,
       type: 'created' as const,
-      title: 'KYC Verification Submitted',
-      description: 'Researcher submitted KYC verification',
-      timestamp: kyc.submitted_at || kyc.created_at,
-      user: kyc.user_name || 'Researcher',
+      title: 'Payment Method Submitted',
+      description: 'Researcher submitted payment method for verification',
+      timestamp: paymentMethod.created_at,
+      user: paymentMethod.researcher?.username || 'Researcher',
     },
-    ...(kyc.status === 'approved' && kyc.reviewed_at
+    ...(paymentMethod.status === 'approved' && paymentMethod.updated_at
       ? [
           {
-            id: `${kycId}-approved`,
+            id: `${methodId}-approved`,
             type: 'approved' as const,
-            title: 'KYC Verification Approved',
-            description: 'KYC verification approved by finance officer',
-            timestamp: kyc.reviewed_at,
+            title: 'Payment Method Approved',
+            description: 'Payment method verified and approved for payouts',
+            timestamp: paymentMethod.updated_at,
             user: 'Finance Officer',
           },
         ]
       : []),
-    ...(kyc.status === 'rejected' && kyc.reviewed_at
+    ...(paymentMethod.status === 'rejected' && paymentMethod.rejected_at
       ? [
           {
-            id: `${kycId}-rejected`,
+            id: `${methodId}-rejected`,
             type: 'rejected' as const,
-            title: 'KYC Verification Rejected',
-            description: kyc.rejection_reason || 'KYC verification rejected',
-            timestamp: kyc.reviewed_at,
+            title: 'Payment Method Rejected',
+            description: paymentMethod.rejection_reason || 'Payment method rejected',
+            timestamp: paymentMethod.rejected_at,
             user: 'Finance Officer',
           },
         ]
@@ -172,13 +186,13 @@ export default function KYCDetailPage() {
       {user ? (
         <PortalShell
           user={user}
-          title="KYC Verification Details"
-          subtitle={`${kyc.user_name || 'Researcher'} - ${kyc.user_email}`}
+          title={`Payment Method Details`}
+          subtitle={`${paymentMethod.method_type?.replace('_', ' ').toUpperCase()} - ${paymentMethod.account_name}`}
           navItems={getPortalNavItems(user.role)}
           hideThemeToggle={true}
         >
           {/* Header Actions */}
-          {kyc.status === 'pending' && (
+          {paymentMethod.status === 'pending' && (
             <div className="mb-6 flex gap-2 justify-end">
               <Button
                 variant="danger"
@@ -192,65 +206,65 @@ export default function KYCDetailPage() {
                 size="sm"
                 onClick={() => setConfirmDialog({ isOpen: true, type: 'approve' })}
               >
-                Approve KYC
+                Approve Payment Method
               </Button>
             </div>
           )}
 
           {/* Streamlined Single Card Layout */}
           <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8">
-            {/* KYC Information Section */}
+            {/* Payment Method Section */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-[#F8FAFC] mb-6 pb-3 border-b border-[#334155]">
-                KYC Verification Information
+                Payment Method Information
               </h2>
               <div className="space-y-4">
                 <div className="flex justify-between items-center gap-4">
+                  <span className="text-[#94A3B8] flex-shrink-0">Method Type</span>
+                  <span className="text-[#F8FAFC] font-medium text-right">
+                    {paymentMethod.method_type?.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center gap-4">
                   <span className="text-[#94A3B8] flex-shrink-0">Status</span>
-                  <div className="flex-shrink-0">{getStatusBadge(kyc.status)}</div>
+                  <div className="flex-shrink-0">{getStatusBadge(paymentMethod.status)}</div>
                 </div>
                 <div className="flex justify-between items-center gap-4">
-                  <span className="text-[#94A3B8] flex-shrink-0">Email Verified</span>
-                  <span className={`font-semibold text-right ${kyc.email_verified ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                    {kyc.email_verified ? '✓ Yes' : '✗ No'}
-                  </span>
+                  <span className="text-[#94A3B8] flex-shrink-0">Account Holder</span>
+                  <span className="text-[#F8FAFC] font-medium text-right">{paymentMethod.account_name || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center gap-4">
-                  <span className="text-[#94A3B8] flex-shrink-0">Persona Verified</span>
-                  <span className={`font-semibold text-right ${kyc.persona_verified ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                    {kyc.persona_verified ? '✓ Yes' : '✗ No'}
+                  <span className="text-[#94A3B8] flex-shrink-0">Account Number</span>
+                  <span className="text-[#F8FAFC] font-medium font-mono text-right">
+                    {paymentMethod.method_type === 'bank_transfer'
+                      ? `****${paymentMethod.account_number?.slice(-4)}`
+                      : paymentMethod.account_number}
                   </span>
                 </div>
-                {kyc.document_type && (
+                {paymentMethod.bank_name && (
                   <div className="flex justify-between items-center gap-4">
-                    <span className="text-[#94A3B8] flex-shrink-0">Document Type</span>
-                    <span className="text-[#F8FAFC] font-medium text-right capitalize">
-                      {kyc.document_type.replace('_', ' ')}
-                    </span>
+                    <span className="text-[#94A3B8] flex-shrink-0">Bank Name</span>
+                    <span className="text-[#F8FAFC] font-medium text-right">{paymentMethod.bank_name}</span>
                   </div>
                 )}
-                {kyc.document_number && (
+                {paymentMethod.phone_number && (
                   <div className="flex justify-between items-center gap-4">
-                    <span className="text-[#94A3B8] flex-shrink-0">Document Number</span>
-                    <span className="text-[#F8FAFC] font-medium font-mono text-right">
-                      {kyc.document_number}
-                    </span>
+                    <span className="text-[#94A3B8] flex-shrink-0">Phone Number</span>
+                    <span className="text-[#F8FAFC] font-medium text-right">{paymentMethod.phone_number}</span>
                   </div>
                 )}
+                <div className="flex justify-between items-center gap-4">
+                  <span className="text-[#94A3B8] flex-shrink-0">Default Method</span>
+                  <span className="text-[#F8FAFC] font-medium text-right">
+                    {paymentMethod.is_default ? 'Yes' : 'No'}
+                  </span>
+                </div>
                 <div className="flex justify-between items-center gap-4">
                   <span className="text-[#94A3B8] flex-shrink-0">Submitted</span>
                   <span className="text-[#F8FAFC] font-medium text-right">
-                    {new Date(kyc.submitted_at || kyc.created_at).toLocaleDateString()}
+                    {new Date(paymentMethod.created_at).toLocaleDateString()}
                   </span>
                 </div>
-                {kyc.reviewed_at && (
-                  <div className="flex justify-between items-center gap-4">
-                    <span className="text-[#94A3B8] flex-shrink-0">Reviewed</span>
-                    <span className="text-[#F8FAFC] font-medium text-right">
-                      {new Date(kyc.reviewed_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -261,26 +275,46 @@ export default function KYCDetailPage() {
               </h2>
               <div className="space-y-4">
                 <div className="flex justify-between items-center gap-4">
-                  <span className="text-[#94A3B8] flex-shrink-0">Name</span>
+                  <span className="text-[#94A3B8] flex-shrink-0">Username</span>
                   <span className="text-[#F8FAFC] font-medium text-right">
-                    {kyc.user_name || 'Unknown'}
+                    {paymentMethod.researcher?.username || paymentMethod.researcher?.full_name || 'Unknown'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center gap-4">
                   <span className="text-[#94A3B8] flex-shrink-0">Email</span>
-                  <span className="text-[#F8FAFC] font-medium text-right">{kyc.user_email}</span>
+                  <span className="text-[#F8FAFC] font-medium text-right">{paymentMethod.researcher?.email}</span>
                 </div>
+                <div className="flex justify-between items-center gap-4">
+                  <span className="text-[#94A3B8] flex-shrink-0">KYC Status</span>
+                  <div className="flex-shrink-0">{getKYCBadge(paymentMethod.kyc)}</div>
+                </div>
+                {paymentMethod.kyc && (
+                  <>
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="text-[#94A3B8] flex-shrink-0">Email Verified</span>
+                      <span className="text-[#F8FAFC] font-medium text-right">
+                        {paymentMethod.kyc.email_verified ? '✓ Yes' : '✗ No'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-4">
+                      <span className="text-[#94A3B8] flex-shrink-0">Persona Verified</span>
+                      <span className="text-[#F8FAFC] font-medium text-right">
+                        {paymentMethod.kyc.persona_verified ? '✓ Yes' : '✗ No'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Rejection Reason (if applicable) */}
-            {kyc.status === 'rejected' && kyc.rejection_reason && (
+            {paymentMethod.status === 'rejected' && paymentMethod.rejection_reason && (
               <div className="mb-8 p-4 rounded-lg border border-[#EF4444] bg-[#EF4444]/10">
                 <h3 className="text-sm font-semibold text-[#EF4444] uppercase mb-2">Rejection Reason</h3>
-                <p className="text-sm text-[#F8FAFC]">{kyc.rejection_reason}</p>
-                {kyc.reviewed_at && (
+                <p className="text-sm text-[#F8FAFC]">{paymentMethod.rejection_reason}</p>
+                {paymentMethod.rejected_at && (
                   <p className="text-xs text-[#94A3B8] mt-2">
-                    Rejected on {new Date(kyc.reviewed_at).toLocaleString()}
+                    Rejected on {new Date(paymentMethod.rejected_at).toLocaleString()}
                   </p>
                 )}
               </div>
@@ -302,23 +336,23 @@ export default function KYCDetailPage() {
             onConfirm={handleConfirmAction}
             title={
               confirmDialog.type === 'approve'
-                ? 'Approve KYC Verification?'
-                : 'Reject KYC Verification?'
+                ? 'Approve Payment Method?'
+                : 'Reject Payment Method?'
             }
             message={
               confirmDialog.type === 'approve'
-                ? `You are about to approve KYC verification for ${kyc.user_name}. This will mark their identity as verified.`
-                : 'You are about to reject this KYC verification. Please provide a reason for rejection.'
+                ? `You are about to approve this payment method for ${paymentMethod.researcher?.username}. This will allow them to receive payouts using this method.`
+                : 'You are about to reject this payment method. Please provide a reason for rejection.'
             }
             confirmText={
-              confirmDialog.type === 'approve' ? 'Approve KYC' : 'Reject KYC'
+              confirmDialog.type === 'approve' ? 'Approve Payment Method' : 'Reject Payment Method'
             }
             type={confirmDialog.type}
             requireNotes={confirmDialog.type === 'reject'}
             notesLabel={confirmDialog.type === 'reject' ? 'Rejection Reason' : 'Notes'}
             notesPlaceholder={
               confirmDialog.type === 'reject'
-                ? 'Explain why this KYC verification is being rejected...'
+                ? 'Explain why this payment method is being rejected...'
                 : 'Add optional notes...'
             }
             isLoading={approveMutation.isLoading || rejectMutation.isLoading}

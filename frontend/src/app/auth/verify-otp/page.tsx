@@ -54,6 +54,26 @@ function VerifyOTPPageContent() {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').trim();
+    
+    // Only accept 6-digit numbers
+    if (!/^\d{6}$/.test(pastedData)) {
+      setError('Please paste a valid 6-digit code');
+      return;
+    }
+
+    // Split the pasted code into individual digits
+    const digits = pastedData.split('');
+    setOtp(digits);
+    setError(''); // Clear any previous errors
+    
+    // Focus the last input
+    const lastInput = document.getElementById('otp-5');
+    lastInput?.focus();
+  };
+
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       const prevInput = document.getElementById(`otp-${index - 1}`);
@@ -74,15 +94,17 @@ function VerifyOTPPageContent() {
     setError('');
 
     try {
-      await api.post('/registration/verify-otp', {
+      const response = await api.post('/registration/verify-otp', {
         email: email,
         otp: otpCode
       });
 
+      const data = response.data;
+
       alert('Registration completed successfully! You can now log in.');
       router.push('/auth/login');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid verification code');
+      setError(err.response?.data?.detail || err.message || 'Invalid verification code');
     } finally {
       setIsLoading(false);
     }
@@ -93,12 +115,13 @@ function VerifyOTPPageContent() {
     setError('');
 
     try {
-      await api.post('/registration/resend-otp', { email });
+      const response = await api.post('/registration/resend-otp', { email });
+
       setTimeLeft(600); // Reset timer
       setOtp(['', '', '', '', '', '']); // Clear current OTP
       alert('New verification code sent to your email!');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to resend verification code');
+      setError(err.response?.data?.detail || err.message || 'Failed to resend verification code');
     } finally {
       setIsResending(false);
     }
@@ -107,31 +130,31 @@ function VerifyOTPPageContent() {
   return (
     <>
       <Header />
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 pt-16">
-        <div className="max-w-md w-full space-y-8 p-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 pt-16 px-4">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               Verify Your Email
             </h2>
-            <p className="text-gray-600 mb-8">
+            <p className="text-gray-600 dark:text-gray-400 mb-8">
               We sent a 6-digit code to<br />
-              <span className="font-medium text-gray-900">{email}</span>
+              <span className="font-medium text-gray-900 dark:text-white">{email}</span>
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-red-600 text-sm">{error}</p>
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
               </div>
             )}
 
             {/* OTP Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-4 text-center">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4 text-center">
                 Enter verification code
               </label>
-              <div className="flex justify-center space-x-3">
+              <div className="flex justify-center space-x-3" onPaste={handlePaste}>
                 {otp.map((digit, index) => (
                   <input
                     key={index}
@@ -140,17 +163,20 @@ function VerifyOTPPageContent() {
                     value={digit}
                     onChange={(e) => handleOtpChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
-                    className="w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    className="w-12 h-12 text-center text-xl font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     maxLength={1}
                   />
                 ))}
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+                You can paste the 6-digit code from your email
+              </p>
             </div>
 
             {/* Timer */}
             <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Code expires in: <span className="font-mono font-medium text-red-600">{formatTime(timeLeft)}</span>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Code expires in: <span className="font-mono font-medium text-red-600 dark:text-red-400">{formatTime(timeLeft)}</span>
               </p>
             </div>
 
@@ -158,7 +184,7 @@ function VerifyOTPPageContent() {
             <button
               type="submit"
               disabled={isLoading || otp.join('').length !== 6}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
             >
               {isLoading ? 'Verifying...' : 'Verify & Complete Registration'}
             </button>
@@ -166,18 +192,18 @@ function VerifyOTPPageContent() {
 
           {/* Resend Section */}
           <div className="text-center space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Didn't receive the code?
             </p>
             <button
               onClick={handleResendOTP}
               disabled={isResending || timeLeft > 540} // Allow resend after 1 minute
-              className="text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed"
             >
               {isResending ? 'Sending...' : 'Resend verification code'}
             </button>
             {timeLeft > 540 && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-500">
                 You can resend in {formatTime(timeLeft - 540)}
               </p>
             )}
@@ -187,7 +213,7 @@ function VerifyOTPPageContent() {
           <div className="text-center">
             <button
               onClick={() => router.push('/auth/register')}
-              className="text-gray-600 hover:text-gray-800 font-medium"
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
             >
               ← Back to Registration
             </button>

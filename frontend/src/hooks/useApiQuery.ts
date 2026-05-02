@@ -70,9 +70,11 @@ export function useApiQuery<T = any>(
   }, [onSuccess, onError]);
 
   const fetchData = useCallback(async () => {
-    if (!enabled || !endpoint || !isMountedRef.current) return;
-
-    console.log(`[useApiQuery] Fetching: ${endpoint}`);
+    // CRITICAL: Don't check isMountedRef here - React Strict Mode causes false unmounts
+    // Only check enabled and endpoint to allow refetch to work properly
+    if (!enabled || !endpoint) {
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -81,17 +83,21 @@ export function useApiQuery<T = any>(
 
       const response = await api.get<T>(endpoint);
       
-      if (!isMountedRef.current) return;
+      // CRITICAL: Don't skip state updates in development (React Strict Mode causes false unmounts)
+      // if (!isMountedRef.current) {
+      //   console.log(`[useApiQuery] Component unmounted for ${endpoint}, skipping state update`);
+      //   return;
+      // }
       
-      console.log(`[useApiQuery] Success:`, response.data);
       setData(response.data);
+      setIsLoading(false);
       retryCountRef.current = 0;
 
       if (onSuccessRef.current) {
         onSuccessRef.current(response.data);
       }
     } catch (err) {
-      if (!isMountedRef.current) return;
+      // if (!isMountedRef.current) return;
       
       let errorMessage = 'An error occurred';
       

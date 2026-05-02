@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -23,6 +23,16 @@ export default function EarningsPage() {
 
   const handleVerificationError = useCallback((error: string) => {
     console.error('Verification error:', error);
+  }, []);
+
+  // Listen for KYC tab switch event from PayoutMethods component
+  useEffect(() => {
+    const handleSwitchToKyc = () => {
+      setActiveTab('kyc');
+    };
+
+    window.addEventListener('switchToKycTab', handleSwitchToKyc);
+    return () => window.removeEventListener('switchToKycTab', handleSwitchToKyc);
   }, []);
 
   return (
@@ -83,46 +93,48 @@ export default function EarningsPage() {
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content - Each tab is completely independent with unique keys */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              <WalletBalance />
+            <div key="overview-tab" className="space-y-6">
+              <WalletBalance key="wallet-overview" />
               
               <SectionCard
                 title="Recent Transactions"
                 description="Your latest earnings and withdrawals"
                 headerAlign="center"
               >
-                <TransactionList limit={5} showFilters={false} />
+                <TransactionList key="transactions-overview" limit={5} showFilters={false} />
               </SectionCard>
             </div>
           )}
 
           {activeTab === 'transactions' && (
             <SectionCard
+              key="transactions-tab"
               title="Transaction History"
               description="All your earnings, bonuses, and withdrawals"
               headerAlign="center"
             >
-              <TransactionList limit={50} showFilters={true} />
+              <TransactionList key="transactions-full" limit={50} showFilters={true} />
             </SectionCard>
           )}
 
           {activeTab === 'payout-methods' && (
             <SectionCard
+              key="payout-tab"
               title="Payout Methods"
               description="Manage your bank accounts and payment methods"
               headerAlign="center"
             >
-              <PayoutMethods />
+              <PayoutMethods key="payout-methods" />
             </SectionCard>
           )}
 
           {activeTab === 'kyc' && (
-            <div className="max-w-4xl mx-auto">
+            <div key="kyc-tab" className="max-w-4xl mx-auto">
               <TwoStepKYCVerification 
+                key="kyc-verification"
                 onComplete={handleVerificationSuccess}
-              />
               />
             </div>
           )}

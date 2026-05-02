@@ -21,9 +21,10 @@ export default function OrganizationReportDetailPage() {
   const [commentText, setCommentText] = useState('');
   const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false);
   const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
 
   // Fetch report details
-  const { data: report, isLoading, error } = useApiQuery(
+  const { data: report, isLoading, error, refetch: refetchReport } = useApiQuery(
     `/reports/${reportId}`,
     { enabled: !!user && !!reportId }
   );
@@ -37,20 +38,38 @@ export default function OrganizationReportDetailPage() {
   const comments = commentsData?.comments || commentsData || [];
 
   // Add comment mutation
-  const addCommentMutation = useApiMutation(
-    `/reports/${reportId}/comments`,
-    'POST',
-    {
-      onSuccess: () => {
-        refetchComments();
-        setCommentText('');
-      },
+  const addCommentMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      refetchComments();
+      setCommentText('');
+    },
+  });
+
+  // Approve bounty mutation
+  const approveBountyMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: (data) => {
+      refetchReport();
+      setShowApprovalDialog(false);
+      // Show success message
+      alert(`Bounty approved successfully! Total cost: ${formatCurrency(data.total_cost)} (Bounty: ${formatCurrency(data.bounty_amount)} + Commission: ${formatCurrency(data.commission)})`);
+    },
+    onError: (error: any) => {
+      alert(error?.message || 'Failed to approve bounty');
     }
-  );
+  });
 
   const handleAddComment = () => {
     if (!commentText.trim()) return;
-    addCommentMutation.mutate({ comment_text: commentText });
+    addCommentMutation.mutate({ 
+      endpoint: `/reports/${reportId}/comments`,
+      comment_text: commentText 
+    });
+  };
+
+  const handleApproveBounty = () => {
+    approveBountyMutation.mutate({ endpoint: `/reports/${reportId}/approve-bounty` });
   };
 
   const handleViewAttachment = (index: number) => {
@@ -149,6 +168,172 @@ export default function OrganizationReportDetailPage() {
 
           {/* Single Page Content - No Cards */}
           <div className="space-y-12">
+            {/* Approve Bounty Section - Only show for valid reports that haven't been approved yet */}
+            {report.status === 'valid' && report.bounty_amount && report.bounty_status !== 'approved' && (
+              <section className="rounded-lg border-2 border-green-200 bg-green-50 p-6 dark:border-green-900 dark:bg-green-950">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex-1">
+                    <h3 className="mb-2 text-lg font-bold text-green-900 dark:text-green-100">
+                      Ready for Bounty Approval
+                    </h3>
+                    <p className="mb-4 text-sm text-green-800 dark:text-green-200">
+                      This vulnerability report has been validated and is ready for bounty payment approval.
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
+                          Bounty Amount
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-green-900 dark:text-green-100">
+                          {formatCurrency(report.bounty_amount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
+                          Platform Commission (30%)
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-green-900 dark:text-green-100">
+                          {formatCurrency(report.bounty_amount * 0.3)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-300">
+                          Total Cost
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-red-600 dark:text-red-400">
+                          {formatCurrency(report.bounty_amount * 1.3)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <Button
+                      onClick={() => setShowApprovalDialog(true)}
+                      variant="primary"
+                      size="lg"
+                      disabled={approveBountyMutation.isLoading}
+                    >
+                      {approveBountyMutation.isLoading ? 'Approving...' : 'Approve Bounty'}
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Bounty Approved Status - Show when bounty is approved */}
+            {report.bounty_status === 'approved' && (
+              <section className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6 dark:border-blue-900 dark:bg-blue-950">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <svg className="h-8 w-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="mb-2 text-lg font-bold text-blue-900 dark:text-blue-100">
+                      Bounty Approved
+                    </h3>
+                    <p className="mb-4 text-sm text-blue-800 dark:text-blue-200">
+                      The bounty payment for this report has been approved and is now queued for processing by the Finance Officer.
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                          Bounty Amount
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-blue-900 dark:text-blue-100">
+                          {formatCurrency(report.bounty_amount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                          Commission (30%)
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-blue-900 dark:text-blue-100">
+                          {formatCurrency(report.bounty_amount * 0.3)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                          Total Paid
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-blue-900 dark:text-blue-100">
+                          {formatCurrency(report.bounty_amount * 1.3)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>The Finance Officer will process this payment and credit the researcher's wallet.</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Approval Confirmation Dialog */}
+            {showApprovalDialog && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-[#0a0a0a]">
+                  <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-slate-100">
+                    Confirm Bounty Approval
+                  </h3>
+                  <div className="mb-6 space-y-4">
+                    <p className="text-sm text-gray-700 dark:text-slate-300">
+                      You are about to approve the bounty payment for this vulnerability report. The following amount will be deducted from your organization wallet:
+                    </p>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-[#111111]">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600 dark:text-slate-400">Bounty Amount:</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                            {formatCurrency(report.bounty_amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600 dark:text-slate-400">Platform Commission (30%):</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                            {formatCurrency(report.bounty_amount * 0.3)}
+                          </span>
+                        </div>
+                        <div className="border-t border-gray-300 pt-2 dark:border-gray-600">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-bold text-gray-900 dark:text-slate-100">Total Cost:</span>
+                            <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                              {formatCurrency(report.bounty_amount * 1.3)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-slate-400">
+                      ⚠️ This action cannot be undone. The funds will be transferred to the platform wallet and queued for payment processing by the Finance Officer.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => setShowApprovalDialog(false)}
+                      variant="secondary"
+                      className="flex-1"
+                      disabled={approveBountyMutation.isLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleApproveBounty}
+                      variant="primary"
+                      className="flex-1"
+                      disabled={approveBountyMutation.isLoading}
+                    >
+                      {approveBountyMutation.isLoading ? 'Processing...' : 'Confirm Approval'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Report Header Section */}
             <section className="border-b border-gray-200 pb-8 dark:border-gray-700">
               <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -165,19 +350,29 @@ export default function OrganizationReportDetailPage() {
                 }`}>
                   {report.assigned_severity || report.suggested_severity || 'Unscored'}
                 </span>
-                <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-bold uppercase ${
-                  report.status === 'new'
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                    : report.status === 'triaged'
-                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                      : report.status === 'valid'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : report.status === 'resolved'
-                          ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                          : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                }`}>
-                  {report.status}
-                </span>
+                {/* Show BOUNTY APPROVED badge if bounty is approved, otherwise show regular status */}
+                {report.bounty_status === 'approved' ? (
+                  <span className="inline-flex items-center rounded-md bg-green-600 px-3 py-1 text-xs font-bold uppercase text-white">
+                    <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Bounty Approved
+                  </span>
+                ) : (
+                  <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-bold uppercase ${
+                    report.status === 'new'
+                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                      : report.status === 'triaged'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        : report.status === 'valid'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : report.status === 'resolved'
+                            ? 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                            : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                  }`}>
+                    {report.status}
+                  </span>
+                )}
                 {report.cvss_score && (
                   <span className="inline-flex items-center rounded-md bg-gray-200 px-3 py-1 text-xs font-bold uppercase text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                     CVSS {report.cvss_score.toFixed(1)}

@@ -3,35 +3,65 @@
 import PersonaVerification from './PersonaVerification';
 import EmailVerification from './EmailVerification';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { useAuthStore } from '@/store/authStore';
 
 interface TwoStepKYCVerificationProps {
   onComplete?: () => void;
 }
 
 export default function TwoStepKYCVerification({ onComplete }: TwoStepKYCVerificationProps) {
-  // COMPLETELY INDEPENDENT: Persona and Email can be tested separately
+  // COMPLETELY INDEPENDENT: Persona and Email are separate systems
   const { data: personaStatus, refetch: refetchPersona, error: personaError } = useApiQuery('/kyc/persona/status');
   const { data: emailStatus, refetch: refetchEmail, error: emailError } = useApiQuery('/kyc/email/status');
+  
+  // Get current user from auth store (more reliable than API call)
+  const user = useAuthStore((state) => state.user);
+
+  // Debug logging - CRITICAL for diagnosing state issues
+  console.log('[TwoStepKYC] personaStatus:', personaStatus);
+  console.log('[TwoStepKYC] emailStatus:', emailStatus);
+  console.log('[TwoStepKYC] emailStatus?.email_verified:', emailStatus?.email_verified);
+  console.log('[TwoStepKYC] typeof emailStatus?.email_verified:', typeof emailStatus?.email_verified);
+  console.log('[TwoStepKYC] user from store:', user);
 
   // Persona is approved when status is "approved"
   const personaApproved = personaStatus?.status === 'approved';
-  const emailVerified = phoneStatus?.phone_verified === true;
+  
+  // Email verification status - ONLY from /kyc/email/status endpoint
+  // CRITICAL: Convert to boolean explicitly to ensure React detects changes
+  const emailVerified = Boolean(
+    emailStatus?.email_verified === true || 
+    emailStatus?.email_verified === 'true' || 
+    emailStatus?.email_verified === 1 ||
+    emailStatus?.email_verified === '1'
+  );
+  
+  // Get email address from email status endpoint
+  const verifiedEmail = emailStatus?.email_address;
+  
+  // SECURITY: Get user's registered email from auth store (most reliable)
+  const userEmail = user?.email || '';
+  
+  console.log('[TwoStepKYC] Raw emailStatus:', emailStatus);
+  console.log('[TwoStepKYC] emailVerified (computed):', emailVerified, 'type:', typeof emailVerified);
+  console.log('[TwoStepKYC] verifiedEmail:', verifiedEmail);
+  console.log('[TwoStepKYC] userEmail:', userEmail);
   
   // Email verification is ALWAYS enabled for independent testing
   const emailEnabled = true;
 
   const handlePersonaSuccess = () => {
     refetchPersona();
-    refetchPhone(); // Refresh email status
+    refetchEmail(); // Refresh email status
   };
 
   const handleEmailSuccess = () => {
-    refetchPhone();
+    refetchEmail();
     if (onComplete) onComplete();
   };
 
   // Show friendly error if API fails
-  if (personaError || phoneError) {
+  if (personaError || emailError) {
     return (
       <div className="bg-[#EF4444]/10 border border-[#EF4444]/20 rounded-lg p-6">
         <div className="flex items-center gap-3">
@@ -70,6 +100,9 @@ export default function TwoStepKYCVerification({ onComplete }: TwoStepKYCVerific
             <EmailVerification 
               enabled={emailEnabled}
               onSuccess={handleEmailSuccess}
+              initialVerified={emailVerified}
+              verifiedEmail={verifiedEmail}
+              userEmail={userEmail}
             />
           </div>
         </div>

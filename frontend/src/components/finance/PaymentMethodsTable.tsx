@@ -1,33 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 
 interface Column {
   key: string;
   label: string;
   sortable?: boolean;
-  width?: string;
   render?: (value: any, row: any) => React.ReactNode;
 }
 
-interface TransactionTableProps {
+interface PaymentMethodsTableProps {
   data: any[];
   columns: Column[];
   onRowClick?: (row: any) => void;
   selectable?: boolean;
   onSelectionChange?: (selectedIds: string[]) => void;
-  linkPrefix?: string;
 }
 
-export default function TransactionTable({
+export default function PaymentMethodsTable({
   data,
   columns,
   onRowClick,
   selectable = false,
   onSelectionChange,
-  linkPrefix,
-}: TransactionTableProps) {
+}: PaymentMethodsTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -143,46 +139,39 @@ export default function TransactionTable({
             ) : (
               sortedData.map((row) => {
                 const isSelected = selectedIds.has(row.id);
-                const RowWrapper = linkPrefix
-                  ? ({ children }: { children: React.ReactNode }) => (
-                      <Link href={`${linkPrefix}/${row.id}`}>{children}</Link>
-                    )
-                  : ({ children }: { children: React.ReactNode }) => <>{children}</>;
-
                 return (
-                  <RowWrapper key={row.id}>
-                    <tr
-                      className={`border-b border-[#334155] last:border-0 cursor-pointer hover:bg-[#334155] transition ${
-                        isSelected ? 'bg-[#1E40AF]/20' : ''
-                      }`}
-                      onClick={() => onRowClick?.(row)}
-                    >
-                      {selectable && (
-                        <td className="py-3 pr-4">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleSelectRow(row.id, e.target.checked);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 rounded border-[#334155] bg-[#1E293B] text-[#3B82F6] focus:ring-[#3B82F6] focus:ring-offset-0"
-                          />
-                        </td>
-                      )}
-                      {columns.map((column) => (
-                        <td
-                          key={column.key}
-                          className="py-3 pr-4 text-[#F8FAFC]"
-                        >
-                          {column.render
-                            ? column.render(row[column.key], row)
-                            : row[column.key]}
-                        </td>
-                      ))}
-                    </tr>
-                  </RowWrapper>
+                  <tr
+                    key={row.id}
+                    className={`border-b border-[#334155] last:border-0 cursor-pointer hover:bg-[#334155] transition ${
+                      isSelected ? 'bg-[#1E40AF]/20' : ''
+                    }`}
+                    onClick={() => onRowClick?.(row)}
+                  >
+                    {selectable && (
+                      <td className="py-3 pr-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleSelectRow(row.id, e.target.checked);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 rounded border-[#334155] bg-[#1E293B] text-[#3B82F6] focus:ring-[#3B82F6] focus:ring-offset-0"
+                        />
+                      </td>
+                    )}
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className="py-3 pr-4 text-[#F8FAFC]"
+                      >
+                        {column.render
+                          ? column.render(row[column.key], row)
+                          : row[column.key]}
+                      </td>
+                    ))}
+                  </tr>
                 );
               })
             )}

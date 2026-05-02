@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Spinner from '@/components/ui/Spinner';
-import Badge from '@/components/ui/Badge';
 
 interface Transaction {
   id: string;
-  transaction_type: string;
+  transaction_type?: string | null;
   amount: number;
   balance_after: number;
   created_at: string;
@@ -47,8 +46,9 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
     return true;
   });
 
-  const getTransactionIcon = (type: string) => {
-    switch (type?.toLowerCase()) {
+  const getTransactionIcon = (type?: string | null) => {
+    const typeStr = type?.toLowerCase() || '';
+    switch (typeStr) {
       case 'credit':
       case 'bounty':
       case 'bonus':
@@ -73,8 +73,9 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
     }
   };
 
-  const getTransactionColor = (type: string) => {
-    switch (type?.toLowerCase()) {
+  const getTransactionColor = (type?: string | null) => {
+    const typeStr = type?.toLowerCase() || '';
+    switch (typeStr) {
       case 'credit':
       case 'bounty':
       case 'bonus':
@@ -190,13 +191,13 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
               <div className="flex items-center gap-4">
                 {/* Icon */}
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white dark:bg-[#111111] flex items-center justify-center border border-[#e6ddd4]">
-                  {getTransactionIcon(transaction.transaction_type)}
+                  {getTransactionIcon(transaction.transaction_type || 'unknown')}
                 </div>
 
                 {/* Details */}
                 <div>
                   <p className="text-sm font-semibold text-[#2d2a26] capitalize">
-                    {transaction.transaction_type.replace('_', ' ')}
+                    {(transaction.transaction_type || 'Unknown').replace('_', ' ')}
                   </p>
                   <p className="text-xs text-[#6d6760] mt-1">
                     {formatDate(transaction.created_at)}
@@ -212,8 +213,8 @@ export default function TransactionList({ limit = 50, showFilters = true }: Tran
               {/* Amount */}
               <div className="text-right">
                 <p className={`text-lg font-bold ${getTransactionColor(transaction.transaction_type)}`}>
-                  {transaction.transaction_type.toLowerCase() === 'debit' || 
-                   transaction.transaction_type.toLowerCase() === 'withdrawal' ? '-' : '+'}
+                  {(transaction.transaction_type?.toLowerCase() === 'debit' || 
+                   transaction.transaction_type?.toLowerCase() === 'withdrawal') ? '-' : '+'}
                   {formatCurrency(transaction.amount)}
                 </p>
                 <p className="text-xs text-[#6d6760] mt-1">

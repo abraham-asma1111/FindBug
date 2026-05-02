@@ -28,9 +28,41 @@ const statusColors: Record<string, string> = {
 export default function OrganizationDashboardPage() {
   const user = useAuthStore((state) => state.user);
 
-  const { data, isLoading } = useApiQuery('/dashboard/organization', {
+  const { data, isLoading, isError, error } = useApiQuery('/dashboard/organization', {
     enabled: !!user,
   });
+
+  // Show error state if API call failed
+  if (isError && error) {
+    return (
+      <ProtectedRoute allowedRoles={['organization']}>
+        {user && (
+          <PortalShell
+            user={user}
+            title="Organization Dashboard"
+            subtitle=""
+            navItems={getPortalNavItems(user.role)}
+            headerAlign="center"
+            eyebrowText="Organization Portal"
+            eyebrowClassName="text-xl tracking-[0.18em]"
+            hideTitle
+            hideSubtitle
+          >
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+              <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Dashboard</h3>
+              <p className="text-red-700">{error.message}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Retry
+              </button>
+            </div>
+          </PortalShell>
+        )}
+      </ProtectedRoute>
+    );
+  }
 
   const programs = data?.programs || { total: 0, active: 0, top_programs: [] };
   const reports = data?.reports || { total: 0, by_status: {}, by_severity: {} };

@@ -234,15 +234,25 @@ export default function OrganizationReportsPage() {
 
                     {/* Badges */}
                     <div className="mb-4 flex flex-wrap gap-2">
-                      <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold ${
-                        report.status === 'new' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        report.status === 'triaged' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                        report.status === 'valid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                        report.status === 'resolved' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
-                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                      }`}>
-                        {report.status}
-                      </span>
+                      {/* Show Bounty Approved badge if bounty is approved, otherwise show regular status */}
+                      {report.bounty_status === 'approved' ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Bounty Approved
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold ${
+                          report.status === 'new' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                          report.status === 'triaged' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                          report.status === 'valid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                          report.status === 'resolved' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
+                          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                        }`}>
+                          {report.status}
+                        </span>
+                      )}
                       <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold ${
                         (report.assigned_severity || report.suggested_severity)?.toLowerCase() === 'critical' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                         (report.assigned_severity || report.suggested_severity)?.toLowerCase() === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :

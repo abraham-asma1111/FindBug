@@ -8,17 +8,32 @@ interface EmailVerificationProps {
   enabled: boolean;
   onSuccess?: () => void;
   onError?: (error: string) => void;
+  initialVerified?: boolean; // Add prop to show verified state from API
+  verifiedEmail?: string; // Add prop to show which email was verified
+  userEmail: string; // SECURITY: The logged-in user's registered email (read-only)
 }
 
-export default function EmailVerification({ enabled, onSuccess, onError }: EmailVerificationProps) {
+export default function EmailVerification({ enabled, onSuccess, onError, initialVerified = false, verifiedEmail, userEmail }: EmailVerificationProps) {
+  console.log('[EmailVerification] Props:', { enabled, initialVerified, verifiedEmail, userEmail });
+  
+  // CRITICAL: Track if email is verified - update when initialVerified prop changes
+  const [isVerified, setIsVerified] = useState(initialVerified);
+  
   const [step, setStep] = useState<'input' | 'verify' | 'success'>('input');
-  const [emailAddress, setEmailAddress] = useState('');
+  // SECURITY: Use the user's registered email - they can ONLY verify their own email
+  const [emailAddress, setEmailAddress] = useState(verifiedEmail || userEmail);
   const [verificationCode, setVerificationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
   const [canResend, setCanResend] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // CRITICAL: Update isVerified when initialVerified prop changes (after refetch)
+  useEffect(() => {
+    console.log('[EmailVerification] initialVerified changed to:', initialVerified);
+    setIsVerified(initialVerified);
+  }, [initialVerified]);
 
   // Countdown timer
   useEffect(() => {
@@ -48,17 +63,14 @@ export default function EmailVerification({ enabled, onSuccess, onError }: Email
   };
 
   const handleSendCode = async () => {
-    if (!emailAddress) {
-      setError('Please enter your email address');
-      return;
-    }
-
+    // NO frontend validation - let backend handle everything
     setIsLoading(true);
     setError(null);
 
     try {
+      console.log('[EmailVerification] Sending code to:', emailAddress);
       const response = await api.post('/kyc/email/send', { email_address: emailAddress });
-      console.log('[EmailVerification] Code sent:', response.data);
+      console.log('[EmailVerification] Code sent successfully:', response.data);
       
       // Reset timer and move to verify step
       setTimeLeft(600); // 10 minutes
@@ -70,8 +82,26 @@ export default function EmailVerification({ enabled, onSuccess, onError }: Email
       
       if (err.response?.status === 400) {
         errorMsg = 'Invalid email address format. Please check and try again.';
+      } else if (err.response?.status === 409) {
+        // Check if it's specifically "already verified" error
+        const detail = err.response?.data?.detail || '';
+        if (detail.toLowerCase().includes('already verified')) {
+          // Email already verified - trigger refetch WITHOUT reload
+          // The parent component will refetch and React will automatically update the UI
+          console.log('[EmailVerification] Email already verified, triggering refetch');
+          if (onSuccess) {
+            onSuccess(); // Trigger refetch - parent will update initialVerified prop
+          }
+          return; // Don't show error or change step
+        } else {
+          // Other conflict error
+          errorMsg = detail || 'Email verification conflict. Please try again.';
+        }
       } else if (err.response?.status === 429) {
         errorMsg = 'Too many attempts. Please wait a few minutes and try again.';
+      } else if (!err.response) {
+        // Network error or request didn't reach backend
+        errorMsg = 'Network error. Please check your connection and try again.';
       }
       
       setError(errorMsg);
@@ -121,43 +151,38 @@ export default function EmailVerification({ enabled, onSuccess, onError }: Email
     await handleSendCode();
   };
 
-  if (!enabled) {
+  // ALWAYS show success state if email is verified (isVerified state from prop)
+  // This ensures the green card persists after page refresh - EXACTLY like Persona card
+  if (isVerified) {
     return (
-      <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-6 h-full flex flex-col">
+      <div className="bg-[#10B981]/10 border border-[#10B981]/20 rounded-lg p-6 h-full flex flex-col">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-[#3B82F6]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          <div className="w-12 h-12 bg-[#10B981] rounded-full flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-[#F8FAFC] mb-2">Email Verification</h3>
-            <p className="text-sm text-[#94A3B8]">
-              Email verification is ready to test
+            <h3 className="text-lg font-bold text-[#F8FAFC] mb-2">Email Verified</h3>
+            <p className="text-sm text-[#94A3B8] mb-3">
+              Your email address has been successfully verified
             </p>
+            <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
+              <div className="flex items-center gap-2 text-[#10B981]">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="font-medium text-sm">{verifiedEmail || emailAddress || userEmail}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  if (step === 'success') {
-    return (
-      <div className="bg-[#10B981]/10 border border-[#10B981]/20 rounded-lg p-6 h-full flex flex-col">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-12 h-12 bg-[#10B981] rounded-full flex items-center justify-center">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-[#F8FAFC]">Email Verified</h3>
-            <p className="text-sm text-[#94A3B8]">Your email has been successfully verified</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // If NOT verified, show the active verification form (NO disabled state)
+  console.log('[EmailVerification] Rendering form, step:', step);
 
   return (
     <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-6 h-full flex flex-col">
@@ -185,15 +210,16 @@ export default function EmailVerification({ enabled, onSuccess, onError }: Email
                 <label className="block text-sm font-medium text-[#F8FAFC] mb-2">
                   Email Address
                 </label>
+                {/* SECURITY: Email is READ-ONLY - user can only verify their registered email */}
                 <input
                   type="email"
                   value={emailAddress}
-                  onChange={(e) => setEmailAddress(e.target.value)}
-                  placeholder="your.email@example.com"
-                  className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-3 text-[#F8FAFC] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                  readOnly
+                  disabled
+                  className="w-full bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-3 text-[#F8FAFC] placeholder-[#64748B] opacity-75 cursor-not-allowed"
                 />
                 <p className="text-xs text-[#64748B] mt-1">
-                  Enter your email address to receive a verification code
+                  This is your registered email address. To change it, update your account settings first.
                 </p>
               </div>
 

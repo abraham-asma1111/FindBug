@@ -94,16 +94,28 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       // OVERVIEW
       { href: '/finance/dashboard', label: 'Dashboard', category: 'OVERVIEW' },
       { href: '/finance/analytics', label: 'Analytics', category: 'OVERVIEW' },
+      { href: '/finance/platform-wallet', label: 'Platform Wallet', category: 'OVERVIEW' },
       
       // PAYMENTS
       { 
         href: '/finance/payments', 
-        label: 'Payments',
+        label: 'Bounty Payments',
         category: 'PAYMENTS',
         children: [
+          { href: '/finance/payments?status=approved', label: 'Awaiting Processing' },
+          { href: '/finance/payments?status=completed', label: 'Processed' },
           { href: '/finance/payments?status=pending', label: 'Pending Approval' },
-          { href: '/finance/payments?status=approved', label: 'Approved' },
-          { href: '/finance/payments?status=completed', label: 'Completed' },
+          { href: '/finance/payments?status=rejected', label: 'Rejected' },
+        ]
+      },
+      { 
+        href: '/finance/payment-methods', 
+        label: 'Payment Methods',
+        category: 'PAYMENTS',
+        children: [
+          { href: '/finance/payment-methods?status=pending', label: 'Pending' },
+          { href: '/finance/payment-methods?status=approved', label: 'Approved' },
+          { href: '/finance/payment-methods?status=rejected', label: 'Rejected' },
         ]
       },
       { 
@@ -111,7 +123,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
         label: 'Payouts',
         category: 'PAYMENTS',
         children: [
-          { href: '/finance/payouts?status=requested', label: 'Requested' },
+          { href: '/finance/payouts?status=pending', label: 'Requested' },
           { href: '/finance/payouts?status=processing', label: 'Processing' },
           { href: '/finance/payouts?status=completed', label: 'Completed' },
         ]
@@ -159,6 +171,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
         ]
       },
       { href: '/organization/researchers', label: 'Researchers' },
+      { href: '/organization/wallet', label: 'Wallet' },
       { href: '/organization/analytics', label: 'Analytics' },
       { href: '/organization/billing', label: 'Billing' },
       { href: '/organization/integrations', label: 'Integrations' },
@@ -190,7 +203,13 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
         { href: '/researcher/reports/code-review', label: 'Code Review Reports' },
       ]
     },
-    { href: '/researcher/earnings', label: 'Earnings' },
+    { 
+      href: '/researcher/earnings', 
+      label: 'Earnings',
+      children: [
+        { href: '/researcher/payment-methods', label: 'Payment Methods' },
+      ]
+    },
     { 
       href: '/researcher/reputation', 
       label: 'Reputation',

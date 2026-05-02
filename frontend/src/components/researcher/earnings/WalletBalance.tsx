@@ -26,25 +26,22 @@ export default function WalletBalance() {
     }
   );
 
-  const { mutate: requestWithdrawal, isLoading: isWithdrawing } = useApiMutation(
-    '/wallet/withdraw',
-    'POST',
-    {
-      onSuccess: () => {
-        setIsWithdrawModalOpen(false);
-        setWithdrawAmount('');
-        setWithdrawError('');
-        refetch();
-      },
-      onError: (error: any) => {
-        if (error.message?.includes('KYC verification required')) {
-          setWithdrawError('KYC verification is required to withdraw funds. Please complete your KYC verification first.');
-        } else {
-          setWithdrawError(error.message || 'Failed to process withdrawal');
-        }
-      },
-    }
-  );
+  const { mutate: requestWithdrawal, isLoading: isWithdrawing } = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount('');
+      setWithdrawError('');
+      refetch();
+    },
+    onError: (error: any) => {
+      if (error.message?.includes('KYC verification required')) {
+        setWithdrawError('KYC verification is required to withdraw funds. Please complete your KYC verification first.');
+      } else {
+        setWithdrawError(error.message || 'Failed to process withdrawal');
+      }
+    },
+  });
 
   const handleWithdraw = () => {
     setWithdrawError('');
@@ -67,6 +64,7 @@ export default function WalletBalance() {
     }
 
     requestWithdrawal({
+      endpoint: '/wallet/withdraw',
       amount,
       payment_method: 'bank_transfer',
       account_details: {},

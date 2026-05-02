@@ -131,26 +131,25 @@ export default function PersonaVerification({ onSuccess, onError }: PersonaVerif
     }
 
     try {
-      // Persona SDK requires EITHER inquiryId OR templateId, not both
-      // Use inquiryId to resume an existing inquiry
+      // Use inquiryId to RESUME the existing inquiry created by backend
+      // This ensures the inquiry ID matches what's in our database
       const clientConfig: any = {
-        inquiryId: inquiryId,
-        environment: process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT || 'sandbox',
-        // Configure modal appearance
-        frameAncestors: ['*'],
-        frameHeight: '100%',
+        inquiryId: inquiryId, // CRITICAL: Resume the inquiry created by backend
+        environment: 'sandbox',
         onReady: () => {
-          console.log('[PersonaVerification] Persona client ready, opening modal...');
-          client.open();
-          // Keep loading state until modal actually opens
+          console.log('[PersonaVerification] Persona client ready');
+          setIsLoading(false); // Stop loading spinner when ready
         },
-        onComplete: async ({ inquiryId }: { inquiryId: string }) => {
-          console.log('[PersonaVerification] Verification completed:', inquiryId);
+        onLoad: () => {
+          console.log('[PersonaVerification] Persona modal loaded');
+        },
+        onComplete: async ({ inquiryId: completedInquiryId }: { inquiryId: string }) => {
+          console.log('[PersonaVerification] Verification completed:', completedInquiryId);
           
           // Verify with backend
           try {
             await api.post('/kyc/persona/verify', null, {
-              params: { inquiry_id: inquiryId }
+              params: { inquiry_id: completedInquiryId }
             });
             
             setStatus('approved');
@@ -164,31 +163,29 @@ export default function PersonaVerification({ onSuccess, onError }: PersonaVerif
             setIsLoading(false);
           }
         },
-        onCancel: ({ inquiryId }: { inquiryId: string }) => {
-          console.log('[PersonaVerification] Verification cancelled:', inquiryId);
+        onCancel: ({ inquiryId: cancelledInquiryId }: { inquiryId: string }) => {
+          console.log('[PersonaVerification] Verification cancelled:', cancelledInquiryId);
           setError('Verification cancelled');
           setIsLoading(false);
         },
         onError: (error: any) => {
           console.error('[PersonaVerification] Persona error:', error);
-          setError('Verification error occurred');
+          setError(`Verification error: ${error.message || 'Unknown error'}`);
           if (onError) onError('Verification error occurred');
           setIsLoading(false);
         }
       };
 
-      // Add session token if available (optional but recommended)
-      if (sessionToken) {
-        clientConfig.sessionToken = sessionToken;
-        console.log('[PersonaVerification] Using session token');
-      }
-
+      console.log('[PersonaVerification] Creating Persona client with config:', clientConfig);
       const client = new Persona.Client(clientConfig);
-      console.log('[PersonaVerification] Persona client created');
+      console.log('[PersonaVerification] Persona client created, calling open()...');
+      
+      // Open the modal
+      client.open();
       
     } catch (err: any) {
       console.error('[PersonaVerification] Error creating Persona client:', err);
-      setError('Failed to initialize verification');
+      setError(`Failed to initialize verification: ${err.message}`);
       setIsLoading(false);
     }
   };
