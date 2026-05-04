@@ -41,7 +41,7 @@ class UserService:
         }
 
         # Attach role-specific data
-        if user.role == "researcher":
+        if user.role.lower() == "researcher":
             researcher = self.researcher_repo.get_by_user_id(user_id)
             if researcher:
                 profile["researcher"] = {
@@ -53,10 +53,11 @@ class UserService:
                     "rank": getattr(researcher, "rank", 0),
                     "total_earnings": float(getattr(researcher, "total_earnings", 0)),
                 }
-        elif user.role == "organization":
+        elif user.role.lower() == "organization":
             org = self.org_repo.get_by_user_id(user_id)
             if org:
                 profile["organization"] = {
+                    "id": str(org.id),  # Include organization ID for subscription management
                     "company_name": getattr(org, "company_name", None),
                     "industry": getattr(org, "industry", None),
                     "website": getattr(org, "website", None),

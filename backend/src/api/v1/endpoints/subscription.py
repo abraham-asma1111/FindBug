@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 
 from src.core.database import get_db
 from src.api.v1.middlewares.auth import get_current_user
@@ -22,6 +23,7 @@ from src.api.v1.schemas.subscription import (
     SubscriptionPaymentResponse,
     MarkPaymentPaidRequest,
     CancelSubscriptionRequest,
+    ChangeSubscriptionPlanRequest,
     SubscriptionRevenueReport
 )
 
@@ -56,15 +58,28 @@ def create_subscription(
     Requires: Admin or Organization role
     """
     # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.ORGANIZATION]:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.ORGANIZATION.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins and organizations can create subscriptions"
         )
     
     # If organization role, verify they're creating for their own org
-    if current_user.role == UserRole.ORGANIZATION:
-        if current_user.id != request.organization_id:
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        # Get the organization for this user
+        from src.domain.models.organization import Organization
+        user_org = db.query(Organization).filter(
+            Organization.user_id == current_user.id
+        ).first()
+        
+        if not user_org:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Organization profile not found"
+            )
+        
+        if user_org.id != request.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Organizations can only create subscriptions for themselves"
@@ -75,7 +90,8 @@ def create_subscription(
         subscription = service.create_subscription(
             organization_id=request.organization_id,
             tier=request.tier,
-            trial_days=request.trial_days
+            trial_days=request.trial_days,
+            pay_from_wallet=request.pay_from_wallet
         )
         return subscription
     except ValueError as e:
@@ -97,15 +113,32 @@ def get_current_subscription(
     For other roles: returns error
     """
     # Only organizations have subscriptions
-    if current_user.role != UserRole.ORGANIZATION:
+    # ROLE COMPARISON FIX: Compare with enum.value (string) not enum object
+    if current_user.role.lower() != UserRole.ORGANIZATION.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations have subscriptions"
         )
     
+    # Get organization from user
+    from src.domain.models.organization import Organization
+    organization = db.query(Organization).filter(
+        Organization.user_id == current_user.id
+    ).first()
+    
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization profile not found"
+        )
+    
     subscription = db.query(OrganizationSubscription).filter(
-        OrganizationSubscription.organization_id == current_user.organization.id,
-        OrganizationSubscription.status.in_(["active", "pending", "suspended"])
+        OrganizationSubscription.organization_id == organization.id,
+        or_(
+            func.upper(OrganizationSubscription.status) == 'ACTIVE',
+            func.upper(OrganizationSubscription.status) == 'PENDING',
+            func.upper(OrganizationSubscription.status) == 'SUSPENDED'
+        )
     ).first()
     
     if not subscription:
@@ -129,13 +162,20 @@ def get_organization_subscription(
     Requires: Admin, Organization (own), or Staff
     """
     # Authorization check
-    if current_user.role == UserRole.ORGANIZATION:
-        if current_user.organization.id != organization_id:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        # Get organization from user
+        from src.domain.models.organization import Organization
+        organization = db.query(Organization).filter(
+            Organization.user_id == current_user.id
+        ).first()
+        
+        if not organization or organization.id != organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Organizations can only view their own subscription"
             )
-    elif current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    elif user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions"
@@ -143,7 +183,11 @@ def get_organization_subscription(
     
     subscription = db.query(OrganizationSubscription).filter(
         OrganizationSubscription.organization_id == organization_id,
-        OrganizationSubscription.status.in_(["active", "pending", "suspended"])
+        or_(
+            func.upper(OrganizationSubscription.status) == 'ACTIVE',
+            func.upper(OrganizationSubscription.status) == 'PENDING',
+            func.upper(OrganizationSubscription.status) == 'SUSPENDED'
+        )
     ).first()
     
     if not subscription:
@@ -180,23 +224,41 @@ def get_subscription_payments(
         )
     
     # Authorization check
-    if current_user.role == UserRole.ORGANIZATION:
-        if current_user.id != subscription.organization_id:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        # Get organization from user
+        from src.domain.models.organization import Organization
+        organization = db.query(Organization).filter(
+            Organization.user_id == current_user.id
+        ).first()
+        
+        if not organization or organization.id != subscription.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Organizations can only view their own payments"
             )
-    elif current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    elif user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions"
         )
     
-    payments = db.query(SubscriptionPayment).filter(
-        SubscriptionPayment.subscription_id == subscription_id
-    ).order_by(
-        SubscriptionPayment.created_at.desc()
-    ).limit(limit).offset(offset).all()
+    # For organizations, only show paid payments (actual payment history)
+    # For finance officers/admins, show all payments
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        payments = db.query(SubscriptionPayment).filter(
+            SubscriptionPayment.subscription_id == subscription_id,
+            SubscriptionPayment.status == "paid"  # Only show completed payments
+        ).order_by(
+            SubscriptionPayment.created_at.desc()
+        ).limit(limit).offset(offset).all()
+    else:
+        # Finance officers and admins see all payments
+        payments = db.query(SubscriptionPayment).filter(
+            SubscriptionPayment.subscription_id == subscription_id
+        ).order_by(
+            SubscriptionPayment.created_at.desc()
+        ).limit(limit).offset(offset).all()
     
     return payments
 
@@ -214,7 +276,8 @@ def mark_payment_paid(
     Requires: Admin or Finance Officer
     """
     # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins and finance officers can mark payments as paid"
@@ -236,7 +299,7 @@ def mark_payment_paid(
         )
 
 
-@router.post("/{subscription_id}/cancel", response_model=SubscriptionResponse)
+@router.post("/{subscription_id}/cancel", response_model=dict)
 def cancel_subscription(
     subscription_id: UUID,
     request: CancelSubscriptionRequest,
@@ -244,7 +307,8 @@ def cancel_subscription(
     db: Session = Depends(get_db)
 ):
     """
-    Cancel subscription.
+    Cancel subscription by deleting it.
+    This allows the organization to freely choose a new plan afterwards.
     
     Requires: Admin or Organization (own)
     """
@@ -260,13 +324,20 @@ def cancel_subscription(
         )
     
     # Authorization check
-    if current_user.role == UserRole.ORGANIZATION:
-        if current_user.id != subscription.organization_id:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        # Get organization from user
+        from src.domain.models.organization import Organization
+        organization = db.query(Organization).filter(
+            Organization.user_id == current_user.id
+        ).first()
+        
+        if not organization or organization.id != subscription.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Organizations can only cancel their own subscription"
             )
-    elif current_user.role != UserRole.ADMIN:
+    elif user_role_lower != UserRole.ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions"
@@ -274,16 +345,97 @@ def cancel_subscription(
     
     try:
         service = SubscriptionService(db)
-        subscription = service.cancel_subscription(
+        result = service.cancel_subscription(
             subscription_id=subscription_id,
             reason=request.reason
         )
-        return subscription
+        return result
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.post("/{subscription_id}/change-plan", response_model=SubscriptionResponse)
+def change_subscription_plan(
+    subscription_id: UUID,
+    request: ChangeSubscriptionPlanRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change subscription plan/tier.
+    
+    Requires: Admin or Organization (own)
+    """
+    # Get subscription
+    subscription = db.query(OrganizationSubscription).filter(
+        OrganizationSubscription.subscription_id == subscription_id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subscription not found"
+        )
+    
+    # Authorization check
+    user_role_lower = current_user.role.lower()
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        # Get organization from user
+        from src.domain.models.organization import Organization
+        organization = db.query(Organization).filter(
+            Organization.user_id == current_user.id
+        ).first()
+        
+        if not organization or organization.id != subscription.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organizations can only change their own subscription"
+            )
+    elif user_role_lower != UserRole.ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions"
+        )
+    
+    # Validate new tier
+    valid_tiers = ['basic', 'professional', 'enterprise']
+    if request.new_tier.lower() not in valid_tiers:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid tier. Must be one of: {', '.join(valid_tiers)}"
+        )
+    
+    # Check if already on this tier
+    if subscription.tier.lower() == request.new_tier.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Already subscribed to this tier"
+        )
+    
+    # Get tier pricing
+    tier_pricing = db.query(SubscriptionTierPricing).filter(
+        SubscriptionTierPricing.tier == request.new_tier.upper(),
+        SubscriptionTierPricing.is_active == True
+    ).first()
+    
+    if not tier_pricing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pricing not found for tier: {request.new_tier}"
+        )
+    
+    # Update subscription
+    subscription.tier = request.new_tier.upper()
+    subscription.subscription_fee = tier_pricing.quarterly_price
+    subscription.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(subscription)
+    
+    return subscription
 
 
 @router.get("/overdue", response_model=List[dict])
@@ -297,7 +449,268 @@ def get_overdue_subscriptions(
     Requires: Admin or Finance Officer
     """
     # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins and finance officers can view overdue subscriptions"
+        )
+    
+    service = SubscriptionService(db)
+    overdue = service.get_overdue_subscriptions()
+    
+    return overdue
+
+
+@router.get("/pending-payments", response_model=dict)
+def get_pending_payments(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all pending subscription payments awaiting verification.
+    Only shows payments that are due now or overdue (not future payments).
+    
+    Requires: Admin or Finance Officer
+    """
+    # Authorization check
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins and finance officers can view pending payments"
+        )
+    
+    # Get all pending payments that are due now or overdue
+    # This excludes future payments that were just created for the next billing cycle
+    from src.domain.models.organization import Organization
+    now = datetime.utcnow()
+    
+    pending_payments = db.query(SubscriptionPayment).filter(
+        SubscriptionPayment.status == "pending",
+        SubscriptionPayment.due_date <= now  # Only show payments that are due now or overdue
+    ).all()
+    
+    result = []
+    for payment in pending_payments:
+        # Get subscription
+        subscription = db.query(OrganizationSubscription).filter(
+            OrganizationSubscription.subscription_id == payment.subscription_id
+        ).first()
+        
+        if subscription:
+            # Get organization
+            organization = db.query(Organization).filter(
+                Organization.id == subscription.organization_id
+            ).first()
+            
+            result.append({
+                "payment_id": str(payment.payment_id),
+                "subscription_id": str(subscription.subscription_id),
+                "organization_id": str(subscription.organization_id),
+                "organization_name": organization.company_name if organization else "Unknown",
+                "amount": float(payment.amount),
+                "currency": payment.currency,
+                "tier": subscription.tier,
+                "due_date": payment.due_date,
+                "invoice_number": payment.invoice_number,
+                "period_start": payment.period_start,
+                "period_end": payment.period_end
+            })
+    
+    return {"payments": result}
+
+
+@router.get("/all", response_model=dict)
+def get_all_subscriptions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    tier: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, le=100),
+    offset: int = Query(default=0, ge=0)
+):
+    """
+    Get all subscriptions with filtering and search.
+    
+    Requires: Admin or Finance Officer
+    """
+    # Authorization check
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins and finance officers can view all subscriptions"
+        )
+    
+    from src.domain.models.organization import Organization
+    
+    # Build query
+    query = db.query(OrganizationSubscription).join(
+        Organization,
+        OrganizationSubscription.organization_id == Organization.id
+    )
+    
+    # Apply filters
+    if tier:
+        query = query.filter(func.upper(OrganizationSubscription.tier) == tier.upper())
+    
+    if status:
+        query = query.filter(func.upper(OrganizationSubscription.status) == status.upper())
+    
+    if search:
+        query = query.filter(
+            Organization.company_name.ilike(f"%{search}%")
+        )
+    
+    # Get total count
+    total = query.count()
+    
+    # Get paginated results
+    subscriptions = query.order_by(
+        OrganizationSubscription.created_at.desc()
+    ).limit(limit).offset(offset).all()
+    
+    # Format results
+    results = []
+    for sub in subscriptions:
+        org = db.query(Organization).filter(
+            Organization.id == sub.organization_id
+        ).first()
+        
+        results.append({
+            "subscription_id": str(sub.subscription_id),
+            "organization_id": str(sub.organization_id),
+            "organization_name": org.company_name if org else "Unknown",
+            "tier": sub.tier,
+            "status": sub.status,
+            "subscription_fee": float(sub.subscription_fee),
+            "currency": sub.currency,
+            "start_date": sub.start_date,
+            "next_billing_date": sub.next_billing_date,
+            "is_trial": sub.is_trial,
+            "trial_end_date": sub.trial_end_date,
+            "created_at": sub.created_at,
+            "updated_at": sub.updated_at
+        })
+    
+    return {
+        "subscriptions": results,
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@router.get("/{subscription_id}/details", response_model=dict)
+def get_subscription_details(
+    subscription_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed subscription information including payment history.
+    
+    Requires: Admin or Finance Officer
+    """
+    # Authorization check
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins and finance officers can view subscription details"
+        )
+    
+    from src.domain.models.organization import Organization
+    
+    # Get subscription
+    subscription = db.query(OrganizationSubscription).filter(
+        OrganizationSubscription.subscription_id == subscription_id
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subscription not found"
+        )
+    
+    # Get organization
+    organization = db.query(Organization).filter(
+        Organization.id == subscription.organization_id
+    ).first()
+    
+    # Get payment history
+    payments = db.query(SubscriptionPayment).filter(
+        SubscriptionPayment.subscription_id == subscription_id
+    ).order_by(SubscriptionPayment.created_at.desc()).all()
+    
+    payment_history = []
+    for payment in payments:
+        payment_history.append({
+            "payment_id": str(payment.payment_id),
+            "amount": float(payment.amount),
+            "currency": payment.currency,
+            "status": payment.status,
+            "due_date": payment.due_date,
+            "paid_at": payment.paid_at,
+            "payment_method": payment.payment_method,
+            "invoice_number": payment.invoice_number,
+            "period_start": payment.period_start,
+            "period_end": payment.period_end,
+            "created_at": payment.created_at
+        })
+    
+    return {
+        "subscription": {
+            "subscription_id": str(subscription.subscription_id),
+            "organization_id": str(subscription.organization_id),
+            "organization_name": organization.company_name if organization else "Unknown",
+            "tier": subscription.tier,
+            "status": subscription.status,
+            "subscription_fee": float(subscription.subscription_fee),
+            "currency": subscription.currency,
+            "billing_cycle_months": subscription.billing_cycle_months,
+            "payments_per_year": subscription.payments_per_year,
+            "start_date": subscription.start_date,
+            "current_period_start": subscription.current_period_start,
+            "current_period_end": subscription.current_period_end,
+            "next_billing_date": subscription.next_billing_date,
+            "is_trial": subscription.is_trial,
+            "trial_end_date": subscription.trial_end_date,
+            "features": subscription.features,
+            "created_at": subscription.created_at,
+            "updated_at": subscription.updated_at
+        },
+        "organization": {
+            "id": str(organization.id) if organization else None,
+            "company_name": organization.company_name if organization else None,
+            "email": organization.email if organization else None,
+            "website": organization.website if organization else None
+        } if organization else None,
+        "payment_history": payment_history,
+        "stats": {
+            "total_payments": len(payments),
+            "paid_payments": len([p for p in payments if p.status == "paid"]),
+            "pending_payments": len([p for p in payments if p.status == "pending"]),
+            "total_paid": float(sum(p.amount for p in payments if p.status == "paid"))
+        }
+    }
+
+
+@router.get("/overdue", response_model=List[dict])
+def get_overdue_subscriptions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get subscriptions with overdue payments.
+    
+    Requires: Admin or Finance Officer
+    """
+    # Authorization check
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins and finance officers can view overdue subscriptions"
@@ -321,7 +734,7 @@ def suspend_overdue_subscriptions(
     Requires: Admin only
     """
     # Authorization check
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role.lower() != UserRole.ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can suspend subscriptions"
@@ -349,7 +762,8 @@ def get_subscription_revenue_report(
     Requires: Admin or Finance Officer
     """
     # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    user_role_lower = current_user.role.lower()
+    if user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins and finance officers can view revenue reports"
@@ -375,7 +789,7 @@ def seed_subscription_tiers(
     Requires: Admin only
     """
     # Authorization check
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role.lower() != UserRole.ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can seed tier pricing"

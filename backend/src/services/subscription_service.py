@@ -49,7 +49,8 @@ class SubscriptionService:
         organization_id: UUID,
         tier: SubscriptionTier,
         start_date: Optional[datetime] = None,
-        trial_days: int = 0
+        trial_days: int = 0,
+        pay_from_wallet: bool = False
     ) -> OrganizationSubscription:
         """
         Create new subscription for organization.
@@ -59,6 +60,7 @@ class SubscriptionService:
             tier: Subscription tier (basic, professional, enterprise)
             start_date: Subscription start date (default: now)
             trial_days: Trial period in days (default: 0)
+            pay_from_wallet: If True, automatically pay from organization wallet
             
         Returns:
             OrganizationSubscription instance
@@ -111,7 +113,7 @@ class SubscriptionService:
         subscription = OrganizationSubscription(
             organization_id=organization_id,
             tier=tier,
-            status=SubscriptionStatus.ACTIVE if not is_trial else SubscriptionStatus.PENDING,
+            status=SubscriptionStatus.PENDING,  # Always start as PENDING
             subscription_fee=tier_pricing.quarterly_price,
             currency=tier_pricing.currency,
             billing_cycle_months=self.BILLING_CYCLE_MONTHS,
@@ -123,15 +125,15 @@ class SubscriptionService:
             trial_end_date=trial_end_date,
             is_trial=is_trial,
             features={
-                "max_programs": tier_pricing.max_programs,
-                "max_researchers": tier_pricing.max_researchers,
-                "max_reports_per_month": tier_pricing.max_reports_per_month,
-                "ptaas_enabled": tier_pricing.ptaas_enabled,
-                "code_review_enabled": tier_pricing.code_review_enabled,
-                "ai_red_teaming_enabled": tier_pricing.ai_red_teaming_enabled,
-                "live_events_enabled": tier_pricing.live_events_enabled,
-                "ssdlc_integration_enabled": tier_pricing.ssdlc_integration_enabled,
-                "support_level": tier_pricing.support_level
+                "max_programs": int(tier_pricing.max_programs) if tier_pricing.max_programs is not None else None,
+                "max_researchers": int(tier_pricing.max_researchers) if tier_pricing.max_researchers is not None else None,
+                "max_reports_per_month": int(tier_pricing.max_reports_per_month) if tier_pricing.max_reports_per_month is not None else None,
+                "ptaas_enabled": bool(tier_pricing.ptaas_enabled),
+                "code_review_enabled": bool(tier_pricing.code_review_enabled),
+                "ai_red_teaming_enabled": bool(tier_pricing.ai_red_teaming_enabled),
+                "live_events_enabled": bool(tier_pricing.live_events_enabled),
+                "ssdlc_integration_enabled": bool(tier_pricing.ssdlc_integration_enabled),
+                "support_level": str(tier_pricing.support_level) if tier_pricing.support_level else None
             }
         )
         
@@ -144,9 +146,47 @@ class SubscriptionService:
             f"tier={tier}, fee={tier_pricing.quarterly_price}, trial={is_trial}"
         )
         
-        # Create first payment record (if not trial)
-        if not is_trial:
-            self._create_payment_record(subscription)
+        # Create first payment record
+        payment = self._create_payment_record(subscription)
+        
+        # If pay_from_wallet is True, automatically pay from wallet
+        if pay_from_wallet:
+            try:
+                from src.services.wallet_service import WalletService
+                wallet_service = WalletService(self.db)
+                
+                # CRITICAL FIX: Get user_id from organization
+                # Wallets are stored with user_id as owner_id, not organization_id
+                user_id = org.user_id
+                
+                # Check wallet balance using user_id
+                wallet = wallet_service.get_or_create_wallet(user_id, "organization")
+                if wallet.available_balance >= tier_pricing.quarterly_price:
+                    # Deduct from wallet using user_id
+                    wallet_service.deduct_from_wallet(
+                        organization_id=user_id,  # Use user_id, not organization_id
+                        amount=tier_pricing.quarterly_price,
+                        description=f"Subscription payment - {tier} tier",
+                        reference_type="subscription_payment",
+                        reference_id=str(payment.payment_id)
+                    )
+                    
+                    # Mark payment as paid
+                    self.mark_payment_paid(
+                        payment_id=payment.payment_id,
+                        payment_method="wallet",
+                        gateway_transaction_id=f"WALLET-{payment.payment_id.hex[:8].upper()}"
+                    )
+                    
+                    logger.info(f"Subscription payment auto-paid from wallet for org {organization_id}")
+                else:
+                    logger.warning(
+                        f"Insufficient wallet balance for org {organization_id}: "
+                        f"required={tier_pricing.quarterly_price}, available={wallet.available_balance}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to auto-pay from wallet: {str(e)}")
+                # Don't fail subscription creation, just log the error
         
         return subscription
     
@@ -166,6 +206,16 @@ class SubscriptionService:
         # Generate invoice number
         invoice_number = f"SUB-{subscription.subscription_id.hex[:8].upper()}-{datetime.utcnow().strftime('%Y%m')}"
         
+        # CRITICAL FIX: For the first payment, due date should be NOW (immediate payment required)
+        # For renewal payments, due date is next_billing_date
+        # Check if this is the first payment by looking at subscription status
+        if subscription.status == SubscriptionStatus.PENDING:
+            # First payment - due immediately
+            due_date = datetime.utcnow()
+        else:
+            # Renewal payment - due at next billing date
+            due_date = subscription.next_billing_date
+        
         payment = SubscriptionPayment(
             subscription_id=subscription.subscription_id,
             organization_id=subscription.organization_id,
@@ -174,7 +224,7 @@ class SubscriptionService:
             period_start=subscription.current_period_start,
             period_end=subscription.current_period_end,
             status="pending",
-            due_date=subscription.next_billing_date,
+            due_date=due_date,
             invoice_number=invoice_number
         )
         
@@ -244,9 +294,11 @@ class SubscriptionService:
         """
         Mark subscription payment as paid.
         
+        If payment was created with wallet payment method, deduct from wallet now.
+        
         Args:
             payment_id: Payment ID
-            payment_method: Payment method used
+            payment_method: Payment method used (from Finance Officer)
             gateway_transaction_id: Gateway transaction ID
             gateway_response: Gateway response data
             
@@ -260,8 +312,59 @@ class SubscriptionService:
         if not payment:
             raise ValueError("Payment not found")
         
+        # CRITICAL FIX: Prevent duplicate verification
         if payment.status == "paid":
-            raise ValueError("Payment already marked as paid")
+            raise ValueError("Payment has already been verified and marked as paid")
+        
+        # Check if this payment should be paid from wallet
+        should_pay_from_wallet = payment.payment_method == "wallet_pending"
+        
+        # If payment should be from wallet, deduct now
+        if should_pay_from_wallet:
+            try:
+                from src.services.wallet_service import WalletService
+                wallet_service = WalletService(self.db)
+                
+                # Get organization to get user_id
+                org = self.db.query(Organization).filter(
+                    Organization.id == payment.organization_id
+                ).first()
+                
+                if not org:
+                    raise ValueError("Organization not found")
+                
+                # Get user_id from organization
+                user_id = org.user_id
+                
+                # Check wallet balance
+                wallet = wallet_service.get_or_create_wallet(user_id, "organization")
+                if wallet.available_balance < payment.amount:
+                    raise ValueError(
+                        f"Insufficient wallet balance. Required: {payment.amount} ETB, "
+                        f"Available: {wallet.available_balance} ETB"
+                    )
+                
+                # Deduct from wallet
+                wallet_service.deduct_from_wallet(
+                    organization_id=user_id,  # Use user_id, not organization_id
+                    amount=payment.amount,
+                    description=f"Subscription payment - {payment.invoice_number}",
+                    reference_type="subscription_payment",
+                    reference_id=str(payment.payment_id)
+                )
+                
+                logger.info(
+                    f"Deducted {payment.amount} ETB from wallet for payment {payment_id}"
+                )
+                
+                # Override payment method to show it was paid from wallet
+                payment_method = "wallet"
+                if not gateway_transaction_id:
+                    gateway_transaction_id = f"WALLET-{payment.payment_id.hex[:8].upper()}"
+                
+            except Exception as e:
+                logger.error(f"Failed to deduct from wallet: {str(e)}")
+                raise ValueError(f"Failed to process wallet payment: {str(e)}")
         
         # Update payment
         payment.status = "paid"
@@ -274,7 +377,7 @@ class SubscriptionService:
         self.db.commit()
         self.db.refresh(payment)
         
-        logger.info(f"Marked payment {payment_id} as paid")
+        logger.info(f"Marked payment {payment_id} as paid via {payment_method}")
         
         # Process subscription renewal
         self.process_subscription_renewal(payment.subscription_id)
@@ -285,16 +388,17 @@ class SubscriptionService:
         self,
         subscription_id: UUID,
         reason: Optional[str] = None
-    ) -> OrganizationSubscription:
+    ) -> Dict[str, Any]:
         """
-        Cancel subscription.
+        Cancel subscription by deleting it from database.
+        This allows users to freely choose a new plan afterwards.
         
         Args:
             subscription_id: Subscription ID
-            reason: Cancellation reason
+            reason: Cancellation reason (logged but not stored)
             
         Returns:
-            Updated subscription
+            Dict with cancellation confirmation
         """
         subscription = self.db.query(OrganizationSubscription).filter(
             OrganizationSubscription.subscription_id == subscription_id
@@ -303,17 +407,26 @@ class SubscriptionService:
         if not subscription:
             raise ValueError("Subscription not found")
         
-        subscription.status = SubscriptionStatus.CANCELLED
-        subscription.cancelled_at = datetime.utcnow()
-        subscription.cancellation_reason = reason
-        subscription.updated_at = datetime.utcnow()
+        # Store info for logging before deletion
+        org_id = subscription.organization_id
+        tier = subscription.tier
         
+        # Delete the subscription
+        self.db.delete(subscription)
         self.db.commit()
-        self.db.refresh(subscription)
         
-        logger.info(f"Cancelled subscription {subscription_id}: {reason}")
+        logger.info(
+            f"Deleted subscription {subscription_id} for org {org_id}: "
+            f"tier={tier}, reason={reason}"
+        )
         
-        return subscription
+        return {
+            "message": "Subscription cancelled successfully",
+            "subscription_id": str(subscription_id),
+            "organization_id": str(org_id),
+            "cancelled_tier": tier,
+            "reason": reason
+        }
     
     def get_overdue_subscriptions(self) -> List[Dict[str, Any]]:
         """

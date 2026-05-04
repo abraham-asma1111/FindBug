@@ -406,3 +406,67 @@ class WalletService:
             }
             for tx in transactions
         ]
+    
+    def deduct_from_wallet(
+        self,
+        organization_id: UUID,
+        amount: Decimal,
+        description: str,
+        reference_type: str = "subscription_payment",
+        reference_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Deduct amount from organization wallet for subscription payment.
+        
+        Args:
+            organization_id: Organization ID
+            amount: Amount to deduct
+            description: Transaction description
+            reference_type: Type of reference
+            reference_id: Reference ID
+            
+        Returns:
+            Transaction result
+        """
+        wallet = self.get_or_create_wallet(organization_id, "organization")
+        
+        # Check available balance
+        if wallet.available_balance < amount:
+            raise ValueError(
+                f"Insufficient wallet balance: available={wallet.available_balance}, required={amount}"
+            )
+        
+        # Deduct from wallet
+        balance_before = wallet.balance
+        wallet.balance -= amount
+        wallet.available_balance = wallet.balance - wallet.reserved_balance
+        
+        # Record transaction
+        transaction = WalletTransaction(
+            wallet_id=wallet.wallet_id,
+            transaction_type="debit",
+            amount=amount,
+            balance_before=balance_before,
+            balance_after=wallet.balance,
+            reference_type=reference_type,
+            reference_id=UUID(reference_id) if reference_id else None,
+            saga_id=str(uuid4()),
+            description=description
+        )
+        
+        self.db.add(transaction)
+        self.db.commit()
+        self.db.refresh(wallet)
+        
+        return {
+            "success": True,
+            "wallet_id": str(wallet.wallet_id),
+            "transaction_id": str(transaction.transaction_id),
+            "debited_amount": float(amount),
+            "new_balance": float(wallet.balance),
+            "available_balance": float(wallet.available_balance)
+        }
+    
+    def get_organization_wallet(self, organization_id: UUID) -> Wallet:
+        """Get organization wallet."""
+        return self.get_or_create_wallet(organization_id, "organization")
