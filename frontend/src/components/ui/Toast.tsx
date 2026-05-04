@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface Toast {
@@ -18,6 +18,11 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+  
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   const showToast = useCallback((message: string, variant: Toast['variant'] = 'info', duration = 5000) => {
     const id = Math.random().toString(36).substring(7);
@@ -39,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {typeof window !== 'undefined' && createPortal(
+      {isMounted && createPortal(
         <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md">
           {toasts.map(toast => (
             <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />

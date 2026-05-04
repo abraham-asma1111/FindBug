@@ -141,6 +141,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       
       // FINANCIAL OPERATIONS
       { href: '/finance/organizations', label: 'Organizations', category: 'FINANCIAL OPERATIONS' },
+      { href: '/finance/subscriptions', label: 'Subscriptions', category: 'FINANCIAL OPERATIONS' },
       { href: '/finance/transactions', label: 'Transactions', category: 'FINANCIAL OPERATIONS' },
       { href: '/finance/billing', label: 'Invoices & Billing', category: 'FINANCIAL OPERATIONS' },
       

@@ -76,35 +76,35 @@ export default function PlatformWalletPage() {
           navItems={getPortalNavItems(user.role)}
           hideThemeToggle={true}
         >
-          {/* Hero Balance Card with Gradient */}
-          <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#3B82F6] via-[#2563EB] to-[#1D4ED8] p-8 shadow-2xl">
+          {/* Hero Balance Card - Dark Theme */}
+          <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1E293B] to-[#0F172A] border border-[#334155] p-8 shadow-2xl">
             {/* Decorative Elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#3B82F6] opacity-5 rounded-full -mr-32 -mt-32"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#3B82F6] opacity-5 rounded-full -ml-24 -mb-24"></div>
             
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium mb-1 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <p className="text-[#94A3B8] text-sm font-medium mb-1 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Total Platform Revenue
                   </p>
                   {balanceLoading ? (
-                    <div className="h-12 w-64 bg-white/10 animate-pulse rounded-lg"></div>
+                    <div className="h-12 w-64 bg-[#334155]/30 animate-pulse rounded-lg"></div>
                   ) : (
-                    <h1 className="text-5xl font-bold text-white mb-2">
-                      {totalRevenue.toLocaleString()} <span className="text-3xl text-blue-100">{balanceData?.currency || 'ETB'}</span>
+                    <h1 className="text-5xl font-bold text-[#F8FAFC] mb-2">
+                      {totalRevenue.toLocaleString()} <span className="text-3xl text-[#94A3B8]">{balanceData?.currency || 'ETB'}</span>
                     </h1>
                   )}
-                  <p className="text-blue-100 text-sm">
+                  <p className="text-[#64748B] text-sm">
                     From {totalTransactions} commission transaction{totalTransactions !== 1 ? 's' : ''}
                   </p>
                 </div>
                 
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                  <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="bg-[#3B82F6]/10 backdrop-blur-sm rounded-2xl p-6 border border-[#3B82F6]/20">
+                  <svg className="w-16 h-16 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                 </div>
@@ -112,17 +112,17 @@ export default function PlatformWalletPage() {
 
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <p className="text-blue-100 text-xs mb-1">Available Balance</p>
-                  <p className="text-white text-xl font-bold">{(balanceData?.available_balance || 0).toLocaleString()} ETB</p>
+                <div className="bg-[#334155]/30 backdrop-blur-sm rounded-xl p-4 border border-[#334155]">
+                  <p className="text-[#94A3B8] text-xs mb-1">Available Balance</p>
+                  <p className="text-[#F8FAFC] text-xl font-bold">{(balanceData?.available_balance || 0).toLocaleString()} ETB</p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <p className="text-blue-100 text-xs mb-1">Avg Commission</p>
-                  <p className="text-white text-xl font-bold">{avgCommission.toLocaleString(undefined, {maximumFractionDigits: 0})} ETB</p>
+                <div className="bg-[#334155]/30 backdrop-blur-sm rounded-xl p-4 border border-[#334155]">
+                  <p className="text-[#94A3B8] text-xs mb-1">Avg Commission</p>
+                  <p className="text-[#F8FAFC] text-xl font-bold">{avgCommission.toLocaleString(undefined, {maximumFractionDigits: 0})} ETB</p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <p className="text-blue-100 text-xs mb-1">Commission Rate</p>
-                  <p className="text-white text-xl font-bold">45%</p>
+                <div className="bg-[#334155]/30 backdrop-blur-sm rounded-xl p-4 border border-[#334155]">
+                  <p className="text-[#94A3B8] text-xs mb-1">Commission Rate</p>
+                  <p className="text-[#F8FAFC] text-xl font-bold">45%</p>
                 </div>
               </div>
             </div>
@@ -138,7 +138,6 @@ export default function PlatformWalletPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
-                <span className="text-[#10B981] text-sm font-semibold">+100%</span>
               </div>
               <h3 className="text-[#94A3B8] text-sm mb-1">Total Transactions</h3>
               <p className="text-[#F8FAFC] text-3xl font-bold">{totalTransactions}</p>
@@ -172,23 +171,6 @@ export default function PlatformWalletPage() {
               <h3 className="text-[#94A3B8] text-sm mb-1">Reserved Balance</h3>
               <p className="text-[#F8FAFC] text-3xl font-bold">{(balanceData?.reserved_balance || 0).toLocaleString()}</p>
               <p className="text-[#64748B] text-xs mt-1">ETB</p>
-            </div>
-          </div>
-
-          {/* Info Banner */}
-          <div className="mb-6 bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-[#3B82F6]/30 rounded-xl p-4 backdrop-blur-sm">
-            <div className="flex items-start gap-3">
-              <div className="bg-[#3B82F6]/10 p-2 rounded-lg">
-                <svg className="w-5 h-5 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-[#F8FAFC] font-semibold mb-1">About Platform Commission</p>
-                <p className="text-[#94A3B8] text-sm">
-                  The platform earns 45% commission on each bounty payment: 30% from the organization (on top of bounty) + 15% from the researcher (deducted from bounty). All commissions are automatically credited to this wallet when bounty payments are approved.
-                </p>
-              </div>
             </div>
           </div>
 

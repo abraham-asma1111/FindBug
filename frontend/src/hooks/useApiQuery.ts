@@ -73,6 +73,8 @@ export function useApiQuery<T = any>(
     // CRITICAL: Don't check isMountedRef here - React Strict Mode causes false unmounts
     // Only check enabled and endpoint to allow refetch to work properly
     if (!enabled || !endpoint) {
+      // IMPORTANT: Set loading to false when query is disabled or endpoint is undefined
+      setIsLoading(false);
       return;
     }
 
@@ -129,6 +131,7 @@ export function useApiQuery<T = any>(
       const error = new Error(errorMessage);
       setIsError(true);
       setError(error);
+      setIsLoading(false); // CRITICAL: Set loading to false on error
 
       if (onErrorRef.current) {
         onErrorRef.current(error);
@@ -144,10 +147,6 @@ export function useApiQuery<T = any>(
             fetchData();
           }
         }, retryDelay * (currentRetry + 1));
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoading(false);
       }
     }
   }, [endpoint, enabled, retry, retryDelay]);
