@@ -48,6 +48,12 @@ class Organization(Base):
     sso_provider = Column(String(50), nullable=True)
     sso_metadata_url = Column(String(500), nullable=True)
     
+    # Organization Branding Configuration
+    logo_url = Column(String(500), nullable=True)
+    cover_image_url = Column(String(500), nullable=True)
+    brand_color = Column(String(7), nullable=True)  # Hex color code (e.g., #3B82F6)
+    theme_settings = Column(Text, nullable=True)  # JSON string for advanced customization
+    
     # Extended ERD Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     

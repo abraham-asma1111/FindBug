@@ -50,7 +50,7 @@ def create_program(
         )
 
 
-@router.get("", response_model=List[ProgramListResponse])
+@router.get("")
 def list_programs(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -59,6 +59,8 @@ def list_programs(
     program_status: Optional[str] = Query(None, description="Filter by status: draft, public, paused, closed"),
     min_reward: Optional[float] = Query(None, description="Minimum reward amount"),
     max_reward: Optional[float] = Query(None, description="Maximum reward amount"),
+    organization_id: Optional[str] = Query(None, description="Filter by organization ID (for finance officers)"),
+    enrich_stats: bool = Query(False, description="Include detailed statistics (for finance officers)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -67,9 +69,86 @@ def list_programs(
     
     - Organizations see their own programs
     - Researchers see public programs
+    - Finance officers can filter by organization_id and get enriched stats
     - Supports search and filtering
     """
     service = ProgramService(db)
+    
+    # If organization_id is provided (e.g., by finance officer), get programs for that organization
+    if organization_id:
+        # Allow finance officers and admins to query by organization_id
+        if current_user.role in ['finance_officer', 'admin', 'super_admin']:
+            programs = service.get_organization_programs(
+                organization_id,
+                search=search,
+                program_type=program_type,
+                status=program_status
+            )
+            
+            # If enrich_stats is requested, add statistics
+            if enrich_stats:
+                from sqlalchemy import func, text
+                from src.domain.models.report import VulnerabilityReport
+                from src.domain.models.bounty_payment import BountyPayment
+                from src.domain.models.program import ProgramParticipation, RewardTier
+                
+                enriched_programs = []
+                for program in programs:
+                    # Get statistics
+                    stats_query = text("""
+                        SELECT 
+                            -- Report stats
+                            (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as total_reports,
+                            (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'valid') as valid_reports,
+                            (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'resolved') as resolved_reports,
+                            -- Researcher stats
+                            (SELECT COUNT(DISTINCT researcher_id) FROM program_participations pp WHERE pp.program_id = :program_id) as total_researchers,
+                            (SELECT COUNT(DISTINCT vr.researcher_id) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as researchers_with_reports,
+                            -- Bounty stats
+                            (SELECT COALESCE(SUM(bp.total_amount), 0) FROM bounty_payments bp 
+                             JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                             WHERE vr.program_id = :program_id AND bp.status = 'completed') as total_bounties_paid,
+                            (SELECT COUNT(*) FROM bounty_payments bp 
+                             JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                             WHERE vr.program_id = :program_id AND bp.status IN ('pending', 'approved')) as pending_payments,
+                            -- Reward tiers
+                            (SELECT MIN(min_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as min_bounty,
+                            (SELECT MAX(max_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as max_bounty
+                    """)
+                    
+                    stats = db.execute(stats_query, {"program_id": program.id}).fetchone()
+                    
+                    # Convert program to dict and add stats
+                    program_dict = {
+                        "id": str(program.id),
+                        "name": program.name,
+                        "description": program.description,
+                        "status": program.status,
+                        "type": program.type,
+                        "visibility": program.visibility,
+                        "created_at": program.created_at.isoformat() if program.created_at else None,
+                        "organization_id": str(program.organization_id),
+                        # Statistics
+                        "total_reports": stats.total_reports if stats else 0,
+                        "valid_reports": stats.valid_reports if stats else 0,
+                        "resolved_reports": stats.resolved_reports if stats else 0,
+                        "total_researchers": stats.total_researchers if stats else 0,
+                        "researchers_with_reports": stats.researchers_with_reports if stats else 0,
+                        "total_bounties_paid": float(stats.total_bounties_paid) if stats and stats.total_bounties_paid else 0,
+                        "pending_payments": stats.pending_payments if stats else 0,
+                        "min_bounty": float(stats.min_bounty) if stats and stats.min_bounty else 0,
+                        "max_bounty": float(stats.max_bounty) if stats and stats.max_bounty else 0,
+                    }
+                    enriched_programs.append(program_dict)
+                
+                return enriched_programs
+            
+            return programs
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to query programs by organization_id"
+            )
     
     if current_user.is_organization():
         programs = service.get_organization_programs(

@@ -199,6 +199,97 @@ def get_organization_subscription(
     return subscription
 
 
+@router.get("/organization/{organization_id}/payments", response_model=dict)
+def get_organization_payments(
+    organization_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, le=100),
+    offset: int = Query(default=0, ge=0)
+):
+    """
+    Get payment history for organization's subscription.
+    
+    Requires: Admin, Organization (own), or Finance Officer
+    """
+    # Authorization check
+    user_role_lower = current_user.role.lower()
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        # Get organization from user
+        from src.domain.models.organization import Organization
+        organization = db.query(Organization).filter(
+            Organization.user_id == current_user.id
+        ).first()
+        
+        if not organization or organization.id != organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organizations can only view their own payments"
+            )
+    elif user_role_lower not in [UserRole.ADMIN.value, UserRole.STAFF.value, UserRole.FINANCE_OFFICER.value]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions"
+        )
+    
+    # Get active subscription for organization
+    subscription = db.query(OrganizationSubscription).filter(
+        OrganizationSubscription.organization_id == organization_id
+    ).order_by(OrganizationSubscription.created_at.desc()).first()
+    
+    if not subscription:
+        return {"payments": [], "total": 0}
+    
+    # For organizations, only show paid payments (actual payment history)
+    # For finance officers/admins, show all payments
+    if user_role_lower == UserRole.ORGANIZATION.value:
+        payments_query = db.query(SubscriptionPayment).filter(
+            SubscriptionPayment.subscription_id == subscription.subscription_id,
+            SubscriptionPayment.status == "paid"  # Only show completed payments
+        )
+    else:
+        # Finance officers and admins see all payments
+        payments_query = db.query(SubscriptionPayment).filter(
+            SubscriptionPayment.subscription_id == subscription.subscription_id
+        )
+    
+    total = payments_query.count()
+    payments = payments_query.order_by(
+        SubscriptionPayment.created_at.desc()
+    ).limit(limit).offset(offset).all()
+    
+    # Convert payments to dictionaries
+    payment_list = []
+    for payment in payments:
+        payment_list.append({
+            "payment_id": str(payment.payment_id),
+            "subscription_id": str(payment.subscription_id),
+            "organization_id": str(payment.organization_id),
+            "amount": float(payment.amount),
+            "currency": payment.currency,
+            "period_start": payment.period_start,
+            "period_end": payment.period_end,
+            "status": payment.status,
+            "payment_method": payment.payment_method,
+            "payment_gateway": payment.payment_gateway,
+            "gateway_transaction_id": payment.gateway_transaction_id,
+            "due_date": payment.due_date,
+            "paid_at": payment.paid_at,
+            "failed_at": payment.failed_at,
+            "failure_reason": payment.failure_reason,
+            "invoice_number": payment.invoice_number,
+            "invoice_url": payment.invoice_url,
+            "created_at": payment.created_at,
+            "updated_at": payment.updated_at
+        })
+    
+    return {
+        "payments": payment_list,
+        "total": total,
+        "subscription_id": str(subscription.subscription_id)
+    }
+
+
 @router.get("/{subscription_id}/payments", response_model=List[SubscriptionPaymentResponse])
 def get_subscription_payments(
     subscription_id: UUID,
@@ -685,7 +776,7 @@ def get_subscription_details(
         "organization": {
             "id": str(organization.id) if organization else None,
             "company_name": organization.company_name if organization else None,
-            "email": organization.email if organization else None,
+            "email": organization.user.email if organization and organization.user else None,
             "website": organization.website if organization else None
         } if organization else None,
         "payment_history": payment_history,

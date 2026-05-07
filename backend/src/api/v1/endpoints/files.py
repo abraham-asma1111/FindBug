@@ -23,42 +23,16 @@ router = APIRouter(prefix="/files", tags=["files"])
 
 @router.get("/serve/{file_path:path}")
 async def serve_file(
-    file_path: str,
-    db: Session = Depends(get_db)
+    file_path: str
 ):
     """
     Serve uploaded files by proxying them from MinIO/S3 or local storage.
     This endpoint streams file content through the backend.
+    
+    Public endpoint - no authentication required for serving files.
     """
     try:
-        storage_service = FileStorageService(db)
-        
-        # Try S3/MinIO first
-        if storage_service.s3_client:
-            try:
-                from src.core.config import settings
-                bucket_name = getattr(settings, 'MINIO_BUCKET', 'bugbounty-files')
-                
-                response = storage_service.s3_client.get_object(
-                    Bucket=bucket_name,
-                    Key=file_path
-                )
-                
-                content_type = response.get('ContentType', 'application/octet-stream')
-                
-                return StreamingResponse(
-                    io.BytesIO(response['Body'].read()),
-                    media_type=content_type,
-                    headers={
-                        'Content-Disposition': f'inline; filename="{file_path.split("/")[-1]}"',
-                        'Cache-Control': 'public, max-age=3600'
-                    }
-                )
-            except Exception as s3_error:
-                # Fall through to local storage
-                pass
-        
-        # Try local storage as fallback
+        # Try local storage (no S3 client needed for local files)
         from src.core.config import settings
         local_storage_path = getattr(settings, 'LOCAL_STORAGE_PATH', 'uploads')
         local_file_path = os.path.join(local_storage_path, file_path)
@@ -79,14 +53,15 @@ async def serve_file(
                 media_type=content_type,
                 headers={
                     'Content-Disposition': f'inline; filename="{file_path.split("/")[-1]}"',
-                    'Cache-Control': 'public, max-age=3600'
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*'  # Allow CORS
                 }
             )
         
-        # File not found in either location
+        # File not found
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found in storage"
+            detail=f"File not found: {file_path}"
         )
         
     except HTTPException:
