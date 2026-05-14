@@ -48,6 +48,7 @@ async def list_payment_history(
     status: Optional[str] = None,
     researcher_id: Optional[str] = None,
     organization_id: Optional[str] = None,
+    program_id: Optional[str] = None,
     skip: int = 0,
     limit: int = 20,
     current_user: User = Depends(require_financial),
@@ -58,6 +59,7 @@ async def list_payment_history(
     List all bounty payments with enriched data (Finance Officer/Admin only).
     
     Returns payments with researcher, organization, and report details.
+    Supports filtering by status, researcher_id, organization_id, and program_id.
     """
     from src.domain.models.researcher import Researcher
     from src.domain.models.organization import Organization
@@ -67,11 +69,13 @@ async def list_payment_history(
         # Convert string IDs to UUID if provided
         researcher_uuid = UUID(researcher_id) if researcher_id else None
         organization_uuid = UUID(organization_id) if organization_id else None
+        program_uuid = UUID(program_id) if program_id else None
         
         payments, total = payment_service.list_bounty_payments(
             status=status,
             researcher_id=researcher_uuid,
             organization_id=organization_uuid,
+            program_id=program_uuid,
             skip=skip,
             limit=limit
         )
@@ -86,22 +90,58 @@ async def list_payment_history(
             # Get report
             report = db.query(VulnerabilityReport).filter(VulnerabilityReport.id == payment.report_id).first()
             
+            # Check actual KYC status from kyc_verifications table
+            from src.domain.models.kyc import KYCVerification
+            from src.domain.models.payment_extended import PaymentMethod as PaymentMethodModel
+            
+            kyc_verified = False
+            payment_method_info = None
+            
+            if researcher and researcher.user_id:
+                # Check KYC status
+                kyc_record = db.query(KYCVerification).filter(
+                    KYCVerification.user_id == researcher.user_id,
+                    KYCVerification.status == 'approved'
+                ).first()
+                kyc_verified = kyc_record is not None
+                
+                # Get researcher's default payment method
+                payment_method_record = db.query(PaymentMethodModel).filter(
+                    PaymentMethodModel.user_id == researcher.user_id,
+                    PaymentMethodModel.is_default == True
+                ).first()
+                
+                if payment_method_record:
+                    payment_method_info = payment_method_record.method_type
+            
+            # Get researcher name with fallback logic
+            researcher_name = "Unknown"
+            if researcher:
+                if researcher.username:
+                    researcher_name = researcher.username
+                elif researcher.user_id:
+                    # Fallback to user's email prefix
+                    user = db.query(User).filter(User.id == researcher.user_id).first()
+                    if user:
+                        researcher_name = user.email.split('@')[0]
+            
             enriched_payments.append({
                 "payment_id": str(payment.payment_id),
                 "transaction_id": payment.transaction_id,
                 "report_id": str(payment.report_id),
+                "report_number": report.report_number if report else None,
                 "report_title": report.title if report else None,
-                "report_severity": report.severity if report else None,
+                "report_severity": report.assigned_severity if report else None,
                 "researcher_id": str(payment.researcher_id),
-                "researcher_name": researcher.username if researcher else "Unknown",
+                "researcher_name": researcher_name,
                 "organization_id": str(payment.organization_id),
                 "organization_name": organization.company_name if organization else "Unknown",
                 "researcher_amount": float(payment.researcher_amount),
                 "commission_amount": float(payment.commission_amount),
                 "total_amount": float(payment.total_amount),
                 "status": payment.status,
-                "payment_method": payment.payment_method,
-                "kyc_verified": payment.kyc_verified,
+                "payment_method": payment_method_info or payment.payment_method,
+                "kyc_verified": kyc_verified,
                 "approved_at": payment.approved_at.isoformat() if payment.approved_at else None,
                 "payout_deadline": payment.payout_deadline.isoformat() if payment.payout_deadline else None,
                 "created_at": payment.created_at.isoformat(),
@@ -121,8 +161,9 @@ async def list_payment_history(
             detail=str(e)
         )
     except Exception as e:
+        from fastapi import status as http_status
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list payments: {str(e)}"
         )
 

@@ -23,18 +23,24 @@ def check_database():
         print("DATABASE DATA ANALYSIS")
         print("=" * 60)
         
-        # Check Users
+        # Check Users (handle both uppercase and lowercase role values)
         total_users = db.query(User).count()
-        researchers = db.query(User).filter(User.role == 'researcher').count()
-        organizations = db.query(User).filter(User.role == 'organization').count()
+        researchers = db.query(User).filter(
+            (User.role == 'researcher') | (User.role == 'RESEARCHER')
+        ).count()
+        organizations = db.query(User).filter(
+            (User.role == 'organization') | (User.role == 'ORGANIZATION')
+        ).count()
         triage_specialists = db.query(User).filter(User.role == 'triage_specialist').count()
         admins = db.query(User).filter(User.role == 'admin').count()
+        finance_officers = db.query(User).filter(User.role == 'finance_officer').count()
         
         print(f"\n👥 USERS: {total_users} total")
         print(f"   - Researchers: {researchers}")
         print(f"   - Organizations: {organizations}")
         print(f"   - Triage Specialists: {triage_specialists}")
         print(f"   - Admins: {admins}")
+        print(f"   - Finance Officers: {finance_officers}")
         
         if total_users > 0:
             print("\n   Sample users:")

@@ -235,9 +235,10 @@ def get_my_participations(
     return participations
 
 
-@router.get("/{program_id}", response_model=ProgramResponse)
+@router.get("/{program_id}")
 def get_program(
     program_id: UUID,
+    enrich_stats: bool = Query(False, description="Include detailed statistics (for finance officers)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -246,6 +247,7 @@ def get_program(
     
     - Public programs: accessible to all
     - Private programs: only accessible to organization owner and invited researchers
+    - Finance officers can request enriched statistics with enrich_stats=true
     """
     service = ProgramService(db)
     program = service.get_program(program_id)
@@ -254,20 +256,82 @@ def get_program(
     if program.visibility == "private":
         # Organization owner can access
         if current_user.is_organization() and program.organization_id == current_user.organization.id:
-            return program
-        
+            pass  # Access granted
         # Invited researchers can access
-        if current_user.is_researcher():
+        elif current_user.is_researcher():
             invitation = service.program_repo.check_existing_invitation(
                 program_id, current_user.researcher.id
             )
-            if invitation and invitation.status == "accepted":
-                return program
+            if not (invitation and invitation.status == "accepted"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to access this program"
+                )
+        # Finance officers and admins can access
+        elif current_user.role not in ['finance_officer', 'admin', 'super_admin']:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this program"
+            )
+    
+    # If enrich_stats is requested, add statistics
+    if enrich_stats and current_user.role in ['finance_officer', 'admin', 'super_admin']:
+        from sqlalchemy import text
         
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this program"
-        )
+        # Get statistics
+        stats_query = text("""
+            SELECT 
+                -- Report stats
+                (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as total_reports,
+                (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'valid') as valid_reports,
+                (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'resolved') as resolved_reports,
+                -- Researcher stats
+                (SELECT COUNT(DISTINCT researcher_id) FROM program_participations pp WHERE pp.program_id = :program_id) as total_researchers,
+                (SELECT COUNT(DISTINCT vr.researcher_id) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as researchers_with_reports,
+                -- Bounty stats
+                (SELECT COALESCE(SUM(bp.total_amount), 0) FROM bounty_payments bp 
+                 JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                 WHERE vr.program_id = :program_id AND bp.status = 'completed') as total_bounties_paid,
+                (SELECT COUNT(*) FROM bounty_payments bp 
+                 JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                 WHERE vr.program_id = :program_id AND bp.status IN ('pending', 'approved')) as pending_payments,
+                -- Reward tiers
+                (SELECT MIN(min_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as min_bounty,
+                (SELECT MAX(max_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as max_bounty
+        """)
+        
+        stats = db.execute(stats_query, {"program_id": program.id}).fetchone()
+        
+        # Convert program to dict and add stats
+        program_dict = {
+            "id": str(program.id),
+            "name": program.name,
+            "description": program.description,
+            "status": program.status,
+            "type": program.type,
+            "visibility": program.visibility,
+            "created_at": program.created_at.isoformat() if program.created_at else None,
+            "organization_id": str(program.organization_id),
+            # Statistics
+            "total_reports": stats.total_reports if stats else 0,
+            "valid_reports": stats.valid_reports if stats else 0,
+            "resolved_reports": stats.resolved_reports if stats else 0,
+            "total_researchers": stats.total_researchers if stats else 0,
+            "researchers_with_reports": stats.researchers_with_reports if stats else 0,
+            "total_bounties_paid": float(stats.total_bounties_paid) if stats and stats.total_bounties_paid else 0,
+            "pending_payments": stats.pending_payments if stats else 0,
+            "min_bounty": float(stats.min_bounty) if stats and stats.min_bounty else 0,
+            "max_bounty": float(stats.max_bounty) if stats and stats.max_bounty else 0,
+        }
+        
+        # Add organization info if available
+        if program.organization:
+            program_dict["organization"] = {
+                "id": str(program.organization.id),
+                "company_name": program.organization.company_name
+            }
+        
+        return program_dict
     
     return program
 
@@ -869,3 +933,74 @@ def delete_program(
     db.commit()
     
     return {"message": "Program deleted successfully"}
+
+
+@router.get("/{program_id}/participants", status_code=status.HTTP_200_OK)
+def get_program_participants(
+    program_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all researchers participating in a program.
+    
+    Returns list of researchers with their participation stats.
+    Accessible by program owners and finance officers.
+    """
+    service = ProgramService(db)
+    
+    # Verify access
+    program = service.get_program(program_id)
+    
+    # Allow access for organization owners and finance officers
+    if current_user.role not in ['finance_officer', 'admin', 'super_admin']:
+        if not (current_user.is_organization() and program.organization_id == current_user.organization.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view program participants"
+            )
+    
+    # Get participants with stats
+    from sqlalchemy import func
+    from src.domain.models.program import ProgramParticipation
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.user import User as UserModel
+    from src.domain.models.report import VulnerabilityReport
+    
+    participants_query = db.query(
+        Researcher,
+        UserModel,
+        ProgramParticipation.joined_at,
+        func.count(VulnerabilityReport.id).label('reports_count')
+    ).join(
+        UserModel, Researcher.user_id == UserModel.id
+    ).join(
+        ProgramParticipation, Researcher.id == ProgramParticipation.researcher_id
+    ).outerjoin(
+        VulnerabilityReport,
+        (VulnerabilityReport.researcher_id == Researcher.id) &
+        (VulnerabilityReport.program_id == program_id)
+    ).filter(
+        ProgramParticipation.program_id == program_id
+    ).group_by(
+        Researcher.id,
+        UserModel.id,
+        ProgramParticipation.joined_at
+    ).all()
+    
+    participants = []
+    for researcher, user, joined_at, reports_count in participants_query:
+        # Use email as username if username doesn't exist
+        username = getattr(user, 'username', None) or user.email.split('@')[0]
+        
+        participants.append({
+            "id": str(researcher.id),
+            "user_id": str(user.id),
+            "username": username,
+            "email": user.email,
+            "joined_at": joined_at.isoformat() if joined_at else None,
+            "reports_count": reports_count or 0,
+            "reputation_score": researcher.reputation_score or 0,
+        })
+    
+    return participants

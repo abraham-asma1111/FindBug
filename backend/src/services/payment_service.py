@@ -334,6 +334,7 @@ class PaymentService:
         status: Optional[str] = None,
         researcher_id: Optional[UUID] = None,
         organization_id: Optional[UUID] = None,
+        program_id: Optional[UUID] = None,
         skip: int = 0,
         limit: int = 20
     ) -> tuple[list[BountyPayment], int]:
@@ -344,12 +345,15 @@ class PaymentService:
             status: Filter by status
             researcher_id: Filter by researcher
             organization_id: Filter by organization
+            program_id: Filter by program
             skip: Pagination offset
             limit: Maximum results
             
         Returns:
             Tuple of (payments list, total count)
         """
+        from src.domain.models.report import VulnerabilityReport
+        
         query = self.db.query(BountyPayment)
         
         if status:
@@ -360,6 +364,13 @@ class PaymentService:
         
         if organization_id:
             query = query.filter(BountyPayment.organization_id == organization_id)
+        
+        if program_id:
+            # Join with VulnerabilityReport to filter by program_id
+            query = query.join(
+                VulnerabilityReport,
+                BountyPayment.report_id == VulnerabilityReport.id
+            ).filter(VulnerabilityReport.program_id == program_id)
         
         total = query.count()
         payments = query.order_by(BountyPayment.created_at.desc()).offset(skip).limit(limit).all()
