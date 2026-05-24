@@ -76,7 +76,10 @@ export default function TriageMessagesPage() {
     messages: Message[];
     total: number;
     conversation_id: string;
-  }>({ endpoint: `/messages/conversation/${selectedConversation}` });
+  }>({ 
+    endpoint: `/messages/conversation/${selectedConversation}`,
+    enabled: !!selectedConversation
+  });
 
   // Send message mutation
   const sendMessageMutation = useApiMutation({

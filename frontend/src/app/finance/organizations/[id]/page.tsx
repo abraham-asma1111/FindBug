@@ -20,6 +20,16 @@ export default function OrganizationDetailPage() {
   const [programStatusFilter, setProgramStatusFilter] = useState<string>('all');
   const [programSortBy, setProgramSortBy] = useState<'name' | 'reports' | 'bounties' | 'researchers'>('name');
 
+  // Fetch all organizations for navigation
+  const { data: allOrgsData } = useApiQuery<any>({
+    endpoint: '/financial/organizations?limit=1000',
+  });
+
+  const allOrganizations = allOrgsData?.organizations || [];
+  const currentIndex = allOrganizations.findIndex((org: any) => org.id === organizationId);
+  const previousOrg = currentIndex > 0 ? allOrganizations[currentIndex - 1] : null;
+  const nextOrg = currentIndex < allOrganizations.length - 1 ? allOrganizations[currentIndex + 1] : null;
+
   useEffect(() => {
     document.documentElement.classList.add('dark');
     document.body.style.backgroundColor = '#0a0e1a';
@@ -42,28 +52,41 @@ export default function OrganizationDetailPage() {
     enabled: activeTab === 'payments',
   });
 
-  if (!user) return null;
-
   return (
     <ProtectedRoute allowedRoles={['finance_officer', 'admin', 'super_admin']}>
-      <PortalShell
-        user={user}
-        title={orgDetails?.company_name || 'Organization Details'}
-        subtitle={`Organization ID: ${organizationId}`}
-        navItems={getPortalNavItems(user.role)}
-        hideThemeToggle={true}
-      >
-        {/* Back Button */}
+      {user && (
+        <PortalShell
+          user={user}
+          title={orgDetails?.company_name || 'Organization Details'}
+          subtitle="Finance Officer View"
+          navItems={getPortalNavItems(user.role)}
+          hideThemeToggle={true}
+        >
+        {/* Breadcrumb Navigation */}
         <div className="mb-6">
-          <button
-            onClick={() => router.push('/finance/organizations')}
-            className="flex items-center gap-2 text-[#94A3B8] hover:text-[#F8FAFC] transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <nav className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => router.push('/finance/dashboard')}
+              className="text-[#64748B] hover:text-[#F8FAFC] transition-colors"
+            >
+              Finance
+            </button>
+            <svg className="w-4 h-4 text-[#475569]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Back to Organizations
-          </button>
+            <button
+              onClick={() => router.push('/finance/organizations')}
+              className="text-[#64748B] hover:text-[#F8FAFC] transition-colors"
+            >
+              Organizations
+            </button>
+            <svg className="w-4 h-4 text-[#475569]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <span className="text-[#F8FAFC] font-medium">
+              {orgDetails?.company_name || 'Loading...'}
+            </span>
+          </nav>
         </div>
 
         {detailsLoading ? (
@@ -663,129 +686,235 @@ export default function OrganizationDetailPage() {
 
                 {/* Programs Tab */}
                 {activeTab === 'programs' && (
-                  <div className="space-y-3">
-                    <div className="bg-[#1E293B]/50 rounded-xl p-6 border border-[#334155]/50 backdrop-blur-sm">
-                      <h3 className="text-2xl font-bold text-[#F8FAFC] mb-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                          </svg>
+                  <div className="space-y-4">
+                    {/* Filters and Search Bar */}
+                    <div className="bg-[#1E293B]/50 rounded-xl p-5 border border-[#334155]/50">
+                      <div className="flex flex-col md:flex-row gap-4">
+                        {/* Search */}
+                        <div className="flex-1">
+                          <div className="relative">
+                            <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                              type="text"
+                              placeholder="Search programs by name..."
+                              value={programSearch}
+                              onChange={(e) => setProgramSearch(e.target.value)}
+                              className="w-full pl-12 pr-4 py-3 bg-[#0F172A] border border-[#334155] rounded-lg text-[#F8FAFC] placeholder-[#64748B] focus:outline-none focus:border-[#3B82F6] transition-colors"
+                            />
+                          </div>
                         </div>
-                        Bug Bounty Programs
-                      </h3>
-                      {orgPrograms && orgPrograms.length > 0 ? (
-                        <div className="space-y-3">
-                          {orgPrograms.map((program: any) => (
-                            <div key={program.id} className="bg-[#0F172A]/50 rounded-xl p-5 border border-[#334155]/30 hover:border-[#8B5CF6]/30 transition-all">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#7C3AED] flex items-center justify-center">
-                                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                      </svg>
-                                    </div>
-                                    <div>
-                                      <h4 className="text-[#F8FAFC] font-bold text-xl mb-1">
-                                        {program.name}
-                                      </h4>
-                                      <div className="flex items-center gap-3">
-                                        <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${
-                                          program.status === 'public' 
-                                            ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' 
-                                            : program.status === 'draft'
-                                            ? 'bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30'
-                                            : program.status === 'paused'
-                                            ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
-                                            : 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30'
-                                        }`}>
-                                          {program.status}
-                                        </span>
-                                        <span className="text-[#64748B] text-sm capitalize">
-                                          {program.type || 'Bug Bounty'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <p className="text-[#94A3B8] text-sm leading-relaxed pl-15">
-                                    {program.description || 'No description provided'}
-                                  </p>
-                                </div>
-                                <div className="text-right ml-6">
-                                  <div className="bg-[#1E293B]/50 rounded-lg p-3 border border-[#334155]/30">
-                                    <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider mb-1">Bounty Range</p>
-                                    <p className="text-[#10B981] font-bold text-lg">
-                                      {program.min_bounty?.toLocaleString() || 0} - {program.max_bounty?.toLocaleString() || 0}
-                                    </p>
-                                    <p className="text-[#64748B] text-xs mt-1">ETB</p>
-                                  </div>
-                                </div>
-                              </div>
 
-                              {/* Program Stats Grid */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-[#334155]/30">
-                                {/* Total Reports */}
-                                <div className="bg-[#1E293B]/30 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg className="w-4 h-4 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider">Reports</p>
-                                  </div>
-                                  <p className="text-[#F8FAFC] font-bold text-lg mb-1">{program.total_reports || 0}</p>
-                                  <p className="text-[#10B981] text-xs">{program.valid_reports || 0} valid</p>
-                                </div>
-
-                                {/* Researchers */}
-                                <div className="bg-[#1E293B]/30 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg className="w-4 h-4 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
-                                    <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider">Researchers</p>
-                                  </div>
-                                  <p className="text-[#F8FAFC] font-bold text-lg mb-1">{program.total_researchers || 0}</p>
-                                  <p className="text-[#8B5CF6] text-xs">{program.researchers_with_reports || 0} active</p>
-                                </div>
-
-                                {/* Bounties Paid */}
-                                <div className="bg-[#1E293B]/30 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg className="w-4 h-4 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider">Bounties Paid</p>
-                                  </div>
-                                  <p className="text-[#F8FAFC] font-bold text-lg mb-1">{(program.total_bounties_paid || 0).toLocaleString()} ETB</p>
-                                  <p className="text-[#10B981] text-xs">Completed payments</p>
-                                </div>
-
-                                {/* Pending Payments */}
-                                <div className="bg-[#1E293B]/30 rounded-lg p-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg className="w-4 h-4 text-[#F59E0B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider">Pending</p>
-                                  </div>
-                                  <p className="text-[#F8FAFC] font-bold text-lg mb-1">{program.pending_payments || 0}</p>
-                                  <p className="text-[#F59E0B] text-xs">Payments due</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        {/* Status Filter */}
+                        <div className="w-full md:w-48">
+                          <select
+                            value={programStatusFilter}
+                            onChange={(e) => setProgramStatusFilter(e.target.value)}
+                            className="w-full px-4 py-3 bg-[#0F172A] border border-[#334155] rounded-lg text-[#F8FAFC] focus:outline-none focus:border-[#3B82F6] transition-colors"
+                          >
+                            <option value="all">All Status</option>
+                            <option value="public">Public</option>
+                            <option value="draft">Draft</option>
+                            <option value="paused">Paused</option>
+                            <option value="archived">Archived</option>
+                          </select>
                         </div>
-                      ) : (
-                        <div className="text-center py-12">
-                          <div className="bg-[#8B5CF6]/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-10 h-10 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+                        {/* Sort By */}
+                        <div className="w-full md:w-48">
+                          <select
+                            value={programSortBy}
+                            onChange={(e) => setProgramSortBy(e.target.value as any)}
+                            className="w-full px-4 py-3 bg-[#0F172A] border border-[#334155] rounded-lg text-[#F8FAFC] focus:outline-none focus:border-[#3B82F6] transition-colors"
+                          >
+                            <option value="name">Sort by Name</option>
+                            <option value="reports">Sort by Reports</option>
+                            <option value="bounties">Sort by Bounties</option>
+                            <option value="researchers">Sort by Researchers</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Programs Table Card */}
+                    <div className="bg-[#1E293B]/50 rounded-xl border border-[#334155]/50 overflow-hidden">
+                      <div className="p-6 border-b border-[#334155]/50">
+                        <h3 className="text-2xl font-bold text-[#F8FAFC] flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                             </svg>
                           </div>
-                          <p className="text-[#94A3B8] text-lg font-medium">No programs found</p>
-                          <p className="text-[#64748B] text-sm mt-2">This organization hasn't created any bug bounty programs yet</p>
-                        </div>
-                      )}
+                          Bug Bounty Programs
+                          {(() => {
+                            const filtered = orgPrograms?.filter((program: any) => {
+                              const matchesSearch = program.name.toLowerCase().includes(programSearch.toLowerCase());
+                              const matchesStatus = programStatusFilter === 'all' || program.status === programStatusFilter;
+                              return matchesSearch && matchesStatus;
+                            }) || [];
+                            return filtered.length > 0 && (
+                              <span className="text-[#64748B] text-base font-normal">
+                                ({filtered.length})
+                              </span>
+                            );
+                          })()}
+                        </h3>
+                      </div>
+
+                      {(() => {
+                        // Filter programs
+                        let filteredPrograms = orgPrograms?.filter((program: any) => {
+                          const matchesSearch = program.name.toLowerCase().includes(programSearch.toLowerCase());
+                          const matchesStatus = programStatusFilter === 'all' || program.status === programStatusFilter;
+                          return matchesSearch && matchesStatus;
+                        }) || [];
+
+                        // Sort programs
+                        filteredPrograms = [...filteredPrograms].sort((a: any, b: any) => {
+                          switch (programSortBy) {
+                            case 'name':
+                              return a.name.localeCompare(b.name);
+                            case 'reports':
+                              return (b.total_reports || 0) - (a.total_reports || 0);
+                            case 'bounties':
+                              return (b.total_bounties_paid || 0) - (a.total_bounties_paid || 0);
+                            case 'researchers':
+                              return (b.total_researchers || 0) - (a.total_researchers || 0);
+                            default:
+                              return 0;
+                          }
+                        });
+
+                        return filteredPrograms.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-[#0F172A]/50">
+                                <tr>
+                                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Program Name</th>
+                                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Status</th>
+                                  <th className="px-6 py-4 text-left text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Bounty Range</th>
+                                  <th className="px-6 py-4 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Reports</th>
+                                  <th className="px-6 py-4 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Researchers</th>
+                                  <th className="px-6 py-4 text-right text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Bounties Paid</th>
+                                  <th className="px-6 py-4 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Pending</th>
+                                  <th className="px-6 py-4 text-center text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#334155]/30">
+                                {filteredPrograms.map((program: any) => (
+                                  <tr 
+                                    key={program.id} 
+                                    onClick={() => router.push(`/finance/programs/${program.id}`)}
+                                    className="hover:bg-[#1E293B]/50 transition-colors cursor-pointer group"
+                                  >
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
+                                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                          </svg>
+                                        </div>
+                                        <div>
+                                          <p className="text-[#F8FAFC] font-semibold text-base group-hover:text-[#3B82F6] transition-colors">
+                                            {program.name}
+                                          </p>
+                                          <p className="text-[#64748B] text-sm capitalize">
+                                            {program.type || 'Bug Bounty'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold uppercase ${
+                                        program.status === 'public' 
+                                          ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30' 
+                                          : program.status === 'draft'
+                                          ? 'bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30'
+                                          : program.status === 'paused'
+                                          ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30'
+                                          : 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30'
+                                      }`}>
+                                        {program.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <div>
+                                        <p className="text-[#10B981] font-bold text-base">
+                                          {program.min_bounty?.toLocaleString() || 0} - {program.max_bounty?.toLocaleString() || 0}
+                                        </p>
+                                        <p className="text-[#64748B] text-xs">ETB</p>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <div>
+                                        <p className="text-[#F8FAFC] font-bold text-lg">{program.total_reports || 0}</p>
+                                        <p className="text-[#10B981] text-xs">{program.valid_reports || 0} valid</p>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <div>
+                                        <p className="text-[#F8FAFC] font-bold text-lg">{program.total_researchers || 0}</p>
+                                        <p className="text-[#8B5CF6] text-xs">{program.researchers_with_reports || 0} active</p>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <div>
+                                        <p className="text-[#F8FAFC] font-bold text-base">{(program.total_bounties_paid || 0).toLocaleString()}</p>
+                                        <p className="text-[#64748B] text-xs">ETB</p>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <span className={`inline-block px-3 py-1 rounded-lg text-sm font-bold ${
+                                        (program.pending_payments || 0) > 0 
+                                          ? 'bg-[#F59E0B]/20 text-[#F59E0B]' 
+                                          : 'bg-[#64748B]/20 text-[#64748B]'
+                                      }`}>
+                                        {program.pending_payments || 0}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            router.push(`/finance/programs/${program.id}`);
+                                          }}
+                                          className="p-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors"
+                                          title="View Details"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="text-center py-16">
+                            <div className="bg-[#8B5CF6]/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <svg className="w-10 h-10 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                              </svg>
+                            </div>
+                            <p className="text-[#94A3B8] text-lg font-medium">
+                              {programSearch || programStatusFilter !== 'all' 
+                                ? 'No programs match your filters' 
+                                : 'No programs found'}
+                            </p>
+                            <p className="text-[#64748B] text-sm mt-2">
+                              {programSearch || programStatusFilter !== 'all'
+                                ? 'Try adjusting your search or filter criteria'
+                                : 'This organization hasn\'t created any bug bounty programs yet'}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -793,7 +922,8 @@ export default function OrganizationDetailPage() {
             </div>
           </>
         )}
-      </PortalShell>
+        </PortalShell>
+      )}
     </ProtectedRoute>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Line, LineChart as RechartsLineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface LineChartProps {
   data: any[];
@@ -16,42 +16,61 @@ interface LineChartProps {
 export default function LineChart({ data, xKey, lines, height = 300 }: LineChartProps) {
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <RechartsLineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+      <AreaChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
+        <defs>
+          {lines.map((line) => (
+            <linearGradient key={`gradient-${line.key}`} id={`gradient-${line.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={line.color} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={line.color} stopOpacity={0} />
+            </linearGradient>
+          ))}
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} vertical={false} />
         <XAxis 
           dataKey={xKey} 
-          stroke="#94A3B8"
+          stroke="#64748B"
           style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748B' }}
+          axisLine={false}
+          tickLine={false}
         />
         <YAxis 
-          stroke="#94A3B8"
+          stroke="#64748B"
           style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748B' }}
+          axisLine={false}
+          tickLine={false}
         />
         <Tooltip
-          contentStyle={{
-            backgroundColor: '#1E293B',
-            border: '1px solid #334155',
-            borderRadius: '8px',
-            color: '#F8FAFC',
+          content={({ active, payload, label }) => {
+            if (active && payload && payload.length) {
+              return (
+                <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3 shadow-xl">
+                  <p className="text-[#94A3B8] font-semibold text-xs mb-1">{label}</p>
+                  {payload.map((entry: any, index: number) => (
+                    <p key={index} className="text-[#F8FAFC] font-bold text-sm">
+                      {entry.value} {entry.name}
+                    </p>
+                  ))}
+                </div>
+              );
+            }
+            return null;
           }}
-          labelStyle={{ color: '#94A3B8' }}
-        />
-        <Legend 
-          wrapperStyle={{ color: '#94A3B8', fontSize: '12px' }}
         />
         {lines.map((line) => (
-          <Line
-            key={line.key}
+          <Area
+            key={`area-${line.key}`}
             type="monotone"
             dataKey={line.key}
             stroke={line.color}
-            strokeWidth={2}
-            name={line.name}
-            dot={{ fill: line.color, r: 4 }}
-            activeDot={{ r: 6 }}
+            strokeWidth={3}
+            fill={`url(#gradient-${line.key})`}
+            dot={{ r: 3, fill: line.color, strokeWidth: 0 }}
+            activeDot={{ fill: '#FFFFFF', stroke: line.color, strokeWidth: 4, r: 6 }}
           />
         ))}
-      </RechartsLineChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }

@@ -20,10 +20,11 @@ export default function AdminPlatformPage() {
 
   const { data: platformStats } = useApiQuery<any>({
     endpoint: '/admin/platform/status',
+    // Added in admin.py as a new route
   });
 
   return (
-    <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+    <ProtectedRoute allowedRoles={['admin']}>
       {user ? (
         <PortalShell
           user={user}

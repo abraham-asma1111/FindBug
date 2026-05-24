@@ -30,10 +30,10 @@ export default function RootLayout({
                 try {
                   // Check if we're on a finance or triage portal page
                   const path = window.location.pathname;
-                  const isFinanceOrTriage = path.startsWith('/finance') || path.startsWith('/triage');
+                  const isForceDark = path.startsWith('/finance') || path.startsWith('/triage') || path.startsWith('/admin');
                   
-                  if (isFinanceOrTriage) {
-                    // Force dark mode for finance and triage portals
+                  if (isForceDark) {
+                    // Force dark mode for finance, triage, and platform wallet portals
                     document.documentElement.classList.add('dark');
                   } else {
                     // For other pages, check localStorage

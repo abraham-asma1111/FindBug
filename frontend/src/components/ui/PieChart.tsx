@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, memo } from 'react';
+import { Pie, PieChart as RechartsPieChart, ResponsiveContainer, Cell, Legend } from 'recharts';
 
 interface PieChartData {
   label: string;
@@ -17,167 +17,125 @@ interface PieChartProps {
   className?: string;
 }
 
-const PieChart = memo(function PieChart({ 
+export default function PieChart({ 
   data, 
-  size = 200, 
-  strokeWidth = 2, 
-  showLabels = true,
+  size = 220, 
   showLegend = true,
   className = '' 
 }: PieChartProps) {
-  const { segments, total, hasData } = useMemo(() => {
-    const total = data.reduce((sum, item) => sum + item.value, 0);
-    const hasData = total > 0;
-    
-    // Always create equal segments for visualization (divided equally)
-    // Start from -90 degrees to account for SVG rotation, so first item appears at top
-    const equalSegments = data.map((item, index) => {
-      const percentage = 100 / data.length; // Equal percentage for each
-      const startAngle = (index * percentage) * 3.6 - 90; // Subtract 90 to start from top
-      const endAngle = ((index + 1) * percentage) * 3.6 - 90;
-      
-      return {
-        ...item,
-        originalValue: item.value, // Keep original value for display
-        value: 1, // Equal value for equal portions
-        percentage: hasData ? (item.value / total) * 100 : 0, // Real percentage for display
-        startAngle,
-        endAngle,
-      };
-    });
-    
-    return { segments: equalSegments, total, hasData };
-  }, [data]);
+  // Calculate total
+  const total = data.reduce((sum, item) => sum + item.value, 0);
 
-  const radius = (size - strokeWidth) / 2;
-  const center = size / 2;
+  // Transform data for Recharts
+  const chartData = data.map(item => ({
+    name: item.label,
+    value: item.value,
+    color: item.color,
+  }));
 
-  const createArcPath = (startAngle: number, endAngle: number) => {
-    // Handle full circle case
-    if (endAngle - startAngle >= 360) {
-      return `M ${center - radius} ${center} A ${radius} ${radius} 0 1 1 ${center + radius} ${center} A ${radius} ${radius} 0 1 1 ${center - radius} ${center}`;
-    }
+  // Custom legend renderer matching the reference screenshot
+  const renderLegend = (props: any) => {
+    const { payload } = props;
     
-    const start = polarToCartesian(center, center, radius, endAngle);
-    const end = polarToCartesian(center, center, radius, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-    
-    return [
-      "M", center, center,
-      "L", start.x, start.y,
-      "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y,
-      "Z"
-    ].join(" ");
-  };
-
-  const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
-    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
-    return {
-      x: centerX + (radius * Math.cos(angleInRadians)),
-      y: centerY + (radius * Math.sin(angleInRadians))
-    };
+    return (
+      <div className="flex flex-col gap-3 ml-6">
+        {payload.map((entry: any, index: number) => {
+          const percentage = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0.0';
+          return (
+            <div key={`legend-${index}`} className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-sm font-medium text-white capitalize">
+                  {entry.value}
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-white whitespace-nowrap">
+                {entry.value.toLocaleString()} ({percentage}%)
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (data.length === 0) {
     return (
       <div className={`flex items-center justify-center ${className}`}>
         <div 
-          className="rounded-full bg-[#f3f0eb] dark:bg-slate-700 flex items-center justify-center"
+          className="rounded-full bg-slate-700 flex items-center justify-center"
           style={{ width: size, height: size }}
         >
-          <span className="text-sm text-[#8b8177] dark:text-slate-400">No data</span>
+          <span className="text-sm text-slate-400">No data</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col items-center ${className}`}>
-      <div className="relative">
-        <svg width={size} height={size}>
-          {segments.map((segment, index) => (
-            <path
-              key={segment.label}
-              d={createArcPath(segment.startAngle, segment.endAngle)}
-              fill={segment.color}
-              stroke="white"
-              strokeWidth={strokeWidth}
-              className="transition-opacity hover:opacity-80 dark:stroke-slate-800"
-            />
-          ))}
-        </svg>
+    <div className={`flex items-center ${className}`}>
+      <div className="relative" style={{ width: size, height: size }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RechartsPieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={size * 0.35}
+              outerRadius={size * 0.45}
+              paddingAngle={2}
+              dataKey="value"
+              startAngle={90}
+              endAngle={450}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+              ))}
+            </Pie>
+          </RechartsPieChart>
+        </ResponsiveContainer>
         
-        {/* Labels on slices */}
-        <svg width={size} height={size} className="absolute inset-0 pointer-events-none">
-          {segments.map((segment) => {
-            // Calculate the middle angle of the segment
-            const middleAngle = (segment.startAngle + segment.endAngle) / 2;
-            // Position label at 70% of radius from center
-            const labelRadius = radius * 0.7;
-            const labelPos = polarToCartesian(center, center, labelRadius, middleAngle);
-            
-            return (
-              <g key={`label-${segment.label}`}>
-                <text
-                  x={labelPos.x}
-                  y={labelPos.y - 7}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-xs font-bold fill-white dark:fill-white"
-                  style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
-                >
-                  {segment.label}
-                </text>
-                <text
-                  x={labelPos.x}
-                  y={labelPos.y + 7}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-sm font-bold fill-white dark:fill-white"
-                  style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
-                >
-                  {segment.originalValue ?? segment.value}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-        
-        {/* Center label showing total */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-bold text-[#2d2a26] dark:text-white">{total}</span>
-          <span className="text-xs text-[#8b8177] dark:text-slate-400 uppercase tracking-wider">Total</span>
+        {/* Center text showing total */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center flex flex-col items-center justify-center mt-1">
+            <span className="text-[32px] font-bold text-white leading-none tracking-tight">{total.toLocaleString()}</span>
+            <span className="text-[13px] text-[#94A3B8] mt-1">Total</span>
+          </div>
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend on the right */}
       {showLegend && (
-        <div className="mt-4 grid grid-cols-2 gap-3 w-full max-w-xs">
-          {segments.map((segment) => (
-            <div key={segment.label} className="flex items-center gap-2">
-              <div 
-                className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: segment.color }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#2d2a26] dark:text-slate-100 capitalize truncate">
-                    {segment.label}
-                  </span>
-                  <span className="text-sm font-bold text-[#2d2a26] dark:text-slate-100 ml-2">
-                    {segment.originalValue ?? segment.value}
+        <div className="flex flex-col gap-3 ml-6">
+          {chartData.map((entry, index) => {
+            const percentage = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0.0';
+            return (
+              <div key={`legend-${index}`} className="flex items-center justify-between gap-4 min-w-[200px]">
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: entry.color }}
+                  />
+                  <span className="text-sm font-medium text-white capitalize">
+                    {entry.name}
                   </span>
                 </div>
-                <div className="text-xs text-[#8b8177] dark:text-slate-400">
-                  {segment.percentage.toFixed(1)}%
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-white whitespace-nowrap">
+                    {entry.value.toLocaleString()}
+                  </span>
+                  <span className="text-xs font-medium text-[#94A3B8] whitespace-nowrap">
+                    ({percentage}%)
+                  </span>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
-});
-
-export default PieChart;
+}

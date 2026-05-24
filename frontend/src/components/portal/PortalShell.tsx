@@ -21,6 +21,7 @@ interface PortalShellProps {
   hideTitle?: boolean;
   hideSubtitle?: boolean;
   hideThemeToggle?: boolean;
+  forceDark?: boolean;
   children: ReactNode;
 }
 
@@ -36,6 +37,7 @@ export default function PortalShell({
   hideTitle = false,
   hideSubtitle = false,
   hideThemeToggle = false,
+  forceDark = false,
   children,
 }: PortalShellProps) {
   const pathname = usePathname();
@@ -45,12 +47,13 @@ export default function PortalShell({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isDarkMode) {
+    const isForceDarkPath = pathname.startsWith('/finance') || pathname.startsWith('/triage') || pathname.startsWith('/admin');
+    if (forceDark || isForceDarkPath || isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isDarkMode]);
+  }, [isDarkMode, forceDark, pathname]);
 
   useEffect(() => {
     const newExpanded = new Set<string>();

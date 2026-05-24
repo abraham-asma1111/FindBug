@@ -4,8 +4,7 @@ export type UserRole =
   | 'staff'
   | 'triage_specialist'
   | 'finance_officer'
-  | 'admin'
-  | 'super_admin';
+  | 'admin';
 
 export interface ResearcherProfile {
   bio?: string | null;
@@ -50,13 +49,25 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
   if (isAdminRole(role)) {
     return [
       { href: '/admin/dashboard', label: 'Dashboard' },
-      { href: '/admin/users', label: 'Users' },
-      { href: '/admin/staff', label: 'Staff' },
       { href: '/admin/programs', label: 'Programs' },
+      { href: '/admin/pentests', label: 'Pentests' },
       { href: '/admin/reports', label: 'Reports' },
-      { href: '/admin/finance', label: 'Finance' },
-      { href: '/admin/platform', label: 'Platform' },
-      { href: '/admin/audit-logs', label: 'Audit Logs' },
+      { href: '/finance/payments?tab=bounty-payments&status=approved', label: 'Bounties' },
+      { href: '/admin/activity-logs', label: 'Activity Logs' },
+      { href: '/admin/analytics', label: 'Analytics' },
+      { href: '/admin/platform-wallet', label: 'Platform Wallet' },
+      { href: '/admin/notifications', label: 'Notifications' },
+      { href: '/admin/messages', label: 'Messages' },
+      { 
+        href: '/admin/users', 
+        label: 'Users & Roles',
+        children: [
+          { href: '/admin/users', label: 'All Users' },
+          { href: '/admin/staff', label: 'Staff' },
+        ]
+      },
+      { href: '/admin/settings', label: 'Settings' },
+      { href: '/admin/system-health', label: 'System Health' },
     ];
   }
 
@@ -94,18 +105,15 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       // OVERVIEW
       { href: '/finance/dashboard', label: 'Dashboard', category: 'OVERVIEW' },
       { href: '/finance/analytics', label: 'Analytics', category: 'OVERVIEW' },
-      { href: '/finance/platform-wallet', label: 'Platform Wallet', category: 'OVERVIEW' },
       
       // PAYMENTS
       { 
         href: '/finance/payments', 
-        label: 'Bounty Payments',
+        label: 'Payments',
         category: 'PAYMENTS',
         children: [
-          { href: '/finance/payments?status=approved', label: 'Awaiting Processing' },
-          { href: '/finance/payments?status=completed', label: 'Processed' },
-          { href: '/finance/payments?status=pending', label: 'Pending Approval' },
-          { href: '/finance/payments?status=rejected', label: 'Rejected' },
+          { href: '/finance/payments?tab=bounty-payments&status=approved', label: 'Bounty Payments' },
+          { href: '/finance/payments?tab=payouts&status=pending', label: 'Payouts' },
         ]
       },
       { 
@@ -116,16 +124,6 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
           { href: '/finance/payment-methods?status=pending', label: 'Pending' },
           { href: '/finance/payment-methods?status=approved', label: 'Approved' },
           { href: '/finance/payment-methods?status=rejected', label: 'Rejected' },
-        ]
-      },
-      { 
-        href: '/finance/payouts', 
-        label: 'Payouts',
-        category: 'PAYMENTS',
-        children: [
-          { href: '/finance/payouts?status=pending', label: 'Requested' },
-          { href: '/finance/payouts?status=processing', label: 'Processing' },
-          { href: '/finance/payouts?status=completed', label: 'Completed' },
         ]
       },
       { 
@@ -145,8 +143,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       { href: '/finance/billing', label: 'Invoices & Billing', category: 'FINANCIAL OPERATIONS' },
       
       // REPORTS
-      { href: '/finance/reports', label: 'Financial Reports', category: 'REPORTS' },
-      { href: '/finance/reports/payouts', label: 'Payout Reports', category: 'REPORTS' },
+      { href: '/finance/reports', label: 'Reports', category: 'REPORTS' },
       
       // SETTINGS
       { href: '/finance/settings/payment-methods', label: 'Payment Methods', category: 'SETTINGS' },
@@ -229,7 +226,7 @@ export function isStaffRole(role: UserRole): boolean {
 }
 
 export function isAdminRole(role: UserRole): boolean {
-  return role === 'admin' || role === 'super_admin';
+  return role === 'admin';
 }
 
 export function getDashboardRouteForRole(role: UserRole): string {
@@ -264,8 +261,6 @@ export function getPortalName(role: UserRole): string {
       return 'Finance Desk';
     case 'admin':
       return 'Admin Console';
-    case 'super_admin':
-      return 'Super Admin Console';
     default:
       return 'Operations Desk';
   }
@@ -283,8 +278,6 @@ export function getRoleLabel(role: UserRole): string {
       return 'Finance Officer';
     case 'admin':
       return 'Administrator';
-    case 'super_admin':
-      return 'Super Admin';
     default:
       return 'Platform Staff';
   }
