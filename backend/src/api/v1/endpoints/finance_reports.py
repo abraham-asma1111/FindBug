@@ -54,9 +54,9 @@ async def generate_payments_report(
         query = db.query(
             BountyPayment,
             Researcher.username.label('researcher_name'),
-            Organization.name.label('organization_name'),
+            Organization.company_name.label('organization_name'),
             VulnerabilityReport.title.label('report_title'),
-            VulnerabilityReport.severity.label('severity')
+            VulnerabilityReport.assigned_severity.label('severity')
         ).join(
             Researcher, BountyPayment.researcher_id == Researcher.id
         ).join(
@@ -93,10 +93,16 @@ async def generate_payments_report(
             for p in payments
         ]
         
-        # Calculate summary
+        # Calculate summary from FILTERED data only
         total_payments = len(data)
-        total_amount = sum(d['researcher_amount'] for d in data)
+        total_amount = sum(d['total_amount'] for d in data)  # Sum of total amounts (researcher + commission)
         total_commission = sum(d['commission_amount'] for d in data)
+        
+        # Debug logging
+        print(f"DEBUG: Date range: {start.date()} to {end.date()}")
+        print(f"DEBUG: Found {total_payments} payments")
+        print(f"DEBUG: Total amount (researcher + commission): {total_amount} ETB")
+        print(f"DEBUG: First few payments: {[d['created_at'] for d in data[:3]]}")
         
         if format == 'csv':
             # Generate CSV
@@ -116,10 +122,10 @@ async def generate_payments_report(
             'start_date': start.isoformat(),
             'end_date': end.isoformat(),
             'summary': {
-                'total_payments': total_payments,
+                'total_transactions': total_payments,
                 'total_amount': total_amount,
                 'total_commission': total_commission,
-                'average_payment': total_amount / total_payments if total_payments > 0 else 0
+                'average_amount': total_amount / total_payments if total_payments > 0 else 0
             },
             'data': data
         }
@@ -262,14 +268,14 @@ async def generate_financial_summary(
         
         # Revenue by organization
         org_revenue = db.query(
-            Organization.name,
+            Organization.company_name,
             func.sum(BountyPayment.total_amount).label('revenue')
         ).join(
             BountyPayment, BountyPayment.organization_id == Organization.id
         ).filter(
             BountyPayment.created_at >= start,
             BountyPayment.created_at <= end
-        ).group_by(Organization.name).all()
+        ).group_by(Organization.company_name).all()
         
         return {
             'report_type': 'financial_summary',
@@ -288,7 +294,7 @@ async def generate_financial_summary(
                 'total': float(payouts.total or 0)
             },
             'revenue_by_organization': [
-                {'organization': r.name, 'revenue': float(r.revenue)}
+                {'organization': r.company_name, 'revenue': float(r.revenue)}
                 for r in org_revenue
             ],
             'net_revenue': float(payments.commission_total or 0)

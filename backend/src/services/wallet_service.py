@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from src.domain.models.bounty_payment import Wallet, WalletTransaction
+from src.services.audit_service import AuditService
 
 
 class WalletService:
@@ -23,6 +24,7 @@ class WalletService:
     
     def __init__(self, db: Session):
         self.db = db
+        self.audit_service = AuditService(db)
     
     def get_or_create_wallet(
         self,
@@ -114,6 +116,26 @@ class WalletService:
         self.db.commit()
         self.db.refresh(wallet)
         
+        try:
+            self.audit_service.log_action(
+                action_type="wallet_reserve_funds",
+                action_category="bounty",
+                target_type="wallet",
+                description=transaction.description,
+                actor_id=owner_id,
+                actor_role=owner_type,
+                target_id=wallet.wallet_id,
+                metadata={
+                    "amount": float(amount),
+                    "currency": wallet.currency,
+                    "reference_type": reference_type,
+                    "saga_id": saga_id
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
+        
         return {
             "success": True,
             "wallet_id": str(wallet.wallet_id),
@@ -167,6 +189,26 @@ class WalletService:
         self.db.add(transaction)
         self.db.commit()
         self.db.refresh(wallet)
+        
+        try:
+            self.audit_service.log_action(
+                action_type="wallet_credit",
+                action_category="bounty",
+                target_type="wallet",
+                description=transaction.description,
+                actor_id=owner_id,
+                actor_role=owner_type,
+                target_id=wallet.wallet_id,
+                metadata={
+                    "amount": float(amount),
+                    "currency": wallet.currency,
+                    "reference_type": reference_type,
+                    "saga_id": saga_id
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return {
             "success": True,
@@ -238,6 +280,27 @@ class WalletService:
         self.db.add(transaction)
         self.db.commit()
         self.db.refresh(wallet)
+        
+        try:
+            self.audit_service.log_action(
+                action_type="wallet_debit",
+                action_category="bounty",
+                target_type="wallet",
+                description=transaction.description,
+                actor_id=owner_id,
+                actor_role=owner_type,
+                target_id=wallet.wallet_id,
+                metadata={
+                    "amount": float(amount),
+                    "currency": wallet.currency,
+                    "reference_type": reference_type,
+                    "from_reserved": from_reserved,
+                    "saga_id": saga_id
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return {
             "success": True,

@@ -1044,17 +1044,23 @@ class PaymentService:
         """
         from src.domain.models.payment_extended import PaymentMethod
         from src.services.kyc_service import KYCService
+        from src.domain.models.user import User
         from fastapi import HTTPException, status
         
-        # Check KYC verification
-        kyc_service = KYCService(self.db)
-        kyc_status = kyc_service.get_kyc_status(user_id)
+        # Check if user is admin/super_admin to bypass KYC
+        user = self.db.query(User).filter(User.id == UUID(user_id)).first()
+        is_admin = user and user.role.lower() in ["admin", "super_admin"]
         
-        if kyc_status["status"] != "approved":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="KYC verification required to access payment methods"
-            )
+        if not is_admin:
+            # Check KYC verification
+            kyc_service = KYCService(self.db)
+            kyc_status = kyc_service.get_kyc_status(user_id)
+            
+            if kyc_status["status"] != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="KYC verification required to access payment methods"
+                )
         
         return self.db.query(PaymentMethod).filter(
             PaymentMethod.user_id == UUID(user_id)
@@ -1077,17 +1083,23 @@ class PaymentService:
         """
         from src.domain.models.payment_extended import PaymentMethod
         from src.services.kyc_service import KYCService
+        from src.domain.models.user import User
         from fastapi import HTTPException, status
         
-        # Check KYC verification
-        kyc_service = KYCService(self.db)
-        kyc_status = kyc_service.get_kyc_status(user_id)
+        # Check if user is admin/super_admin to bypass KYC
+        user = self.db.query(User).filter(User.id == UUID(user_id)).first()
+        is_admin = user and user.role.lower() in ["admin", "super_admin"]
         
-        if kyc_status["status"] != "approved":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="KYC verification required to add payment methods"
-            )
+        if not is_admin:
+            # Check KYC verification
+            kyc_service = KYCService(self.db)
+            kyc_status = kyc_service.get_kyc_status(user_id)
+            
+            if kyc_status["status"] != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="KYC verification required to add payment methods"
+                )
         
         # If this is set as default, unset other defaults
         if method_data.get("is_default", False):

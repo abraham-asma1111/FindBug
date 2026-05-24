@@ -559,7 +559,6 @@ async def get_payment_methods(
         methods = service.get_user_payment_methods(str(user_id))
         return [PaymentMethodResponse.from_orm(method) for method in methods]
     except HTTPException:
-        # Re-raise HTTP exceptions (like 403 for KYC) without wrapping
         raise
     except Exception as e:
         raise HTTPException(
@@ -578,6 +577,8 @@ async def add_payment_method(
         service = PaymentService(db)
         method = service.add_payment_method(str(user_id), method_data.dict())
         return PaymentMethodResponse.from_orm(method)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

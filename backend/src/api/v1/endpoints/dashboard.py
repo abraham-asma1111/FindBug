@@ -23,6 +23,7 @@ def get_dashboard(
     - researcher → researcher dashboard
     - organization → organization dashboard
     - staff/admin → staff dashboard
+    - finance_officer → admin dashboard (platform-wide financial view)
     """
     service = DashboardService(db)
     
@@ -43,8 +44,8 @@ def get_dashboard(
                 )
             return service.get_organization_dashboard(organization_id=current_user.organization.id)
         
-        elif current_user.role in ["staff", "admin"]:
-            if current_user.is_admin():
+        elif current_user.role in ["staff", "admin", "finance_officer"]:
+            if current_user.is_admin() or current_user.role == "finance_officer":
                 return service.get_admin_dashboard()
             else:
                 return service.get_staff_dashboard()

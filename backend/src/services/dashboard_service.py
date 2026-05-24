@@ -655,6 +655,24 @@ class DashboardService:
         # Monthly growth trend
         monthly_growth = self._get_platform_monthly_growth()
         
+        # Recent reports (last 10)
+        recent_reports_query = self.db.query(VulnerabilityReport).order_by(
+            desc(VulnerabilityReport.submitted_at)
+        ).limit(10).all()
+        
+        recent_reports = [
+            {
+                'id': str(report.id),
+                'report_number': report.report_number,
+                'title': report.title,
+                'status': report.status,
+                'assigned_severity': report.assigned_severity,
+                'submitted_at': report.submitted_at.isoformat() if report.submitted_at else None,
+                'program_name': report.program.name if report.program else None
+            }
+            for report in recent_reports_query
+        ]
+        
         return {
             'users': {
                 'total': total_users,
@@ -666,7 +684,13 @@ class DashboardService:
             'programs': {
                 'total': total_programs,
                 'active': active_programs,
-                'new_30d': new_programs_30d
+                'new_30d': new_programs_30d,
+                'top_programs': self._get_top_programs_by_reports(
+                    [p.id for p in self.db.query(BountyProgram).filter(
+                        BountyProgram.deleted_at.is_(None)
+                    ).all()],
+                    limit=5
+                )
             },
             'reports': {
                 'total': total_reports,
@@ -702,7 +726,8 @@ class DashboardService:
                 'pending_triage': pending_triage,
                 'overdue_payouts': overdue_payouts
             },
-            'monthly_growth': monthly_growth
+            'monthly_growth': monthly_growth,
+            'recent_reports': recent_reports
         }
     
     def _get_platform_monthly_growth(self, months: int = 6) -> List[Dict]:

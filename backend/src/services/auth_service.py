@@ -25,6 +25,7 @@ from src.domain.repositories.user_repository import UserRepository
 from src.domain.repositories.researcher_repository import ResearcherRepository
 from src.domain.repositories.organization_repository import OrganizationRepository
 from src.core.logging import get_logger
+from src.services.audit_service import AuditService
 
 logger = get_logger(__name__)
 
@@ -53,6 +54,7 @@ class AuthService:
         self.researcher_repo = researcher_repo
         self.organization_repo = organization_repo
         self.db = db
+        self.audit_service = AuditService(db)
     
     # ═══════════════════════════════════════════════════════════════════════
     # SECURITY LOGGING HELPERS
@@ -271,6 +273,16 @@ class AuthService:
             ip_address=ip_address
         )
         
+        # Audit log: user created (for activity log)
+        try:
+            self.audit_service.log_user_created(
+                user_id=user.id,
+                user_email=email,
+                user_role="researcher"
+            )
+        except Exception:
+            pass
+        
         logger.info("Researcher registered successfully", extra={
             "user_id": str(user.id),
             "username": username,
@@ -370,6 +382,16 @@ class AuthService:
             severity="low",
             ip_address=ip_address
         )
+        
+        # Audit log: organization user created
+        try:
+            self.audit_service.log_user_created(
+                user_id=user.id,
+                user_email=email,
+                user_role="organization"
+            )
+        except Exception:
+            pass
         
         logger.info("Organization registered successfully", extra={
             "user_id": str(user.id),

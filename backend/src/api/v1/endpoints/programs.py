@@ -436,7 +436,20 @@ def publish_program(
         program_id,
         current_user.organization.id
     )
-    
+
+    # Notify all admins about the new program
+    try:
+        from src.services.notification_service import NotificationService
+        notification_service = NotificationService(db)
+        org_name = current_user.organization.company_name if current_user.organization else "An organization"
+        notification_service.notify_admin_program_created(
+            program_name=program.name,
+            organization_name=org_name,
+            program_id=program.id,
+        )
+    except Exception:
+        pass  # Notifications are non-blocking
+
     return program
 
 

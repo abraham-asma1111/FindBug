@@ -213,58 +213,10 @@ def process_bounty_payment(
         from src.services.payment_service import PaymentService
         from decimal import Decimal
         from datetime import datetime
-        import uuid
-        
-        wallet_service = WalletService(db)
-        payment_service = PaymentService(db)
-        
-        # Generate saga ID for this transaction
-        saga_id = f"PROCESS-{uuid.uuid4().hex[:12].upper()}"
-        
-        # Step 1: Get researcher's user_id
-        researcher = db.query(Researcher).filter(
-            Researcher.id == payment.researcher_id
-        ).first()
-        
-        if not researcher:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Researcher not found"
-            )
-        
-        # Step 2: Credit researcher wallet
-        wallet_service.credit_wallet(
-            owner_id=researcher.user_id,  # Use user_id, not researcher_id
-            owner_type="researcher",
-            amount=Decimal(str(payment.researcher_amount)),
-            saga_id=saga_id,
-            reference_type="bounty_payment",
-            reference_id=payment.payment_id
-        )
-        
-        # Step 3: Debit platform wallet (only researcher_amount, commission stays)
-        # Get platform user (first admin or finance officer)
-        from src.domain.models.user import User as UserModel
-        platform_user = db.query(UserModel).filter(UserModel.role == "admin").first()
-        if not platform_user:
-            platform_user = db.query(UserModel).filter(UserModel.role == "finance_officer").first()
-        
-        if not platform_user:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Platform wallet user not found"
-            )
-        
-        wallet_service.debit_wallet(
-            owner_id=platform_user.id,
-            owner_type="platform",
-            amount=Decimal(str(payment.researcher_amount)),
-            saga_id=saga_id,
-            from_reserved=False,
-            reference_type="bounty_payment",
-            reference_id=payment.payment_id
-        )
+        # The wallet transactions (crediting researcher and platform commission) 
+        # are already handled in approve_bounty_payment. 
+        # Here we only need to update the status to completed.
+
         
         # Step 4: Update payment status
         payment.status = "completed"

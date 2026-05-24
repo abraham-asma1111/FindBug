@@ -25,6 +25,7 @@ from src.domain.models.subscription import (
     SubscriptionStatus
 )
 from src.domain.models.organization import Organization
+from src.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class SubscriptionService:
     
     def __init__(self, db: Session):
         self.db = db
+        self.audit_service = AuditService(db)
     
     def create_subscription(
         self,
@@ -187,6 +189,25 @@ class SubscriptionService:
             except Exception as e:
                 logger.error(f"Failed to auto-pay from wallet: {str(e)}")
                 # Don't fail subscription creation, just log the error
+        
+        try:
+            self.audit_service.log_action(
+                action_type="subscription_created",
+                action_category="config",
+                target_type="organization",
+                description=f"Created {tier} subscription for organization",
+                actor_id=organization_id,
+                actor_role="organization",
+                target_id=organization_id,
+                metadata={
+                    "tier": tier,
+                    "subscription_id": str(subscription.subscription_id),
+                    "fee": float(tier_pricing.quarterly_price)
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return subscription
     
@@ -382,6 +403,25 @@ class SubscriptionService:
         # Process subscription renewal
         self.process_subscription_renewal(payment.subscription_id)
         
+        try:
+            self.audit_service.log_action(
+                action_type="subscription_renewed",
+                action_category="config",
+                target_type="organization",
+                description=f"Subscription renewed (Payment {payment_id}) via {payment_method}",
+                actor_id=payment.organization_id,
+                actor_role="organization",
+                target_id=payment.organization_id,
+                metadata={
+                    "payment_id": str(payment_id),
+                    "amount": float(payment.amount),
+                    "payment_method": payment_method
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
+        
         return payment
     
     def cancel_subscription(
@@ -419,6 +459,25 @@ class SubscriptionService:
             f"Deleted subscription {subscription_id} for org {org_id}: "
             f"tier={tier}, reason={reason}"
         )
+        
+        try:
+            self.audit_service.log_action(
+                action_type="subscription_cancelled",
+                action_category="config",
+                target_type="organization",
+                description=f"Cancelled {tier} subscription",
+                actor_id=org_id,
+                actor_role="organization",
+                target_id=org_id,
+                metadata={
+                    "tier": tier,
+                    "subscription_id": str(subscription_id),
+                    "reason": reason
+                },
+                severity="medium"
+            )
+        except Exception:
+            pass
         
         return {
             "message": "Subscription cancelled successfully",

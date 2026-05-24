@@ -13,6 +13,7 @@ from src.domain.models.program import (
 from src.domain.repositories.program_repository import ProgramRepository
 from src.domain.repositories.organization_repository import OrganizationRepository
 from src.domain.repositories.researcher_repository import ResearcherRepository
+from src.services.audit_service import AuditService
 
 
 class ProgramService:
@@ -23,6 +24,7 @@ class ProgramService:
         self.program_repo = ProgramRepository(db)
         self.org_repo = OrganizationRepository(db)
         self.researcher_repo = ResearcherRepository(db)
+        self.audit_service = AuditService(db)
     
     def create_program(
         self,
@@ -77,7 +79,20 @@ class ProgramService:
             response_sla_hours=response_sla_hours
         )
         
-        return self.program_repo.create_program(program)
+        program = self.program_repo.create_program(program)
+        
+        # Audit log: program created
+        try:
+            self.audit_service.log_program_created(
+                program_id=program.id,
+                program_name=name,
+                organization_id=organization_id,
+                organization_email=org.user.email if hasattr(org, 'user') and org.user else str(organization_id)
+            )
+        except Exception:
+            pass  # Don't fail if audit logging fails
+        
+        return program
     
     def get_program(self, program_id: UUID) -> BountyProgram:
         """Get program by ID."""
@@ -223,6 +238,22 @@ class ProgramService:
         self.db.commit()
         self.db.refresh(participation)
         
+        # Audit log: researcher joined program
+        try:
+            self.audit_service.log_action(
+                action_type="researcher_joined_program",
+                action_category="program",
+                target_type="program",
+                description=f"Researcher joined program: {program.name}",
+                actor_id=researcher_id,
+                actor_role="researcher",
+                target_id=program_id,
+                metadata={"program_name": program.name},
+                severity="info"
+            )
+        except Exception:
+            pass
+        
         return participation
     
     def get_researcher_participations(
@@ -304,7 +335,25 @@ class ProgramService:
         program.visibility = "public"
         program.start_date = datetime.utcnow()
         
-        return self.program_repo.update_program(program)
+        result = self.program_repo.update_program(program)
+        
+        # Audit log: program published
+        try:
+            self.audit_service.log_action(
+                action_type="program_published",
+                action_category="program",
+                target_type="program",
+                description=f"Program published: {result.name}",
+                actor_id=organization_id,
+                actor_role="organization",
+                target_id=program_id,
+                metadata={"program_name": result.name, "status": "public"},
+                severity="info"
+            )
+        except Exception:
+            pass
+        
+        return result
     
     def add_scope(
         self,

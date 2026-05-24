@@ -265,10 +265,10 @@ class FinancialAnalyticsService:
         end_date: Optional[datetime] = None
     ) -> Dict[str, Any]:
         """
-        Bounty economics: payouts, severity distribution, top researchers
+        Bounty economics: payouts, severity distribution, top researchers, monthly trend
         """
         if not start_date:
-            start_date = datetime.utcnow() - timedelta(days=90)
+            start_date = datetime.utcnow() - timedelta(days=365)
         if not end_date:
             end_date = datetime.utcnow()
         
@@ -280,6 +280,9 @@ class FinancialAnalyticsService:
         
         # Top researchers
         top_researchers = self._get_top_researchers(start_date, end_date)
+        
+        # Monthly trend (bounties + commissions per month)
+        monthly_trend = self._get_monthly_bounty_trend(start_date, end_date)
         
         # Total payouts
         total_payouts = self.db.query(
@@ -295,6 +298,7 @@ class FinancialAnalyticsService:
             'average_bounty_by_severity': bounty_by_severity,
             'payout_distribution': payout_distribution,
             'top_researchers': top_researchers,
+            'monthly_trend': monthly_trend,
             'period': {
                 'start': start_date.isoformat(),
                 'end': end_date.isoformat()
@@ -388,6 +392,85 @@ class FinancialAnalyticsService:
             }
             for r in results
         ]
+    
+    def _get_monthly_bounty_trend(self, start_date: datetime, end_date: datetime) -> List[Dict]:
+        """Get monthly bounty payouts and commission trend for line chart"""
+        import calendar
+        results = self.db.query(
+            extract('year', BountyPayment.created_at).label('year'),
+            extract('month', BountyPayment.created_at).label('month'),
+            func.sum(BountyPayment.researcher_amount).label('total_bounties'),
+            func.sum(BountyPayment.commission_amount).label('total_commission'),
+            func.count(BountyPayment.payment_id).label('payment_count')
+        ).filter(
+            BountyPayment.created_at >= start_date,
+            BountyPayment.created_at <= end_date,
+            BountyPayment.status.in_(['completed', 'approved'])
+        ).group_by('year', 'month').order_by('year', 'month').all()
+        
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        return [
+            {
+                'year': int(r.year),
+                'month': int(r.month),
+                'month_label': month_names[int(r.month) - 1],
+                'total_bounties': float(r.total_bounties or 0),
+                'total_commission': float(r.total_commission or 0),
+                'payment_count': r.payment_count
+            }
+            for r in results
+        ]
+    
+    def get_recent_payments(
+        self,
+        limit: int = 10
+    ) -> List[Dict]:
+        """
+        Get recent bounty payments enriched with researcher, report, and program info.
+        Used for the Finance Dashboard recent payouts table.
+        """
+        from sqlalchemy.orm import joinedload
+        payments = self.db.query(BountyPayment).filter(
+            BountyPayment.status.in_(['completed', 'approved', 'processing', 'pending'])
+        ).order_by(BountyPayment.created_at.desc()).limit(limit).all()
+        
+        result = []
+        for p in payments:
+            # Fetch related report
+            report = self.db.query(VulnerabilityReport).filter(
+                VulnerabilityReport.id == p.report_id
+            ).first() if p.report_id else None
+            
+            # Fetch researcher
+            researcher = self.db.query(Researcher).filter(
+                Researcher.id == p.researcher_id
+            ).first() if p.researcher_id else None
+            
+            # Fetch program via report
+            program = self.db.query(BountyProgram).filter(
+                BountyProgram.id == report.program_id
+            ).first() if report and report.program_id else None
+            
+            result.append({
+                'payment_id': str(p.payment_id),
+                'transaction_id': p.transaction_id,
+                'researcher_name': researcher.username if researcher else 'Unknown',
+                'researcher_id': str(p.researcher_id) if p.researcher_id else None,
+                'report_title': report.title if report else 'N/A',
+                'report_number': report.report_number if report else None,
+                'program_name': program.name if program else 'N/A',
+                'severity': report.assigned_severity if report else None,
+                'researcher_amount': float(p.researcher_amount),
+                'commission_amount': float(p.commission_amount),
+                'total_amount': float(p.total_amount),
+                'status': p.status,
+                'payment_method': p.payment_method,
+                'created_at': p.created_at.isoformat() if p.created_at else None,
+                'completed_at': p.completed_at.isoformat() if p.completed_at else None,
+            })
+        
+        return result
     
     # ==================== PROGRAM ECONOMICS ====================
     

@@ -821,7 +821,16 @@ class TriageService:
                 old_status=old_status,
                 new_status=status
             )
-            
+
+            # Notify all admins about the status change
+            notification_service.notify_admin_report_validated(
+                report_title=report.title,
+                report_number=report.report_number,
+                specialist_email=actor_email,
+                new_status=status,
+                report_id=report.id,
+            )
+
             # Log audit trail (FREQ-17)
             self.audit_service.log_report_status_changed(
                 report_id=report_id,

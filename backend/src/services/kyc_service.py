@@ -11,6 +11,7 @@ from src.domain.models.user import User
 from src.core.file_storage import FileStorageService
 from src.core.exceptions import NotFoundException, ForbiddenException, ConflictException
 from src.core.logging import get_logger
+from src.services.audit_service import AuditService
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ class KYCService:
     def __init__(self, db: Session, file_storage: Optional[FileStorageService] = None):
         self.db = db
         self.file_storage = file_storage or FileStorageService(base_path="data/uploads/kyc")
+        self.audit_service = AuditService(db)
         
         # Allowed document types
         self.allowed_document_types = [
@@ -140,6 +142,24 @@ class KYCService:
                 notification_type="KYC_SUBMITTED",
                 data=notification_data
             )
+            
+            try:
+                self.audit_service.log_action(
+                    action_type="kyc_submitted",
+                    action_category="user",
+                    target_type="user",
+                    description=f"KYC submitted by user: {user.email}",
+                    actor_id=UUID(user_id),
+                    actor_role=user.role,
+                    target_id=UUID(user_id),
+                    metadata={
+                        "document_type": document_type,
+                        "kyc_id": str(kyc.id)
+                    },
+                    severity="info"
+                )
+            except Exception:
+                pass
             
             return {
                 "kyc_id": str(kyc.id),
@@ -314,6 +334,25 @@ class KYCService:
                 data=notification_data
             )
         
+        try:
+            self.audit_service.log_action(
+                action_type="kyc_reviewed",
+                action_category="user",
+                target_type="user",
+                description=f"KYC review: {kyc.status} for user {kyc.user.email if kyc.user else kyc.user_id}",
+                actor_id=UUID(reviewer_id),
+                actor_role=reviewer.role,
+                target_id=kyc.user_id,
+                metadata={
+                    "status": kyc.status,
+                    "kyc_id": str(kyc.id),
+                    "rejection_reason": rejection_reason
+                },
+                severity="info" if approved else "medium"
+            )
+        except Exception:
+            pass
+        
         return {
             "kyc_id": str(kyc.id),
             "user_id": str(kyc.user_id),
@@ -404,6 +443,24 @@ class KYCService:
         self.db.refresh(kyc)
         
         logger.info("KYC status updated", extra={"kyc_id": kyc_id, "status": status})
+        
+        try:
+            self.audit_service.log_action(
+                action_type="kyc_status_updated",
+                action_category="user",
+                target_type="user",
+                description=f"KYC status updated to {status} for user {kyc.user_id}",
+                actor_id=kyc.user_id,
+                actor_role="system",
+                target_id=kyc.user_id,
+                metadata={
+                    "status": status,
+                    "kyc_id": str(kyc.id)
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return {
             "kyc_id": str(kyc.id),

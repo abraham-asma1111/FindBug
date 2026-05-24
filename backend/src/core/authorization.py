@@ -24,91 +24,78 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Get current authenticated user from JWT token
-    
-    Args:
-        credentials: HTTP Bearer token
-        db: Database session
-    
-    Returns:
-        User: Current authenticated user
-    
-    Raises:
-        HTTPException: If token is invalid or user not found
+    Get current authenticated user from JWT token.
+    Uses verify_access_token() so signing and verification use the same key.
     """
+    from src.core.security import verify_access_token
+
     token = credentials.credentials
-    
-    try:
-        # Decode JWT token
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM]
-        )
-        user_id: str = payload.get("sub")
-        
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    
-    except JWTError:
+    payload = verify_access_token(token)
+
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Get user from database
-    user = db.query(User).filter(User.id == user_id).first()
-    
+
+    # JWT contains 'user_id' (UUID) and 'sub' (email)
+    user_id: str = payload.get("user_id") or payload.get("sub")
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Look up user — prefer UUID, fall back to email
+    user = None
+    try:
+        from uuid import UUID as _UUID
+        user_uuid = _UUID(str(user_id))
+        user = db.query(User).filter(User.id == user_uuid).first()
+    except (ValueError, AttributeError):
+        user = db.query(User).filter(User.email == user_id).first()
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
-    
+
     return user
 
 
 def require_role(*allowed_roles: str) -> Callable:
     """
-    Dependency to require specific user roles
-    
-    Args:
-        *allowed_roles: Roles that are allowed to access the endpoint
-    
-    Returns:
-        Callable: Dependency function that checks user role
-    
-    Example:
-        @router.get("/admin")
-        def admin_endpoint(user: User = Depends(require_role("admin", "staff"))):
-            ...
+    Dependency to require specific user roles.
+    Passing 'admin' automatically accepts 'super_admin' as well.
     """
+    # Single admin role for this platform
+    expanded = set(allowed_roles)
+
     def role_checker(
         credentials: HTTPAuthorizationCredentials = Depends(security),
         db: Session = Depends(get_db)
     ) -> User:
         user = get_current_user(credentials, db)
-        
-        if user.role not in allowed_roles:
+
+        if user.role not in expanded:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required roles: {', '.join(allowed_roles)}"
             )
-        
+
         return user
-    
+
     return role_checker
 
 

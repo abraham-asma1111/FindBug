@@ -133,12 +133,22 @@ class ReportService:
                 report=report,
                 organization_user_id=program.organization.user_id
             )
-            
+
             # Log audit trail (FREQ-17)
             from src.domain.models.researcher import Researcher
             researcher = self.db.query(Researcher).filter(Researcher.id == researcher_id).first()
             researcher_email = researcher.user.email if researcher and researcher.user else "unknown"
-            
+
+            # Notify all admins about new report submission
+            notification_service.notify_admin_report_submitted(
+                report_title=report.title,
+                report_number=report.report_number,
+                researcher_email=researcher_email,
+                program_name=program.name,
+                report_id=report.id,
+                severity=suggested_severity,
+            )
+
             self.audit_service.log_report_submitted(
                 report_id=report.id,
                 researcher_id=researcher_id,

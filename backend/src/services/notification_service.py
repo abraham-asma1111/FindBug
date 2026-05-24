@@ -289,8 +289,161 @@ class NotificationService:
                 "user_id": str(notification.user_id)
             })
     
+    # ═══════════════════════════════════════════════════════════════════════
+    # ADMIN PLATFORM NOTIFICATIONS
+    # Notify all admin/super_admin users about critical platform events
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _get_admin_user_ids(self) -> List[UUID]:
+        """Return user IDs for all active admin and super_admin users."""
+        admins = self.db.query(User).filter(
+            User.role.in_(["admin", "super_admin"]),
+            User.is_active == True
+        ).all()
+        return [a.id for a in admins]
+
+    def _notify_all_admins(
+        self,
+        notification_type: "NotificationType",
+        priority: "NotificationPriority",
+        title: str,
+        message: str,
+        action_url: Optional[str] = None,
+        action_text: Optional[str] = None,
+        related_entity_type: Optional[str] = None,
+        related_entity_id: Optional[UUID] = None,
+    ) -> List["Notification"]:
+        """Helper: create an in-app notification for every admin user."""
+        notifications = []
+        for admin_id in self._get_admin_user_ids():
+            n = self.create_notification(
+                user_id=admin_id,
+                notification_type=notification_type,
+                priority=priority,
+                title=title,
+                message=message,
+                action_url=action_url,
+                action_text=action_text,
+                related_entity_type=related_entity_type,
+                related_entity_id=related_entity_id,
+                send_email=False,  # avoid email spam on every platform event
+            )
+            notifications.append(n)
+        return notifications
+
+    def notify_admin_program_created(
+        self,
+        program_name: str,
+        organization_name: str,
+        program_id: UUID,
+    ) -> List["Notification"]:
+        """Notify admins when an organization publishes a new program."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.PROGRAM_PUBLISHED,
+            priority=NotificationPriority.MEDIUM,
+            title=f"New Program Published: {program_name}",
+            message=f"{organization_name} has published a new bug bounty program '{program_name}'.",
+            action_url=f"/admin/programs/{program_id}",
+            action_text="View Program",
+            related_entity_type="program",
+            related_entity_id=program_id,
+        )
+
+    def notify_admin_report_submitted(
+        self,
+        report_title: str,
+        report_number: str,
+        researcher_email: str,
+        program_name: str,
+        report_id: UUID,
+        severity: str,
+    ) -> List["Notification"]:
+        """Notify admins when a researcher submits a new vulnerability report."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.REPORT_SUBMITTED,
+            priority=NotificationPriority.HIGH,
+            title=f"New Report Submitted: {report_number}",
+            message=(
+                f"Researcher {researcher_email} submitted report '{report_title}' "
+                f"(Severity: {severity.upper()}) to program '{program_name}'."
+            ),
+            action_url=f"/admin/reports/{report_id}",
+            action_text="Review Report",
+            related_entity_type="report",
+            related_entity_id=report_id,
+        )
+
+    def notify_admin_report_validated(
+        self,
+        report_title: str,
+        report_number: str,
+        specialist_email: str,
+        new_status: str,
+        report_id: UUID,
+    ) -> List["Notification"]:
+        """Notify admins when a triage specialist validates/changes a report status."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.REPORT_STATUS_CHANGED,
+            priority=NotificationPriority.MEDIUM,
+            title=f"Report {report_number} Status: {new_status.title()}",
+            message=(
+                f"Triage specialist {specialist_email} changed report '{report_title}' "
+                f"to status '{new_status}'."
+            ),
+            action_url=f"/admin/reports/{report_id}",
+            action_text="View Report",
+            related_entity_type="report",
+            related_entity_id=report_id,
+        )
+
+    def notify_admin_bounty_approved(
+        self,
+        report_title: str,
+        report_number: str,
+        organization_name: str,
+        bounty_amount: float,
+        report_id: UUID,
+    ) -> List["Notification"]:
+        """Notify admins when an organization approves a bounty."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.BOUNTY_APPROVED,
+            priority=NotificationPriority.HIGH,
+            title=f"Bounty Approved: ${bounty_amount:,.2f} for {report_number}",
+            message=(
+                f"{organization_name} approved a ${bounty_amount:,.2f} bounty "
+                f"for report '{report_title}'."
+            ),
+            action_url=f"/admin/reports/{report_id}",
+            action_text="View Report",
+            related_entity_type="report",
+            related_entity_id=report_id,
+        )
+
+    def notify_admin_payment_processed(
+        self,
+        report_title: str,
+        report_number: str,
+        researcher_email: str,
+        amount: float,
+        report_id: UUID,
+    ) -> List["Notification"]:
+        """Notify admins when finance officer processes a bounty payment."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.BOUNTY_PAID,
+            priority=NotificationPriority.HIGH,
+            title=f"Payment Processed: ${amount:,.2f} — {report_number}",
+            message=(
+                f"Finance processed a ${amount:,.2f} payout to {researcher_email} "
+                f"for report '{report_title}'."
+            ),
+            action_url=f"/admin/reports/{report_id}",
+            action_text="View Report",
+            related_entity_type="report",
+            related_entity_id=report_id,
+        )
+
     # Report Notifications
-    
+
     def notify_report_submitted(
         self,
         report: VulnerabilityReport,
