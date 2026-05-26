@@ -25,6 +25,7 @@ interface Report {
   researcher_email: string;
   submitted_at: string;
   bounty_amount: number | null;
+  is_ptaas?: boolean;
 }
 
 interface ProgramDetail {
@@ -82,9 +83,9 @@ export default function TriageProgramDetailPage() {
     endpoint: `/triage/programs/${programId}`,
   });
 
-  // Fetch program reports
+  // Bug bounty reports only — program_id is a bounty_program UUID (not PTaaS engagement)
   const { data: reportsData, isLoading: reportsLoading, error: reportsError, refetch } = useApiQuery<{ reports: Report[]; total: number }>({
-    endpoint: `/triage/queue?program_id=${programId}&limit=100`,
+    endpoint: `/triage/queue?program_id=${programId}&bug_bounty_only=true&include_all_statuses=true&limit=100`,
   });
 
   const handleRefresh = async () => {
@@ -350,7 +351,13 @@ export default function TriageProgramDetailPage() {
                         )}
                       </div>
                     </div>
-                    <Link href={`/triage/reports/${report.id}`}>
+                    <Link
+                      href={
+                        report.is_ptaas
+                          ? `/triage/ptaas/${report.id}`
+                          : `/triage/reports/${report.id}`
+                      }
+                    >
                       <Button variant="outline" size="sm" className="gap-2">
                         <ExternalLink className="w-4 h-4" />
                         Review

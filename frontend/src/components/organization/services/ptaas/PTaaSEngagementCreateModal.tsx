@@ -97,16 +97,14 @@ export default function PTaaSEngagementCreateModal({
   const [techniqueInput, setTechniqueInput] = useState('');
   const [skillInput, setSkillInput] = useState('');
 
-  const { mutate: createEngagement, isLoading, error } = useApiMutation(
-    '/ptaas/engagements',
-    'POST',
-    {
-      onSuccess: () => {
-        onSuccess();
-        resetForm();
-      },
-    }
-  );
+  const { mutate: createEngagement, isLoading, error } = useApiMutation({
+    endpoint: '/ptaas/engagements',
+    method: 'POST',
+    onSuccess: () => {
+      onSuccess();
+      resetForm();
+    },
+  });
 
   const resetForm = () => {
     setCurrentStep(1);

@@ -66,12 +66,6 @@ export default function OrganizationFindingDetailPage() {
     queryKey: ['finding', findingId]
   });
 
-  // Debug: Log the finding data
-  if (finding) {
-    console.log('Finding data:', finding);
-    console.log('exploit_screenshots:', finding.exploit_screenshots);
-  }
-
   const handleRequestRetest = async () => {
     setIsSubmitting(true);
     try {

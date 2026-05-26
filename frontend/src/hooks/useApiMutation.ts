@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 
 export interface UseApiMutationOptions<TData, TVariables> {
+  endpoint?: string;
   method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   onSuccess?: (data: TData, variables: TVariables) => void;
   onError?: (error: Error, variables: TVariables) => void;
@@ -22,9 +23,25 @@ export interface UseApiMutationResult<TData, TVariables> {
 }
 
 export function useApiMutation<TData = any, TVariables = any>(
-  options: UseApiMutationOptions<TData, TVariables> = {}
+  arg1?: string | UseApiMutationOptions<TData, TVariables>,
+  arg2?: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  arg3?: UseApiMutationOptions<TData, TVariables>
 ): UseApiMutationResult<TData, TVariables> {
-  const { onSuccess, onError, onSettled, method = 'POST' } = options;
+  let configuredEndpoint: string | undefined;
+  let method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'POST';
+  let options: UseApiMutationOptions<TData, TVariables> = {};
+
+  if (typeof arg1 === 'string') {
+    configuredEndpoint = arg1;
+    if (arg2) method = arg2;
+    if (arg3) options = arg3;
+  } else if (arg1) {
+    options = arg1;
+    configuredEndpoint = options.endpoint;
+    if (options.method) method = options.method;
+  }
+
+  const { onSuccess, onError, onSettled } = options;
 
   const [data, setData] = useState<TData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -49,9 +66,16 @@ export function useApiMutation<TData = any, TVariables = any>(
         setIsSuccess(false);
 
         // Extract endpoint from variables if provided
-        const { endpoint, ...data } = variables as any;
+        let payloadData = variables;
+        let mutationEndpoint = configuredEndpoint;
+
+        if (variables && typeof variables === 'object' && 'endpoint' in variables) {
+          const { endpoint, ...rest } = variables as any;
+          if (endpoint) mutationEndpoint = endpoint;
+          payloadData = rest as any;
+        }
         
-        if (!endpoint) {
+        if (!mutationEndpoint) {
           throw new Error('Endpoint is required');
         }
 
@@ -59,16 +83,16 @@ export function useApiMutation<TData = any, TVariables = any>(
 
         switch (method) {
           case 'POST':
-            response = (await api.post<TData>(endpoint, data)).data;
+            response = (await api.post<TData>(mutationEndpoint, payloadData)).data;
             break;
           case 'PUT':
-            response = (await api.put<TData>(endpoint, data)).data;
+            response = (await api.put<TData>(mutationEndpoint, payloadData)).data;
             break;
           case 'PATCH':
-            response = (await api.patch<TData>(endpoint, data)).data;
+            response = (await api.patch<TData>(mutationEndpoint, payloadData)).data;
             break;
           case 'DELETE':
-            response = (await api.delete<TData>(endpoint)).data;
+            response = (await api.delete<TData>(mutationEndpoint)).data;
             break;
           default:
             throw new Error(`Unsupported method: ${method}`);

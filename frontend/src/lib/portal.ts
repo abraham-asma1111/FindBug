@@ -68,6 +68,15 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
       },
       { href: '/admin/settings', label: 'Settings' },
       { href: '/admin/system-health', label: 'System Health' },
+      {
+        href: '/admin/simulation',
+        label: 'Simulation Panel',
+        children: [
+          { href: '/admin/simulation', label: 'Challenges' },
+          { href: '/admin/simulation/reports', label: 'Review Reports' },
+          { href: '/admin/simulation/writeups', label: 'Writeups' },
+        ]
+      },
     ];
   }
 
@@ -217,6 +226,7 @@ export function getPortalNavItems(role: UserRole): PortalNavItem[] {
     { href: '/researcher/analytics', label: 'Analytics' },
     { href: '/researcher/messages', label: 'Messages' },
     { href: '/researcher/events', label: 'Events' },
+    { href: '/researcher/simulation', label: 'Academy' },
     { href: '/researcher/settings', label: 'Settings' },
   ];
 }

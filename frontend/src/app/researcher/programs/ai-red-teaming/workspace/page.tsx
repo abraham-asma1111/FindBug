@@ -1,7 +1,15 @@
 'use client';
 
-import ResearcherAIRedTeamingWorkspace from '@/components/researcher/workflows/ResearcherAIRedTeamingWorkspace';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function AIRedTeamingWorkspacePage() {
-  return <ResearcherAIRedTeamingWorkspace />;
+/** Legacy route — workspace lives on the main AI Red Teaming page. */
+export default function AIRedTeamingWorkspaceRedirectPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/researcher/programs/ai-red-teaming');
+  }, [router]);
+
+  return null;
 }

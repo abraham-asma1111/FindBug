@@ -29,6 +29,7 @@ export default function StaffCreatePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; temporary_password: string } | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -54,9 +55,13 @@ export default function StaffCreatePage() {
         department: form.department,
         role: form.role,
       });
-      await api.post(`/admin/staff/create?${params.toString()}`);
+      const response = await api.post(`/admin/staff/create?${params.toString()}`);
+      setCreatedCredentials({
+        email: response.data.email,
+        temporary_password: response.data.temporary_password,
+      });
       setSuccess(true);
-      setTimeout(() => router.push('/admin/staff'), 1500);
+      // Removed auto-redirect so the admin has time to copy the password
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to provision staff member. Please try again.');
     } finally {
@@ -97,16 +102,52 @@ export default function StaffCreatePage() {
                 Create Staff Account
               </h1>
               <p className="mt-4 text-sm leading-7 text-[#94A3B8] sm:text-base">
-                Provision a new internal staff member. A temporary password will be generated and a welcome email sent.
+                Provision a new internal staff member. A temporary password will be generated for them.
               </p>
             </div>
           </section>
 
           <div className="mt-6 mx-auto max-w-lg">
-            {success ? (
-              <div className="rounded-lg border border-[#10B981] bg-[#10B981]/10 p-6 text-center">
-                <p className="text-[#10B981] font-semibold text-lg">Staff member provisioned!</p>
-                <p className="text-[#94A3B8] text-sm mt-2">Redirecting to staff list…</p>
+            {success && createdCredentials ? (
+              <div className="rounded-lg border border-[#10B981] bg-[#0F172A] p-6 text-center shadow-lg">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#10B981]/20 mb-4">
+                  <svg className="h-6 w-6 text-[#10B981]" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-[#F8FAFC] mb-2">Staff Member Provisioned!</h3>
+                <p className="text-[#94A3B8] text-sm mb-6">
+                  Please securely share these credentials with the new staff member. They will be prompted to change their password upon their first login.
+                </p>
+                
+                <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-4 text-left mb-6 space-y-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] block mb-1">Email</label>
+                    <code className="text-sm text-[#F8FAFC] bg-[#0F172A] px-2 py-1 rounded block">{createdCredentials.email}</code>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-[#64748B] block mb-1">Temporary Password</label>
+                    <div className="flex items-center justify-between bg-[#0F172A] px-3 py-2 rounded border border-[#334155]">
+                      <code className="text-[#38BDF8] font-mono">{createdCredentials.temporary_password}</code>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(createdCredentials.temporary_password)}
+                        className="text-xs text-[#94A3B8] hover:text-[#F8FAFC] flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={() => router.push('/admin/staff')}
+                  className="w-full bg-[#10B981] hover:bg-[#059669] text-white font-bold"
+                >
+                  Return to Staff List
+                </Button>
               </div>
             ) : (
               <form

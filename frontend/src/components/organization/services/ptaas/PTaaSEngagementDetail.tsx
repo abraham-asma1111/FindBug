@@ -10,7 +10,7 @@ import Modal from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { 
   Calendar, Users, AlertCircle, CheckCircle, Clock, 
-  FileText, Target, TrendingUp, MessageSquare, Flag, Edit, Play, UserPlus 
+  FileText, Target, TrendingUp, MessageSquare, Flag, Edit, Play, UserPlus, RefreshCcw
 } from 'lucide-react';
 import PTaaSKPIMetrics from './dashboard/PTaaSKPIMetrics';
 import PTaaSSeverityChart from './dashboard/PTaaSSeverityChart';
@@ -18,6 +18,7 @@ import PTaaSAssetCoverage from './dashboard/PTaaSAssetCoverage';
 import PTaaSActivityFeed from './dashboard/PTaaSActivityFeed';
 import PTaaSFindingAssignModal from './findings/PTaaSFindingAssignModal';
 import PTaaSFindingStatusModal from './findings/PTaaSFindingStatusModal';
+import PTaaSRetestRequestModal from './findings/PTaaSRetestRequestModal';
 import PTaaSResearcherAssignModal from './PTaaSResearcherAssignModal';
 
 interface PTaaSEngagement {
@@ -640,6 +641,7 @@ function DashboardTab({ engagementId }: { engagementId: string }) {
   const { data: dashboard, isLoading, error, refetch } = useApiQuery({
     endpoint: `/ptaas/engagements/${engagementId}/dashboard`,
     queryKey: ['ptaas-dashboard', engagementId],
+    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
   });
 
   const { mutate: initializePhases, isLoading: isInitializing } = useApiMutation(
@@ -923,6 +925,7 @@ function FindingsTab({ engagementId }: { engagementId: string }) {
   const { data: findings, isLoading, error, refetch } = useApiQuery({
     endpoint: `/ptaas/engagements/${engagementId}/findings`,
     queryKey: ['ptaas-findings', engagementId, severityFilter],
+    refetchInterval: 30000,
   });
 
   if (isLoading) {
@@ -1032,6 +1035,7 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
   const router = useRouter();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showRetestModal, setShowRetestModal] = useState(false);
 
   const severityConfig = {
     critical: { label: 'Critical', color: 'bg-red-100 text-red-700', icon: '🔴' },
@@ -1044,17 +1048,32 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
   const statusConfig = {
     pending: { label: 'Pending Review', color: 'bg-gray-100 text-gray-700' },
     submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700' },
-    triaged: { label: 'Triaged', color: 'bg-purple-100 text-purple-700' },
-    accepted: { label: 'Accepted', color: 'bg-green-100 text-green-700' },
-    in_progress: { label: 'In Progress', color: 'bg-yellow-100 text-yellow-700' },
-    fixed: { label: 'Fixed', color: 'bg-green-100 text-green-700' },
     validated: { label: 'Validated', color: 'bg-green-100 text-green-700' },
+    verified: { label: 'Verified', color: 'bg-green-100 text-green-700' },
+    closed: { label: 'Closed / Bounty Approved', color: 'bg-gray-100 text-gray-700' },
     rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
     duplicate: { label: 'Duplicate', color: 'bg-yellow-100 text-yellow-700' },
+    retest_requested: { label: 'Retest Requested', color: 'bg-orange-100 text-orange-700' },
   };
 
-  const severity = severityConfig[finding.severity as keyof typeof severityConfig] || severityConfig.info;
-  const status = statusConfig[finding.status as keyof typeof statusConfig] || statusConfig.pending;
+  const severity =
+    severityConfig[finding.severity?.toLowerCase() as keyof typeof severityConfig] || severityConfig.info;
+  const status = statusConfig[finding.status?.toLowerCase() as keyof typeof statusConfig] || statusConfig.pending;
+  const { showToast } = useToast();
+
+  const { mutate: approveBounty, isLoading: isApproving } = useApiMutation(
+    `/ptaas/findings/${finding.id}/approve-bounty`,
+    'POST',
+    {
+      onSuccess: () => {
+        showToast('Bounty approved successfully!', 'success');
+        onRefresh();
+      },
+      onError: (error: Error) => {
+        showToast(error.message || 'Failed to approve bounty', 'error');
+      },
+    }
+  );
 
   return (
     <>
@@ -1096,7 +1115,7 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
             </div>
           </div>
           
-          <div className="flex gap-2 ml-4">
+          <div className="flex gap-2 ml-4 flex-col items-end sm:flex-row sm:items-center">
             <Button 
               size="sm" 
               variant="outline"
@@ -1107,6 +1126,41 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
             >
               View Details
             </Button>
+            
+            {/* Show Request Retest if status is fixed or accepted */}
+            {(finding.status?.toLowerCase() === 'fixed' || finding.status?.toLowerCase() === 'accepted' || finding.status?.toLowerCase() === 'in_progress') && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRetestModal(true);
+                }}
+              >
+                <RefreshCcw className="h-4 w-4 mr-1" />
+                Request Retest
+              </Button>
+            )}
+
+            {/* Show Approve Bounty if status is verified */}
+            {finding.status?.toLowerCase() === 'verified' && (
+              <Button 
+                size="sm" 
+                className="bg-green-600 hover:bg-green-700 text-white"
+                isLoading={isApproving}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm('Are you sure you want to approve the bounty for this verified finding?')) {
+                    approveBounty({});
+                  }
+                }}
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Approve Bounty
+              </Button>
+            )}
+
             <Button 
               size="sm" 
               variant="outline"
@@ -1152,6 +1206,16 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
           onSuccess={onRefresh}
         />
       )}
+
+      {/* Retest Modal */}
+      {showRetestModal && (
+        <PTaaSRetestRequestModal
+          isOpen={showRetestModal}
+          onClose={() => setShowRetestModal(false)}
+          findingId={finding.id}
+          onSuccess={onRefresh}
+        />
+      )}
     </>
   );
 }
@@ -1161,6 +1225,7 @@ function DeliverablesTab({ engagementId }: { engagementId: string }) {
   const { data: deliverables, isLoading, error } = useApiQuery({
     endpoint: `/ptaas/engagements/${engagementId}/deliverables`,
     queryKey: ['ptaas-deliverables', engagementId],
+    refetchInterval: 30000,
   });
 
   if (isLoading) {
@@ -1543,6 +1608,7 @@ function ActivityTab({ engagementId }: { engagementId: string }) {
   const { data: activities, isLoading, error } = useApiQuery({
     endpoint: `/ptaas/engagements/${engagementId}/collaboration`,
     queryKey: ['ptaas-activity', engagementId],
+    refetchInterval: 15000, // Poll more frequently for activity feed
   });
 
   if (isLoading) {

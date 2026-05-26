@@ -9,9 +9,10 @@ import { getPortalNavItems } from '@/lib/portal';
 import Button from '@/components/ui/Button';
 import { 
   ArrowLeft, AlertCircle, CheckCircle, Clock, FileText, Code, Shield, 
-  TrendingUp, Users, Database, Wrench, Image, Video, X, ChevronRight 
+  TrendingUp, Users, Database, Wrench, Image, Video, X, ChevronRight, RefreshCcw 
 } from 'lucide-react';
 import { useState } from 'react';
+import ResearcherPTaaSRetestResultModal from '@/components/researcher/ptaas/ResearcherPTaaSRetestResultModal';
 
 export default function ResearcherFindingDetailPage() {
   const params = useParams();
@@ -20,9 +21,10 @@ export default function ResearcherFindingDetailPage() {
   const engagementId = params.id as string;
   const [activeTab, setActiveTab] = useState('overview');
   const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
+  const [showRetestModal, setShowRetestModal] = useState(false);
   const user = useAuthStore((state) => state.user);
 
-  const { data: finding, isLoading } = useApiQuery<any>({
+  const { data: finding, isLoading, refetch } = useApiQuery<any>({
     endpoint: `/ptaas/findings/${findingId}`
   });
 
@@ -101,10 +103,11 @@ export default function ResearcherFindingDetailPage() {
     TRIAGED: { label: 'Triaged', color: 'bg-purple-100 text-purple-700', icon: CheckCircle },
     VALIDATED: { label: 'Validated', color: 'bg-green-100 text-green-700', icon: CheckCircle },
     REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-700', icon: AlertCircle },
+    RETEST_REQUESTED: { label: 'Retest Requested', color: 'bg-orange-100 text-orange-700', icon: RefreshCcw },
   };
 
   const severityInfo = severityConfig[finding.severity] || severityConfig.Info;
-  const statusInfo = statusConfig[finding.status] || statusConfig.SUBMITTED;
+  const statusInfo = statusConfig[finding.status?.toUpperCase()] || statusConfig.SUBMITTED;
   const SeverityIcon = severityInfo.icon;
   const StatusIcon = statusInfo.icon;
 
@@ -165,15 +168,27 @@ export default function ResearcherFindingDetailPage() {
               )}
             </div>
             <h2 className="text-xl font-semibold text-[#2d2a26] mb-2">{finding.title}</h2>
-            {finding.discovered_at && (
-              <p className="text-sm text-[#6d6760]">
-                Discovered {new Date(finding.discovered_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </p>
-            )}
+            <div className="flex items-center justify-between">
+              {finding.discovered_at && (
+                <p className="text-sm text-[#6d6760]">
+                  Discovered {new Date(finding.discovered_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+              )}
+              {finding.status?.toUpperCase() === 'RETEST_REQUESTED' && (
+                <Button 
+                  size="sm"
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={() => setShowRetestModal(true)}
+                >
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Submit Retest Result
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Tabs */}
@@ -627,6 +642,15 @@ export default function ResearcherFindingDetailPage() {
           </div>
         )}
       </div>
+
+      {showRetestModal && (
+        <ResearcherPTaaSRetestResultModal
+          isOpen={showRetestModal}
+          onClose={() => setShowRetestModal(false)}
+          findingId={finding.id}
+          onSuccess={refetch}
+        />
+      )}
     </PortalShell>
   );
 }

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
+import Spinner from '@/components/ui/Spinner';
 import { api } from '@/lib/api';
-import { getPortalNavItems } from '@/lib/portal';
+import { formatCompactNumber, getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 
 interface LeaderboardEntry {
@@ -18,6 +20,42 @@ interface LeaderboardEntry {
     valid_reports: number;
     success_rate: number;
   };
+}
+
+function getRankBadge(rank: number) {
+  if (rank === 1) {
+    return (
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#ffd700] to-[#ffed4e] shadow-md">
+        <span className="text-lg font-bold text-[#2d2a26]">{rank}</span>
+      </div>
+    );
+  }
+  if (rank === 2) {
+    return (
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#c0c0c0] to-[#e8e8e8] shadow-md">
+        <span className="text-lg font-bold text-[#2d2a26]">{rank}</span>
+      </div>
+    );
+  }
+  if (rank === 3) {
+    return (
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#cd7f32] to-[#e8a87c] shadow-md">
+        <span className="text-lg font-bold text-white">{rank}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-12 w-12 items-center justify-center">
+      <span className="text-base font-semibold text-[#6d6760] dark:text-gray-400">#{rank}</span>
+    </div>
+  );
+}
+
+function getRowBackground(rank: number) {
+  if (rank === 1) return 'bg-[#fef9e7] dark:bg-amber-950/20';
+  if (rank === 2) return 'bg-[#f5f5f5] dark:bg-gray-800/50';
+  if (rank === 3) return 'bg-[#fef5e7] dark:bg-orange-950/20';
+  return rank % 2 === 0 ? 'bg-white dark:bg-[#111111]' : 'bg-[#fcfaf7] dark:bg-gray-900/40';
 }
 
 export default function ResearcherLeaderboardPage() {
@@ -39,9 +77,13 @@ export default function ResearcherLeaderboardPage() {
           setLeaderboard(response.data?.leaderboard || []);
           setError('');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(err.response?.data?.detail || 'Failed to load leaderboard data.');
+          const message =
+            err && typeof err === 'object' && 'response' in err
+              ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+              : undefined;
+          setError(message || 'Failed to load leaderboard data.');
         }
       } finally {
         if (!cancelled) {
@@ -50,62 +92,12 @@ export default function ResearcherLeaderboardPage() {
       }
     };
 
-    loadLeaderboard();
+    void loadLeaderboard();
 
     return () => {
       cancelled = true;
     };
   }, [selectedPeriod]);
-
-  const getRankBadge = (rank: number) => {
-    if (rank === 1) {
-      return (
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-[#ffd700] to-[#ffed4e] shadow-md">
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-[#2d2a26]">{rank}</span>
-            <svg className="w-4 h-4 text-[#2d2a26] -mt-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          </div>
-        </div>
-      );
-    } else if (rank === 2) {
-      return (
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-[#c0c0c0] to-[#e8e8e8] shadow-md">
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-[#2d2a26]">{rank}</span>
-            <svg className="w-4 h-4 text-[#2d2a26] -mt-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          </div>
-        </div>
-      );
-    } else if (rank === 3) {
-      return (
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-[#cd7f32] to-[#e8a87c] shadow-md">
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-white">{rank}</span>
-            <svg className="w-4 h-4 text-white -mt-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          </div>
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center justify-center w-12 h-12">
-          <span className="text-base font-semibold text-[#6d6760] dark:text-[#6d6760]">{rank}th</span>
-        </div>
-      );
-    }
-  };
-
-  const getRowBackground = (rank: number) => {
-    if (rank === 1) return 'bg-[#fef9e7]';
-    if (rank === 2) return 'bg-[#f5f5f5]';
-    if (rank === 3) return 'bg-[#fef5e7]';
-    return rank % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]';
-  };
 
   return (
     <ProtectedRoute allowedRoles={['researcher']}>
@@ -113,125 +105,137 @@ export default function ResearcherLeaderboardPage() {
         <PortalShell
           user={user}
           title="Leaderboard"
-          subtitle="Top researchers ranked by reputation score and contributions"
+          subtitle="Top researchers ranked by reputation score and validated contributions."
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Researcher Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           {error ? (
-            <div className="mb-6 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318]">
+            <div className="mb-6 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318] dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
               {error}
             </div>
           ) : null}
 
-          {/* Header with Period Selector */}
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100" style={{marginLeft:'350px'}}>LEADERBOARD</h2>
-            <div className="flex items-center gap-3">
-              <button className="p-2 rounded-full hover:bg-[#f5f5f5] dark:hover:bg-gray-800 transition">
-                <svg className="w-5 h-5 text-[#6d6760] dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-4 py-2 rounded-lg border border-[#e6ddd4] bg-white dark:bg-[#111111] dark:border-gray-700 text-sm font-medium text-[#2d2a26] dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2d2a26] focus:border-transparent"
-              >
-                <option value="2026 - Q2">2026 - Q2</option>
-                <option value="2026 - Q1">2026 - Q1</option>
-                <option value="2025 - Q4">2025 - Q4</option>
-                <option value="2025 - Q3">2025 - Q3</option>
-                <option value="All Time">All Time</option>
-              </select>
-              <button className="p-2 rounded-full hover:bg-[#f5f5f5] dark:hover:bg-gray-800 transition">
-                <svg className="w-5 h-5 text-[#6d6760] dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
+          <section className="mb-8 rounded-[32px] border border-[#d8cfc6] dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(239,35,48,0.12),_transparent_38%),linear-gradient(135deg,_#fffaf3,_#f5efe7)] dark:bg-[radial-gradient(circle_at_top_left,rgba(239,35,48,0.15),transparent_38%),linear-gradient(135deg,#1a1a1a,#151515)] p-6 shadow-sm lg:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8b8177] dark:text-gray-400">
+                  Global Rankings
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#2d2a26] dark:text-gray-100">
+                  See where you stand among the community
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-[#5f5851] dark:text-gray-300">
+                  Rankings reflect reputation earned from validated reports. Climb by submitting high-quality
+                  findings across bug bounty, PTaaS, and specialized engagements.
+                </p>
+                <Link
+                  href="/researcher/reputation"
+                  className="mt-5 inline-flex items-center rounded-full border border-[#d4c9be] bg-white px-5 py-2.5 text-sm font-semibold text-[#4f4943] transition hover:bg-[#faf3ea] dark:border-gray-700 dark:bg-[#111111] dark:text-gray-200 dark:hover:bg-gray-800"
+                >
+                  View my reputation
+                </Link>
+              </div>
+              <div className="flex items-center gap-3">
+                <label htmlFor="leaderboard-period" className="sr-only">
+                  Leaderboard period
+                </label>
+                <select
+                  id="leaderboard-period"
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm font-medium text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2] dark:border-gray-700 dark:bg-[#111111] dark:text-gray-200"
+                >
+                  <option value="2026 - Q2">2026 - Q2</option>
+                  <option value="2026 - Q1">2026 - Q1</option>
+                  <option value="2025 - Q4">2025 - Q4</option>
+                  <option value="2025 - Q3">2025 - Q3</option>
+                  <option value="All Time">All Time</option>
+                </select>
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Leaderboard Table */}
-          <div className="rounded-2xl border border-[#e6ddd4] dark:border-gray-700 overflow-hidden bg-white dark:bg-white shadow-sm">
-            {/* Table Header */}
-            <div className="grid grid-cols-[120px_1fr_120px] gap-4 px-6 py-4 bg-[#faf6f1] dark:bg-[#faf6f1] border-b border-[#e6ddd4] dark:border-[#e6ddd4]">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-[#6d6760]">RANK</div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-[#6d6760]">HUNTER</div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-[#6d6760] text-right">POINTS</div>
+          <div className="overflow-hidden rounded-[28px] border border-[#e6ddd4] bg-white shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+            <div className="grid grid-cols-[100px_1fr_120px] gap-4 border-b border-[#e6ddd4] bg-[#faf6f1] px-6 py-4 dark:border-gray-800 dark:bg-gray-900/60">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-gray-400">
+                Rank
+              </div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-gray-400">
+                Hunter
+              </div>
+              <div className="text-right text-xs font-bold uppercase tracking-wider text-[#6d6760] dark:text-gray-400">
+                Points
+              </div>
             </div>
 
-            {/* Table Body */}
-            <div>
-              {isLoading ? (
-                <div className="px-6 py-12 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2d2a26] dark:border-[#2d2a26]"></div>
-                  <p className="mt-4 text-sm text-[#6d6760] dark:text-[#6d6760]">Loading leaderboard...</p>
-                </div>
-              ) : leaderboard.length === 0 ? (
-                <div className="px-6 py-12 text-center">
-                  <p className="text-sm text-[#6d6760] dark:text-[#6d6760]">No leaderboard data available.</p>
-                </div>
-              ) : (
-                leaderboard.map((entry) => (
-                  <div
-                    key={entry.researcher_id}
-                    className={`grid grid-cols-[120px_1fr_120px] gap-4 px-6 py-4 border-b border-[#e6ddd4] dark:border-[#e6ddd4] last:border-b-0 transition hover:bg-[#fcfaf7] dark:hover:bg-[#fcfaf7] ${getRowBackground(entry.rank)}`}
-                  >
-                    {/* Rank Badge */}
-                    <div className="flex items-center">
-                      {getRankBadge(entry.rank)}
+            {isLoading ? (
+              <div className="flex justify-center px-6 py-16">
+                <Spinner size="lg" />
+              </div>
+            ) : leaderboard.length === 0 ? (
+              <div className="px-6 py-12 text-center">
+                <p className="text-sm text-[#6d6760] dark:text-gray-400">No leaderboard data available.</p>
+              </div>
+            ) : (
+              leaderboard.map((entry) => (
+                <div
+                  key={entry.researcher_id}
+                  className={`grid grid-cols-[100px_1fr_120px] gap-4 border-b border-[#e6ddd4] px-6 py-4 transition last:border-b-0 hover:bg-[#fcfaf7] dark:border-gray-800 dark:hover:bg-gray-900/50 ${getRowBackground(entry.rank)}`}
+                >
+                  <div className="flex items-center">{getRankBadge(entry.rank)}</div>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#2d2a26] to-[#6d6760] text-sm font-bold text-white">
+                      {entry.username.charAt(0).toUpperCase()}
                     </div>
-
-                    {/* Hunter Info */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2d2a26] to-[#6d6760] flex items-center justify-center text-white font-bold">
-                        {entry.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-[#2d2a26] dark:text-[#2d2a26] hover:underline cursor-pointer">
-                          {entry.username}
-                        </span>
-                        <svg className="w-4 h-4 text-[#0ea5e9]" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
-
-                    {/* Points */}
-                    <div className="flex items-center justify-end">
-                      <span className="text-xl font-bold text-[#2d2a26] dark:text-[#2d2a26]">
-                        {Math.round(entry.reputation_score)}
-                      </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-[#2d2a26] dark:text-gray-100">
+                        {entry.username}
+                      </p>
+                      <p className="text-xs text-[#8b8177] dark:text-gray-400">
+                        {formatCompactNumber(entry.stats.valid_reports)} valid reports ·{' '}
+                        {entry.stats.success_rate.toFixed(0)}% success
+                      </p>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                  <div className="flex items-center justify-end">
+                    <span className="text-xl font-bold text-[#2d2a26] dark:text-gray-100">
+                      {Math.round(entry.reputation_score)}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
-          {/* Your Position Card */}
-          {user.researcher && (
-            <div className="mt-6 rounded-2xl border-2 border-[#2d2a26] dark:border-gray-600 bg-[#fcfaf7] dark:bg-gray-800 p-6">
-              <div className="flex items-center justify-between">
+          {user.researcher ? (
+            <div className="mt-6 rounded-[28px] border-2 border-[#2d2a26] bg-[#fcfaf7] p-6 dark:border-gray-600 dark:bg-gray-900/60">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2d2a26] to-[#6d6760] flex items-center justify-center text-white font-bold text-lg">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#2d2a26] to-[#6d6760] text-lg font-bold text-white">
                     {user.email.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-wider text-[#8b8177] dark:text-gray-400">Your Position</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#8b8177] dark:text-gray-400">
+                      Your position
+                    </p>
                     <p className="text-lg font-bold text-[#2d2a26] dark:text-gray-100">
                       {user.researcher.rank ? `#${user.researcher.rank}` : 'Unranked'}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold uppercase tracking-wider text-[#8b8177] dark:text-gray-400">Your Points</p>
+                <div className="text-left sm:text-right">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#8b8177] dark:text-gray-400">
+                    Your points
+                  </p>
                   <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
                     {Math.round(user.researcher.reputation_score || 0)}
                   </p>
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </PortalShell>
       ) : null}
     </ProtectedRoute>

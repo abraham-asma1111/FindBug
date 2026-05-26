@@ -12,18 +12,24 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { api } from '@/lib/api';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
+import Spinner from '@/components/ui/Spinner';
 import {
   Banner,
   EmptyCollection,
   MetricGrid,
   PillList,
+  ProgramGuide,
+  ProgramHighlights,
   SectionCard,
   StatusBadge,
+  StructuredValueBlock,
+  WorkflowPickerCard,
+  WorkflowTabs,
   WorkflowTimeline,
   formatStatusLabel,
   formatWorkflowDate,
-  stringifyStructuredValue,
 } from './shared';
+import { aiRedTeamingProgramGuide } from './programGuideContent';
 
 interface AIRedTeamingEngagement {
   id: string;
@@ -65,6 +71,25 @@ interface AIVulnerabilityReport {
   mitigation_recommendation?: string | null;
   submitted_at?: string | null;
 }
+
+const aiHighlights = [
+  {
+    title: 'Transcript-first evidence',
+    description: 'Capture prompts, model responses, and attack framing — not just static screenshots.',
+  },
+  {
+    title: 'Policy-aligned probing',
+    description: 'Test against organization-defined in-scope harms and safety policies.',
+  },
+  {
+    title: 'Probabilistic reporting',
+    description: 'Document success rates when model behavior is non-deterministic.',
+  },
+  {
+    title: 'Sandbox isolation',
+    description: 'Work inside approved environments with guardrails and rate limits.',
+  },
+];
 
 const aiWorkflow = [
   {
@@ -220,15 +245,17 @@ export default function ResearcherAIRedTeamingWorkspace() {
           navItems={getPortalNavItems(user.role)}
           headerAlign="center"
           eyebrowText="Researcher Portal"
-          eyebrowClassName="text-sm tracking-[0.25em]"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           <div className="space-y-6">
             <Banner
+              tone="indigo"
               title="AI Red Teaming"
-              subtitle="This workspace now runs on live AI engagement data instead of a static invitation-only description. Assigned work, environment details, and report submission stay on one surface."
-              accentClassName="bg-[linear-gradient(135deg,#50237e_0%,#7d39c2_45%,#c176ff_100%)]"
-              badge="Transcript-Driven Testing"
+              subtitle="Probe assigned models for prompt injection, jailbreaks, data leakage, and policy violations — with full transcript evidence and sandbox guardrails."
+              badge="Transcript-driven testing"
               icon="🤖"
+              asideTitle="Model safety assessments"
+              asideDescription="Briefing, environment access, and structured AI reports live on one desk."
             />
 
             {pageError ? (
@@ -249,30 +276,31 @@ export default function ResearcherAIRedTeamingWorkspace() {
               </Alert>
             ) : null}
 
+            <ProgramHighlights items={aiHighlights} tone="indigo" />
+
+            <ProgramGuide guide={aiRedTeamingProgramGuide} tone="indigo" defaultOpen />
+
             <SectionCard title="Assigned AI engagements" description="Only engagements explicitly assigned to you appear here.">
               {isLoadingEngagements ? (
-                <p className="text-sm text-[#6d6760]">Loading AI red teaming engagements...</p>
+                <div className="flex justify-center py-12">
+                  <Spinner size="lg" />
+                </div>
               ) : engagements?.length ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {engagements.map((engagement) => (
-                    <button
+                    <WorkflowPickerCard
                       key={engagement.id}
-                      type="button"
+                      tone="indigo"
+                      selected={engagement.id === selectedEngagementId}
                       onClick={() => setSelectedEngagementId(engagement.id)}
-                      className={`rounded-[20px] border p-5 text-left transition ${
-                        engagement.id === selectedEngagementId
-                          ? 'border-[#7d39c2] bg-[#f6efff]'
-                          : 'border-[#e6ddd4] bg-[#fcfaf7] hover:border-[#d5c4eb]'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-lg font-semibold text-[#2d2a26]">{engagement.name}</p>
-                          <p className="mt-2 text-sm text-[#6d6760]">{engagement.target_ai_system}</p>
-                        </div>
-                        <StatusBadge status={engagement.status} />
-                      </div>
-                    </button>
+                      title={engagement.name}
+                      description={engagement.target_ai_system}
+                      status={engagement.status}
+                      metrics={[
+                        { label: 'Model', value: formatStatusLabel(engagement.model_type) },
+                        { label: 'Findings', value: String(engagement.total_findings) },
+                      ]}
+                    />
                   ))}
                 </div>
               ) : (
@@ -287,22 +315,16 @@ export default function ResearcherAIRedTeamingWorkspace() {
               <>
                 <MetricGrid items={metrics} />
 
-                <div className="flex flex-wrap gap-2 rounded-[22px] border border-[#e6ddd4] bg-white dark:bg-[#111111] p-2">
-                  {(['briefing', 'reports', 'environment'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setActiveTab(tab)}
-                      className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                        activeTab === tab
-                          ? 'bg-[#7d39c2] text-white'
-                          : 'text-[#6d6760] hover:bg-[#f5efe8] hover:text-[#2d2a26]'
-                      }`}
-                    >
-                      {formatStatusLabel(tab)}
-                    </button>
-                  ))}
-                </div>
+                <WorkflowTabs
+                  tone="indigo"
+                  active={activeTab}
+                  onChange={setActiveTab}
+                  items={[
+                    { value: 'briefing', label: 'Briefing' },
+                    { value: 'reports', label: 'Reports', badge: reports?.length ?? 0 },
+                    { value: 'environment', label: 'Environment' },
+                  ]}
+                />
 
                 {activeTab === 'briefing' ? (
                   <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -368,7 +390,7 @@ export default function ResearcherAIRedTeamingWorkspace() {
                       ) : reports?.length ? (
                         <div className="space-y-4">
                           {reports.map((report) => (
-                            <div key={report.id} className="rounded-[20px] border border-[#e6ddd4] bg-[#fcfaf7] p-5">
+                            <div key={report.id} className="rounded-[24px] border border-[#dbe3ec] bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                   <p className="text-base font-semibold text-[#2d2a26]">{report.title}</p>
@@ -442,13 +464,13 @@ export default function ResearcherAIRedTeamingWorkspace() {
                             </div>
                           </div>
                           <div className="grid gap-4 md:grid-cols-3">
-                            <div className="rounded-2xl bg-[#fcfaf7] p-4 text-sm text-[#2d2a26]">
+                            <div className="rounded-[18px] border border-[#dbe3ec] bg-[#eef2ff] p-4 text-sm text-[#243b7b] dark:border-gray-700 dark:bg-gray-800 dark:text-indigo-200">
                               Isolated: <span className="font-semibold">{testingEnvironment.is_isolated ? 'Yes' : 'No'}</span>
                             </div>
-                            <div className="rounded-2xl bg-[#fcfaf7] p-4 text-sm text-[#2d2a26]">
+                            <div className="rounded-[18px] border border-[#dbe3ec] bg-[#eef2ff] p-4 text-sm text-[#243b7b] dark:border-gray-700 dark:bg-gray-800 dark:text-indigo-200">
                               Monitoring: <span className="font-semibold">{testingEnvironment.monitoring_enabled ? 'Enabled' : 'Off'}</span>
                             </div>
-                            <div className="rounded-2xl bg-[#fcfaf7] p-4 text-sm text-[#2d2a26]">
+                            <div className="rounded-[18px] border border-[#dbe3ec] bg-[#eef2ff] p-4 text-sm text-[#243b7b] dark:border-gray-700 dark:bg-gray-800 dark:text-indigo-200">
                               Transcript logging: <span className="font-semibold">{testingEnvironment.log_all_interactions ? 'On' : 'Off'}</span>
                             </div>
                           </div>
@@ -465,16 +487,16 @@ export default function ResearcherAIRedTeamingWorkspace() {
                       {testingEnvironment ? (
                         <div className="space-y-4">
                           <div>
-                            <p className="text-sm font-semibold text-[#2d2a26]">Access controls</p>
-                            <pre className="mt-2 overflow-x-auto rounded-2xl bg-[#fcfaf7] p-4 text-xs text-[#5f584f]">
-                              {stringifyStructuredValue(testingEnvironment.access_controls)}
-                            </pre>
+                            <p className="text-sm font-semibold text-[#2d2a26] dark:text-gray-100">Access controls</p>
+                            <div className="mt-2">
+                              <StructuredValueBlock value={testingEnvironment.access_controls} />
+                            </div>
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-[#2d2a26]">Rate limits</p>
-                            <pre className="mt-2 overflow-x-auto rounded-2xl bg-[#fcfaf7] p-4 text-xs text-[#5f584f]">
-                              {stringifyStructuredValue(testingEnvironment.rate_limits)}
-                            </pre>
+                            <p className="text-sm font-semibold text-[#2d2a26] dark:text-gray-100">Rate limits</p>
+                            <div className="mt-2">
+                              <StructuredValueBlock value={testingEnvironment.rate_limits} />
+                            </div>
                           </div>
                         </div>
                       ) : (

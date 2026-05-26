@@ -78,7 +78,7 @@ export default function PieChart({
   return (
     <div className={`flex items-center ${className}`}>
       <div className="relative" style={{ width: size, height: size }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width={size} height={size} minWidth={0}>
           <RechartsPieChart>
             <Pie
               data={chartData}

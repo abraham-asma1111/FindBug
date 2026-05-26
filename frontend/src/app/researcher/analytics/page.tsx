@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
+import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
@@ -185,20 +186,39 @@ export default function ResearcherAnalyticsPage() {
           eyebrowText="Researcher Portal"
           eyebrowClassName="text-xl tracking-[0.18em]"
         >
-          {/* Time Period Selector */}
-          <div className="mb-6 flex justify-end items-center">
-            <select
-              value={timePeriod}
-              onChange={(e) => setTimePeriod(e.target.value)}
-              className="rounded-xl border border-[#d8d0c8] dark:border-gray-700 bg-white dark:bg-[#111111] px-4 py-2 text-sm text-[#2d2a26] dark:text-gray-200 focus:border-[#c8bfb6] focus:outline-none"
-            >
-              {timePeriodOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <section className="mb-8 rounded-[32px] border border-[#d8cfc6] dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(45,120,168,0.12),_transparent_38%),linear-gradient(135deg,_#fffaf3,_#f5efe7)] dark:bg-[radial-gradient(circle_at_top_left,rgba(45,120,168,0.15),transparent_38%),linear-gradient(135deg,#1a1a1a,#151515)] p-6 shadow-sm lg:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8b8177] dark:text-gray-400">
+                  Performance Analytics
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#2d2a26] dark:text-gray-100">
+                  Understand trends behind your submissions and earnings
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-[#5f5851] dark:text-gray-300">
+                  Track success rate, severity mix, specialization, and monthly momentum across your researcher
+                  activity.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="analytics-period" className="text-sm font-medium text-[#5f5851] dark:text-gray-400">
+                  Period
+                </label>
+                <select
+                  id="analytics-period"
+                  value={timePeriod}
+                  onChange={(e) => setTimePeriod(e.target.value)}
+                  className="rounded-xl border border-[#d8d0c8] bg-white px-4 py-2.5 text-sm font-medium text-[#2d2a26] focus:border-[#c8bfb6] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2] dark:border-gray-700 dark:bg-[#111111] dark:text-gray-200"
+                >
+                  {timePeriodOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
 
           {error && (
             <div className="mb-6 rounded-2xl border border-[#f2c0bc] bg-[#fff2f1] p-4 text-sm text-[#b42318]">
@@ -213,55 +233,34 @@ export default function ResearcherAnalyticsPage() {
             </div>
           ) : analyticsData ? (
             <div className="space-y-12">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
-                    Total Reports
-                  </p>
-                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
-                    {Math.floor(analyticsData.metrics.total_reports)}
-                  </p>
-                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
-                    {Math.floor(analyticsData.metrics.valid_reports)} valid, {Math.floor(analyticsData.metrics.invalid_reports)} invalid
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <StatCard
+                  label="Total Reports"
+                  value={String(Math.floor(analyticsData.metrics.total_reports))}
+                  helper={`${Math.floor(analyticsData.metrics.valid_reports)} valid · ${Math.floor(analyticsData.metrics.invalid_reports)} invalid`}
+                  align="center"
+                />
+                <div className="rounded-3xl border border-[#ddd4cb] bg-white p-5 text-center shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8b8177] dark:text-gray-400">
                     Success Rate
                   </p>
-                  <p className={`text-2xl font-bold ${getSuccessRateColor(analyticsData.metrics.success_rate)}`}>
+                  <p className={`mt-3 text-3xl font-semibold tracking-tight ${getSuccessRateColor(analyticsData.metrics.success_rate)}`}>
                     {analyticsData.metrics.success_rate}%
                   </p>
-                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
-                    Valid reports ratio
-                  </p>
+                  <p className="mt-2 text-sm text-[#6d6760] dark:text-gray-400">Valid reports ratio</p>
                 </div>
-
-                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
-                    Total Earnings
-                  </p>
-                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
-                    {formatCurrency(analyticsData.metrics.earnings)}
-                  </p>
-                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
-                    In selected period
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-5 text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177] dark:text-gray-400 mb-2">
-                    Current Rank
-                  </p>
-                  <p className="text-2xl font-bold text-[#2d2a26] dark:text-gray-100">
-                    #{analyticsData.metrics.rank || 'Unranked'}
-                  </p>
-                  <p className="text-xs text-[#6d6760] dark:text-gray-300 mt-1">
-                    {analyticsData.metrics.reputation_score.toFixed(1)} reputation
-                  </p>
-                </div>
+                <StatCard
+                  label="Total Earnings"
+                  value={formatCurrency(analyticsData.metrics.earnings)}
+                  helper="In selected period"
+                  align="center"
+                />
+                <StatCard
+                  label="Current Rank"
+                  value={analyticsData.metrics.rank ? `#${analyticsData.metrics.rank}` : 'Unranked'}
+                  helper={`${analyticsData.metrics.reputation_score.toFixed(1)} reputation`}
+                  align="center"
+                />
               </div>
 
               <Tabs
@@ -275,8 +274,8 @@ export default function ResearcherAnalyticsPage() {
                 {/* Overview Tab */}
                 <div data-tab="overview" className="space-y-6">
                   {/* Severity Distribution */}
-                  <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-6 text-center">Severity Distribution</h3>
+                  <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                    <h3 className="mb-6 text-center text-lg font-semibold text-[#2d2a26] dark:text-gray-100">Severity Distribution</h3>
                     <div className="flex justify-center">
                       <PieChart
                         data={pieChartData}
@@ -287,8 +286,8 @@ export default function ResearcherAnalyticsPage() {
                   </div>
 
                   {/* Top Vulnerability Types */}
-                  <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Top Vulnerability Types</h3>
+                  <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                    <h3 className="mb-4 text-lg font-semibold text-[#2d2a26] dark:text-gray-100">Top Vulnerability Types</h3>
                     {analyticsData.top_vulnerability_types.length > 0 ? (
                       <div className="space-y-3">
                         {analyticsData.top_vulnerability_types.map((vuln, index) => (
@@ -314,8 +313,8 @@ export default function ResearcherAnalyticsPage() {
                   {analyticsData.monthly_trend.length > 0 ? (
                     <>
                       {/* Total Reports Chart */}
-                      <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
-                        <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Total Reports per Month</h3>
+                      <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                        <h3 className="mb-4 text-lg font-semibold text-[#2d2a26] dark:text-gray-100">Total Reports per Month</h3>
                         <BarChart
                           data={totalReportsChartData}
                           height={250}
@@ -324,8 +323,8 @@ export default function ResearcherAnalyticsPage() {
                       </div>
 
                       {/* Valid Reports Chart */}
-                      <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
-                        <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Valid Reports per Month</h3>
+                      <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                        <h3 className="mb-4 text-lg font-semibold text-[#2d2a26] dark:text-gray-100">Valid Reports per Month</h3>
                         <BarChart
                           data={validReportsChartData}
                           height={250}
@@ -334,8 +333,8 @@ export default function ResearcherAnalyticsPage() {
                       </div>
 
                       {/* Earnings Chart */}
-                      <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
-                        <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Earnings per Month (ETB)</h3>
+                      <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                        <h3 className="mb-4 text-lg font-semibold text-[#2d2a26] dark:text-gray-100">Earnings per Month (ETB)</h3>
                         <BarChart
                           data={earningsChartData}
                           height={250}
@@ -346,7 +345,7 @@ export default function ResearcherAnalyticsPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
+                    <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
                       <p className="text-sm text-[#6d6760] dark:text-gray-300">No trend data available for this period.</p>
                     </div>
                   )}
@@ -354,8 +353,8 @@ export default function ResearcherAnalyticsPage() {
 
                 {/* Specialization Tab */}
                 <div data-tab="specialization" className="space-y-6">
-                  <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-6">
-                    <h3 className="text-lg font-bold text-[#2d2a26] dark:text-gray-100 mb-4">Your Specializations</h3>
+                  <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-[#111111]">
+                    <h3 className="mb-4 text-lg font-semibold text-[#2d2a26] dark:text-gray-100">Your Specializations</h3>
                     {analyticsData.top_vulnerability_types.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {analyticsData.top_vulnerability_types.map((vuln) => {
@@ -388,7 +387,7 @@ export default function ResearcherAnalyticsPage() {
               </Tabs>
             </div>
           ) : (
-            <div className="rounded-2xl bg-[#faf6f1] dark:bg-gray-800 p-8 text-center">
+            <div className="rounded-[28px] border border-[#e6ddd4] bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-[#111111]">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">
                 No Analytics Data
               </p>

@@ -11,10 +11,13 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Tabs from '@/components/ui/Tabs';
+import { withReputationRank } from '@/lib/researcherRanking';
 
 interface Researcher {
   id: string;
+  reputation_rank?: number;
   user: {
+    full_name?: string;
     username: string;
     email: string;
   };
@@ -51,20 +54,23 @@ export default function ResearcherManagementPage() {
     { enabled: !!user }
   );
 
-  // Filter researchers
-  const filteredResearchers = researchers?.filter((researcher) => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch =
-      researcher.user.email.toLowerCase().includes(query);
-    
-    const matchesReputation = researcher.reputation_score >= parseInt(minReputation);
-    
-    const matchesSpecialization =
-      specialization === 'all' ||
-      researcher.profile?.specializations?.includes(specialization);
+  const filteredResearchers = withReputationRank(
+    (researchers ?? []).filter((researcher) => {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        researcher.user.email.toLowerCase().includes(query) ||
+        (researcher.user.full_name?.toLowerCase().includes(query) ?? false) ||
+        researcher.user.username.toLowerCase().includes(query);
 
-    return matchesSearch && matchesReputation && matchesSpecialization;
-  }) || [];
+      const matchesReputation = researcher.reputation_score >= parseInt(minReputation, 10);
+
+      const matchesSpecialization =
+        specialization === 'all' ||
+        researcher.profile?.specializations?.includes(specialization);
+
+      return matchesSearch && matchesReputation && matchesSpecialization;
+    })
+  );
 
   const tabs = [
     { id: 'browse', label: 'Browse Researchers' },
@@ -174,8 +180,11 @@ export default function ResearcherManagementPage() {
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                                  #{researcher.reputation_rank}
+                                </span>
                                 <h4 className="font-bold text-[#2d2a26] dark:text-slate-100">
-                                  {researcher.user.username}
+                                  {researcher.user.full_name || researcher.user.username}
                                 </h4>
                                 <span className="inline-flex items-center rounded-full bg-[#eef7ef] px-3 py-1 text-xs font-semibold text-[#24613a]">
                                   {researcher.reputation_score} Rep

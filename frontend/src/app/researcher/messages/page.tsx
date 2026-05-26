@@ -207,9 +207,18 @@ export default function ResearcherMessagesPage() {
           eyebrowText="Researcher Portal"
           eyebrowClassName="text-xl tracking-[0.18em]"
         >
-          <div className="flex h-[600px] rounded-2xl bg-[#faf6f1] dark:bg-gray-800 border border-[#e6ddd4] dark:border-gray-700 overflow-hidden">
+          <section className="mb-6 rounded-[32px] border border-[#d8cfc6] dark:border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(239,35,48,0.1),_transparent_38%),linear-gradient(135deg,_#fffaf3,_#f5efe7)] dark:bg-[radial-gradient(circle_at_top_left,rgba(239,35,48,0.12),transparent_38%),linear-gradient(135deg,#1a1a1a,#151515)] p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8b8177] dark:text-gray-400">
+              Secure Messaging
+            </p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5f5851] dark:text-gray-300">
+              Coordinate with organizations, triage specialists, and other researchers about reports and engagements.
+            </p>
+          </section>
+
+          <div className="flex min-h-[560px] flex-col overflow-hidden rounded-[28px] border border-[#e6ddd4] bg-white shadow-sm dark:border-gray-800 dark:bg-[#111111] lg:h-[600px] lg:flex-row">
             {/* Conversations List */}
-            <div className="w-1/3 border-r border-[#e6ddd4] dark:border-gray-700 flex flex-col">
+            <div className="flex w-full flex-col border-b border-[#e6ddd4] dark:border-gray-700 lg:w-1/3 lg:border-b-0 lg:border-r">
               <div className="p-4 border-b border-[#e6ddd4] dark:border-gray-700 flex items-center justify-between">
                 <h3 className="font-semibold text-[#2d2a26] dark:text-gray-100">Conversations</h3>
                 <Button
@@ -287,7 +296,7 @@ export default function ResearcherMessagesPage() {
             </div>
 
             {/* Message Thread */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex min-h-[320px] flex-1 flex-col lg:min-h-0">
               {selectedConversation ? (
                 <>
                   {/* Thread Header */}

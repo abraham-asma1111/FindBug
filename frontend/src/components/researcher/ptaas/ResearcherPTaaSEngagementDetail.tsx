@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { api } from '@/lib/api';
@@ -8,10 +8,46 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
+import Alert from '@/components/ui/Alert';
+import Spinner from '@/components/ui/Spinner';
 import { 
   Calendar, Users, AlertCircle, CheckCircle, Clock, 
-  Target, TrendingUp, Flag
+  Target, TrendingUp, Flag, RefreshCcw
 } from 'lucide-react';
+import ResearcherPTaaSRetestResultModal from '@/components/researcher/ptaas/ResearcherPTaaSRetestResultModal';
+import {
+  MetricGrid,
+  SectionCard,
+  StatusBadge,
+  WorkflowTabs,
+  formatStatusLabel,
+  formatWorkflowDate,
+} from '@/components/researcher/workflows/shared';
+
+function normalizeApiError(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail;
+  if (!detail) return error?.message || fallback;
+
+  if (Array.isArray(detail)) {
+    const lines = detail.map((item: any) => {
+      if (typeof item === 'string') return item;
+      const field = Array.isArray(item?.loc) ? item.loc.slice(1).join('.') : 'field';
+      return `${field}: ${item?.msg || 'Invalid value'}`;
+    });
+    return lines.join('\n');
+  }
+
+  if (typeof detail === 'object') {
+    if (typeof detail.message === 'string') return detail.message;
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return String(detail);
+}
 
 interface PTaaSEngagement {
   id: string;
@@ -56,18 +92,31 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
   const [activeTab, setActiveTab] = useState('overview');
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showFindingModal, setShowFindingModal] = useState(false);
+  const [showRetestModal, setShowRetestModal] = useState(false);
+  const [selectedRetestFindingId, setSelectedRetestFindingId] = useState<string | null>(null);
   const [acceptedNDA, setAcceptedNDA] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pageError, setPageError] = useState('');
+  const [pageSuccess, setPageSuccess] = useState('');
 
   // Finding form state
   const [findingForm, setFindingForm] = useState({
     title: '',
     severity: 'Medium',
+    vulnerability_type: 'Web Application',
+    affected_component: '',
     description: '',
     reproduction_steps: '',
     impact_analysis: '',
+    business_impact: 'Medium',
+    technical_confidentiality: 'Medium',
+    technical_integrity: 'Medium',
+    technical_availability: 'Medium',
     remediation: '',
+    remediation_priority: 'Medium',
+    remediation_effort: 'Medium',
+    remediation_steps: '',
     proof_of_exploit: ''
   });
 
@@ -75,24 +124,43 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
     endpoint: `/ptaas/researcher/engagements/${engagementId}`
   });
 
-  const { data: findings } = useApiQuery<Finding[] | null>({
-    endpoint: `/ptaas/engagements/${engagementId}/findings`
+  const { data: findings, refetch: refetchFindings } = useApiQuery<Finding[] | null>({
+    endpoint: `/ptaas/engagements/${engagementId}/findings`,
+    refetchInterval: 30000,
   });
+
+  // IMPORTANT: hooks must run on every render (no early-return before useMemo).
+  const findingsCount = findings?.length ?? 0;
+  const retestCount = findings?.filter(f => f.status?.toUpperCase() === 'RETEST_REQUESTED').length ?? 0;
+  const tabItems = useMemo(
+    () =>
+      [
+        { value: 'overview', label: 'Overview' },
+        { value: 'scope', label: 'Scope & Assets' },
+        { value: 'testing', label: 'Testing' },
+        // Findings tab shows badge with retest count if any pending
+        { value: 'findings', label: retestCount > 0 ? `Findings 🔄${retestCount}` : 'Findings', badge: findingsCount },
+        { value: 'team', label: 'Team' },
+      ],
+    [findingsCount, retestCount]
+  );
 
   const handleAcceptEngagement = async () => {
     if (!acceptedNDA) {
-      alert('Please accept the NDA and testing rules');
+      setPageError('Please accept the NDA and testing rules.');
       return;
     }
 
     setIsAccepting(true);
     try {
+      setPageError('');
+      setPageSuccess('');
       await api.post(`/ptaas/researcher/engagements/${engagementId}/accept`, {});
-      alert('Engagement accepted successfully!');
+      setPageSuccess('Engagement accepted successfully. You can now start testing and submitting findings.');
       setShowAcceptModal(false);
       refetch();
     } catch (error: any) {
-      alert(error.message || 'Failed to accept engagement');
+      setPageError(normalizeApiError(error, 'Failed to accept engagement.'));
     } finally {
       setIsAccepting(false);
     }
@@ -101,23 +169,82 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
   const handleSubmitFinding = async () => {
     setIsSubmitting(true);
     try {
+      setPageError('');
+      setPageSuccess('');
+      if (findingForm.proof_of_exploit.length < 50) {
+        setPageError('proof_of_exploit must be at least 50 characters.');
+        return;
+      }
+      if (findingForm.impact_analysis.length < 50) {
+        setPageError('impact_analysis must be at least 50 characters.');
+        return;
+      }
+      if (findingForm.remediation.length < 50) {
+        setPageError('remediation must be at least 50 characters.');
+        return;
+      }
+      if (!findingForm.affected_component.trim()) {
+        setPageError('affected_component is required.');
+        return;
+      }
+      if (!findingForm.vulnerability_type.trim()) {
+        setPageError('vulnerability_type is required.');
+        return;
+      }
+      const remediationSteps = findingForm.remediation_steps
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (remediationSteps.length === 0) {
+        setPageError('At least one remediation step is required.');
+        return;
+      }
       await api.post(`/ptaas/findings`, {
         engagement_id: engagementId,
-        ...findingForm
+        title: findingForm.title,
+        severity: findingForm.severity,
+        vulnerability_type: findingForm.vulnerability_type,
+        affected_component: findingForm.affected_component,
+        description: findingForm.description,
+        reproduction_steps: findingForm.reproduction_steps,
+        proof_of_exploit: findingForm.proof_of_exploit,
+        impact_analysis: findingForm.impact_analysis,
+        business_impact: findingForm.business_impact,
+        technical_impact: {
+          confidentiality: findingForm.technical_confidentiality,
+          integrity: findingForm.technical_integrity,
+          availability: findingForm.technical_availability,
+        },
+        remediation: findingForm.remediation,
+        remediation_priority: findingForm.remediation_priority,
+        remediation_effort: findingForm.remediation_effort,
+        remediation_steps: remediationSteps,
       });
-      alert('Finding submitted successfully!');
+      setPageSuccess('Finding submitted successfully.');
       setShowFindingModal(false);
+      await refetchFindings();
+      refetch();
+      setActiveTab('findings');
       setFindingForm({
         title: '',
         severity: 'Medium',
+        vulnerability_type: 'Web Application',
+        affected_component: '',
         description: '',
         reproduction_steps: '',
         impact_analysis: '',
+        business_impact: 'Medium',
+        technical_confidentiality: 'Medium',
+        technical_integrity: 'Medium',
+        technical_availability: 'Medium',
         remediation: '',
+        remediation_priority: 'Medium',
+        remediation_effort: 'Medium',
+        remediation_steps: '',
         proof_of_exploit: ''
       });
     } catch (error: any) {
-      alert(error.message || 'Failed to submit finding');
+      setPageError(normalizeApiError(error, 'Failed to submit finding.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -125,10 +252,8 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6 animate-pulse">
-          <div className="h-64 bg-[#faf6f1] rounded"></div>
-        </div>
+      <div className="flex justify-center py-12">
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -150,105 +275,85 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
   const statusInfo = statusConfig[engagement.status as keyof typeof statusConfig] || statusConfig.DRAFT;
   const StatusIcon = statusInfo.icon;
 
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'scope', label: 'Scope & Assets' },
-    { id: 'testing', label: 'Testing' },
-    { id: 'findings', label: `Findings (${findings?.length || 0})` },
-    { id: 'team', label: 'Team' },
+  const metrics = [
+    {
+      label: 'Methodology',
+      value: formatStatusLabel(engagement.testing_methodology),
+      helper: 'Testing framework assigned',
+    },
+    {
+      label: 'Team size',
+      value: String(engagement.team_size ?? 0),
+      helper: 'Assigned researchers',
+    },
+    {
+      label: 'Findings',
+      value: String(findings?.length || 0),
+      helper: 'Submitted in this engagement',
+    },
+    {
+      label: 'Duration',
+      value: engagement.duration_days ? `${engagement.duration_days} days` : 'TBD',
+      helper: `${formatWorkflowDate(engagement.start_date, 'Start TBD')} → ${formatWorkflowDate(engagement.end_date, 'End TBD')}`,
+    },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-[#2d2a26]">{engagement.name}</h1>
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>
-                <StatusIcon className="h-3.5 w-3.5" />
-                {statusInfo.label}
-              </span>
-            </div>
-            <p className="mt-2 text-sm text-[#6d6760]">{engagement.description}</p>
+      <SectionCard
+        title={engagement.name}
+        description={engagement.description}
+        action={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={statusInfo.label} />
+            {engagement.status === 'DRAFT' ? (
+              <Button size="sm" onClick={() => setShowAcceptModal(true)}>
+                <CheckCircle className="mr-1 h-4 w-4" />
+                Accept engagement
+              </Button>
+            ) : null}
           </div>
-          {engagement.status === 'DRAFT' && (
-            <Button size="sm" onClick={() => setShowAcceptModal(true)}>
-              <CheckCircle className="h-4 w-4 mr-1" />
-              Accept Engagement
-            </Button>
-          )}
-        </div>
+        }
+      >
+        <MetricGrid items={metrics} />
+      </SectionCard>
 
-        {/* Quick Stats */}
-        <div className="mt-6 grid grid-cols-4 gap-4 border-t border-[#e6ddd4] pt-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-blue-50 p-2">
-              <Target className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-[#8b8177]">Methodology</p>
-              <p className="text-sm font-semibold text-[#2d2a26]">{engagement.testing_methodology}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-green-50 p-2">
-              <Users className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-[#8b8177]">Team Size</p>
-              <p className="text-sm font-semibold text-[#2d2a26]">{engagement.team_size}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-orange-50 p-2">
-              <Flag className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-xs text-[#8b8177]">Findings</p>
-              <p className="text-sm font-semibold text-[#2d2a26]">{findings?.length || 0}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-purple-50 p-2">
-              <Calendar className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-[#8b8177]">Duration</p>
-              <p className="text-sm font-semibold text-[#2d2a26]">{engagement.duration_days} days</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {pageError ? (
+        <Alert variant="error" title="PTaaS workflow issue">
+          {pageError}
+        </Alert>
+      ) : null}
 
-      {/* Tabs */}
-      <div className="border-b border-[#e6ddd4]">
-        <div className="flex gap-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-                activeTab === tab.id
-                  ? 'text-[#3b82f6] border-[#3b82f6]'
-                  : 'text-[#6d6760] border-transparent hover:text-[#2d2a26]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {pageSuccess ? (
+        <Alert variant="success" title="PTaaS updated">
+          {pageSuccess}
+        </Alert>
+      ) : null}
 
-      {/* Tab Content */}
-      <div className="rounded-2xl border border-[#e6ddd4] bg-white p-6">
+      <WorkflowTabs
+        tone="blue"
+        active={activeTab as any}
+        onChange={(value) => setActiveTab(value)}
+        items={tabItems as any}
+      />
+
+      <SectionCard title={formatStatusLabel(activeTab)} description="Engagement workspace panel.">
         {activeTab === 'overview' && <OverviewTab engagement={engagement} />}
         {activeTab === 'scope' && <ScopeTab engagement={engagement} />}
         {activeTab === 'testing' && <TestingTab engagement={engagement} />}
-        {activeTab === 'findings' && <FindingsTab findings={findings} onSubmit={() => setShowFindingModal(true)} engagementId={engagementId} />}
+        {activeTab === 'findings' && (
+          <FindingsTab
+            findings={findings}
+            onSubmit={() => setShowFindingModal(true)}
+            onSubmitRetest={(id) => {
+              setSelectedRetestFindingId(id);
+              setShowRetestModal(true);
+            }}
+            engagementId={engagementId}
+          />
+        )}
         {activeTab === 'team' && <TeamTab engagement={engagement} />}
-      </div>
+      </SectionCard>
 
       {/* Accept Engagement Modal */}
       <Modal
@@ -322,7 +427,7 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
               type="text"
               value={findingForm.title}
               onChange={(e) => setFindingForm({ ...findingForm, title: e.target.value })}
-              className="w-full px-3 py-2 border border-[#e6ddd4] rounded-lg bg-white text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-[#e6ddd4] bg-white px-3 py-2 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-[#111111] dark:text-gray-100"
               placeholder="Brief title of the vulnerability"
             />
           </div>
@@ -341,6 +446,32 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
                 { value: 'Low', label: 'Low' },
                 { value: 'Info', label: 'Info' },
               ]}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#2d2a26] mb-1">
+              Vulnerability Type
+            </label>
+            <input
+              type="text"
+              value={findingForm.vulnerability_type}
+              onChange={(e) => setFindingForm({ ...findingForm, vulnerability_type: e.target.value })}
+              className="w-full rounded-xl border border-[#e6ddd4] bg-white px-3 py-2 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-[#111111] dark:text-gray-100"
+              placeholder="e.g., SQL Injection"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#2d2a26] mb-1">
+              Affected Component
+            </label>
+            <input
+              type="text"
+              value={findingForm.affected_component}
+              onChange={(e) => setFindingForm({ ...findingForm, affected_component: e.target.value })}
+              className="w-full rounded-xl border border-[#e6ddd4] bg-white px-3 py-2 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-[#111111] dark:text-gray-100"
+              placeholder="e.g., /api/v1/auth/login"
             />
           </div>
 
@@ -378,6 +509,104 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
               rows={2}
               placeholder="Business and technical impact"
             />
+            <p className="mt-1 text-xs text-[#8b8177]">
+              {findingForm.impact_analysis.length}/50 minimum characters
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-[#2d2a26] mb-1">Business Impact</label>
+              <Select
+                value={findingForm.business_impact}
+                onChange={(e) => setFindingForm({ ...findingForm, business_impact: e.target.value })}
+                options={[
+                  { value: 'Critical', label: 'Critical' },
+                  { value: 'High', label: 'High' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'Low', label: 'Low' },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#2d2a26] mb-1">Remediation Priority</label>
+              <Select
+                value={findingForm.remediation_priority}
+                onChange={(e) => setFindingForm({ ...findingForm, remediation_priority: e.target.value })}
+                options={[
+                  { value: 'Immediate', label: 'Immediate' },
+                  { value: 'High', label: 'High' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'Low', label: 'Low' },
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-[#8b8177] mb-1">Tech impact: C</label>
+              <Select value={findingForm.technical_confidentiality} onChange={(e) => setFindingForm({ ...findingForm, technical_confidentiality: e.target.value })} options={[{ value: 'Low', label: 'Low' }, { value: 'Medium', label: 'Medium' }, { value: 'High', label: 'High' }]} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#8b8177] mb-1">Tech impact: I</label>
+              <Select value={findingForm.technical_integrity} onChange={(e) => setFindingForm({ ...findingForm, technical_integrity: e.target.value })} options={[{ value: 'Low', label: 'Low' }, { value: 'Medium', label: 'Medium' }, { value: 'High', label: 'High' }]} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#8b8177] mb-1">Tech impact: A</label>
+              <Select value={findingForm.technical_availability} onChange={(e) => setFindingForm({ ...findingForm, technical_availability: e.target.value })} options={[{ value: 'Low', label: 'Low' }, { value: 'Medium', label: 'Medium' }, { value: 'High', label: 'High' }]} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#2d2a26] mb-1">Proof of Exploit (min 50 chars)</label>
+            <Textarea
+              value={findingForm.proof_of_exploit}
+              onChange={(e) => setFindingForm({ ...findingForm, proof_of_exploit: e.target.value })}
+              rows={3}
+              placeholder="Provide clear PoC evidence, payloads, and observed behavior..."
+            />
+            <p className="mt-1 text-xs text-[#8b8177]">
+              {findingForm.proof_of_exploit.length}/50 minimum characters
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#2d2a26] mb-1">Remediation (min 50 chars)</label>
+            <Textarea
+              value={findingForm.remediation}
+              onChange={(e) => setFindingForm({ ...findingForm, remediation: e.target.value })}
+              rows={3}
+              placeholder="Provide concrete remediation guidance..."
+            />
+            <p className="mt-1 text-xs text-[#8b8177]">
+              {findingForm.remediation.length}/50 minimum characters
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-[#2d2a26] mb-1">Remediation Effort</label>
+              <Select
+                value={findingForm.remediation_effort}
+                onChange={(e) => setFindingForm({ ...findingForm, remediation_effort: e.target.value })}
+                options={[
+                  { value: 'Low', label: 'Low' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'High', label: 'High' },
+                  { value: 'Very High', label: 'Very High' },
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#2d2a26] mb-1">Remediation Steps (one per line)</label>
+              <Textarea
+                value={findingForm.remediation_steps}
+                onChange={(e) => setFindingForm({ ...findingForm, remediation_steps: e.target.value })}
+                rows={3}
+                placeholder="1. Step one&#10;2. Step two"
+              />
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-[#e6ddd4]">
@@ -395,6 +624,15 @@ export default function ResearcherPTaaSEngagementDetail({ engagementId }: Resear
           </div>
         </div>
       </Modal>
+
+      {showRetestModal && selectedRetestFindingId && (
+        <ResearcherPTaaSRetestResultModal
+          isOpen={showRetestModal}
+          onClose={() => { setShowRetestModal(false); setSelectedRetestFindingId(null); }}
+          findingId={selectedRetestFindingId}
+          onSuccess={refetchFindings}
+        />
+      )}
     </div>
   );
 }
@@ -491,9 +729,39 @@ function TestingTab({ engagement }: { engagement: PTaaSEngagement }) {
 }
 
 // Findings Tab
-function FindingsTab({ findings, onSubmit, engagementId }: { findings: Finding[] | null | undefined; onSubmit: () => void; engagementId: string }) {
+function FindingsTab({
+  findings,
+  onSubmit,
+  onSubmitRetest,
+  engagementId,
+}: {
+  findings: Finding[] | null | undefined;
+  onSubmit: () => void;
+  onSubmitRetest: (id: string) => void;
+  engagementId: string;
+}) {
   const router = useRouter();
-  
+
+  const statusBadge = (status: string) => {
+    const s = status?.toUpperCase();
+    if (s === 'RETEST_REQUESTED') return 'bg-orange-100 text-orange-700 border border-orange-300';
+    if (s === 'VERIFIED') return 'bg-green-100 text-green-700';
+    if (s === 'CLOSED') return 'bg-gray-100 text-gray-600';
+    if (s === 'SUBMITTED') return 'bg-blue-100 text-blue-700';
+    if (s === 'TRIAGED') return 'bg-purple-100 text-purple-700';
+    if (s === 'IN_PROGRESS') return 'bg-yellow-100 text-yellow-700';
+    if (s === 'REJECTED') return 'bg-red-100 text-red-700';
+    return 'bg-blue-100 text-blue-700';
+  };
+
+  const statusLabel = (status: string) => {
+    const s = status?.toUpperCase();
+    if (s === 'RETEST_REQUESTED') return '🔄 Retest Requested';
+    if (s === 'VERIFIED') return '✅ Verified';
+    if (s === 'CLOSED') return '💰 Bounty Approved';
+    return status?.replace(/_/g, ' ');
+  };
+
   if (!findings || findings.length === 0) {
     return (
       <div className="text-center py-12">
@@ -501,9 +769,7 @@ function FindingsTab({ findings, onSubmit, engagementId }: { findings: Finding[]
           <Flag className="h-8 w-8 text-[#8b8177]" />
         </div>
         <h3 className="text-lg font-semibold text-[#2d2a26] mb-2">No findings submitted yet</h3>
-        <p className="text-sm text-[#6d6760] mb-6">
-          Start testing and submit your first security finding
-        </p>
+        <p className="text-sm text-[#6d6760] mb-6">Start testing and submit your first security finding</p>
         <Button onClick={onSubmit}>
           <Flag className="h-4 w-4 mr-1" />
           Submit Finding
@@ -515,41 +781,70 @@ function FindingsTab({ findings, onSubmit, engagementId }: { findings: Finding[]
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[#2d2a26]">Submitted Findings</h3>
+        <h3 className="text-lg font-semibold text-[#2d2a26]">Submitted Findings ({findings.length})</h3>
         <Button size="sm" onClick={onSubmit}>
           <Flag className="h-4 w-4 mr-1" />
           Submit Finding
         </Button>
       </div>
       <div className="space-y-3">
-        {findings.map((finding) => (
-          <div 
-            key={finding.id} 
-            className="p-4 rounded-xl border border-[#e6ddd4] bg-[#faf6f1] hover:bg-white cursor-pointer transition-colors"
-            onClick={() => router.push(`/researcher/programs/ptaas/${engagementId}/findings/${finding.id}`)}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h4 className="font-medium text-[#2d2a26] mb-1">{finding.title}</h4>
-                <p className="text-sm text-[#6d6760]">
-                  Submitted {new Date(finding.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                  {finding.severity}
-                </span>
-                <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                  {finding.status}
-                </span>
+        {findings.map((finding) => {
+          const isRetest = finding.status?.toUpperCase() === 'RETEST_REQUESTED';
+          return (
+            <div
+              key={finding.id}
+              className={`p-4 rounded-xl border transition-all ${
+                isRetest
+                  ? 'border-orange-300 bg-orange-50'
+                  : 'border-[#e6ddd4] bg-[#faf6f1] hover:bg-white cursor-pointer'
+              }`}
+              onClick={isRetest ? undefined : () => router.push(`/researcher/programs/ptaas/${engagementId}/findings/${finding.id}`)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    {isRetest && <RefreshCcw className="h-4 w-4 text-orange-600 flex-shrink-0 animate-spin-slow" />}
+                    <h4 className="font-medium text-[#2d2a26] truncate">{finding.title}</h4>
+                  </div>
+                  <p className="text-sm text-[#6d6760]">
+                    Submitted {new Date(finding.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    finding.severity?.toLowerCase() === 'critical' ? 'bg-red-100 text-red-700' :
+                    finding.severity?.toLowerCase() === 'high' ? 'bg-orange-100 text-orange-700' :
+                    finding.severity?.toLowerCase() === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {finding.severity}
+                  </span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${statusBadge(finding.status)}`}>
+                    {statusLabel(finding.status)}
+                  </span>
+                  {isRetest && (
+                    <Button
+                      size="sm"
+                      className="bg-orange-600 hover:bg-orange-700 text-white ml-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSubmitRetest(finding.id);
+                      }}
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+                      Submit Retest
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
+
 
 // Team Tab
 function TeamTab({ engagement }: { engagement: PTaaSEngagement }) {

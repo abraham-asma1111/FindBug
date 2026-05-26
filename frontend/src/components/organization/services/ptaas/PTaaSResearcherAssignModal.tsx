@@ -7,6 +7,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { useApiMutation } from '@/hooks/useApiMutation';
 import { useToast } from '@/components/ui/Toast';
 import { Search, Users, Star, Award, CheckCircle, UserPlus, Filter } from 'lucide-react';
+import { withReputationRank } from '@/lib/researcherRanking';
 
 interface PTaaSResearcherAssignModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface PTaaSResearcherAssignModalProps {
 
 interface Researcher {
   id: string;
+  reputation_rank?: number;
   user: {
     id: string;
     email: string;
@@ -89,30 +91,26 @@ export default function PTaaSResearcherAssignModal({
     });
   };
 
-  // Filter researchers
-  const filteredResearchers = researchers?.filter((researcher) => {
-    // Search filter
-    const matchesSearch =
-      !searchQuery ||
-      researcher.user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      researcher.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      researcher.user.username.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredResearchers = withReputationRank(
+    (researchers ?? []).filter((researcher) => {
+      const matchesSearch =
+        !searchQuery ||
+        researcher.user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        researcher.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        researcher.user.username.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Reputation filter
-    const matchesReputation = researcher.reputation_score >= minReputation;
+      const matchesReputation = researcher.reputation_score >= minReputation;
 
-    // Skill filter
-    const matchesSkill =
-      !skillFilter ||
-      researcher.profile.skills.some((skill) =>
-        skill.toLowerCase().includes(skillFilter.toLowerCase())
-      ) ||
-      researcher.profile.specializations.some((spec) =>
-        spec.toLowerCase().includes(skillFilter.toLowerCase())
-      );
+      const skills = researcher.profile?.skills ?? [];
+      const specializations = researcher.profile?.specializations ?? [];
+      const matchesSkill =
+        !skillFilter ||
+        skills.some((skill) => skill.toLowerCase().includes(skillFilter.toLowerCase())) ||
+        specializations.some((spec) => spec.toLowerCase().includes(skillFilter.toLowerCase()));
 
-    return matchesSearch && matchesReputation && matchesSkill;
-  });
+      return matchesSearch && matchesReputation && matchesSkill;
+    })
+  );
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Assign Researchers" size="xl">
@@ -124,7 +122,7 @@ export default function PTaaSResearcherAssignModal({
             <div>
               <h4 className="font-semibold text-blue-900">Assigning to: {engagementName}</h4>
               <p className="mt-1 text-sm text-blue-700">
-                Select researchers to invite to this engagement. They will receive notifications and can accept or decline.
+                Select researchers to invite to this engagement. Listed by reputation rank (#1 = highest).
               </p>
             </div>
           </div>
@@ -235,12 +233,15 @@ export default function PTaaSResearcherAssignModal({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-900">
+                        #{researcher.reputation_rank}
+                      </span>
                       <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                        {researcher.user.full_name.charAt(0).toUpperCase()}
+                        {(researcher.user.full_name || researcher.user.username).charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <h4 className="font-semibold text-[#2d2a26]">
-                          {researcher.user.full_name}
+                          {researcher.user.full_name || researcher.user.username}
                         </h4>
                         <p className="text-sm text-[#6d6760]">@{researcher.user.username}</p>
                       </div>

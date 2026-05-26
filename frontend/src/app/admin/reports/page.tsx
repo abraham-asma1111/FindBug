@@ -18,6 +18,7 @@ export default function AdminReportsPage() {
   const severityFilter = searchParams.get('severity')   || 'all';
   const programId      = searchParams.get('program_id') || '';
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPTaaSOnly, setShowPTaaSOnly] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -33,11 +34,14 @@ export default function AdminReportsPage() {
   const reports = data?.reports || [];
 
   const filteredReports = reports.filter((r: any) => {
+    if (showPTaaSOnly && !r.is_ptaas) return false;
+    
     const searchLower = searchQuery.toLowerCase();
     return (
       (r.title && r.title.toLowerCase().includes(searchLower)) ||
       (r.researcher_name && r.researcher_name.toLowerCase().includes(searchLower)) ||
-      (r.program_name && r.program_name.toLowerCase().includes(searchLower))
+      (r.program_name && r.program_name.toLowerCase().includes(searchLower)) ||
+      (r.report_number && r.report_number.toLowerCase().includes(searchLower))
     );
   });
 
@@ -160,6 +164,23 @@ export default function AdminReportsPage() {
             </div>
           </div>
 
+          {/* PTaaS Toggle */}
+          <div className="flex items-center gap-2 mt-4 sm:mt-0 xl:mr-auto pl-2 xl:pl-4">
+            <label className="flex items-center cursor-pointer">
+              <div className="relative">
+                <input 
+                  type="checkbox" 
+                  className="sr-only" 
+                  checked={showPTaaSOnly}
+                  onChange={() => setShowPTaaSOnly(!showPTaaSOnly)}
+                />
+                <div className={`block w-10 h-6 rounded-full transition-colors ${showPTaaSOnly ? 'bg-[#EF2330]' : 'bg-[#334155]'}`}></div>
+                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${showPTaaSOnly ? 'transform translate-x-4' : ''}`}></div>
+              </div>
+              <span className="ml-3 text-sm font-medium text-[#F8FAFC]">PTaaS Only</span>
+            </label>
+          </div>
+
           {/* Search Bar */}
           <div className="w-full xl:w-72 flex justify-end">
             <div className="relative w-full max-w-sm">
@@ -211,9 +232,22 @@ export default function AdminReportsPage() {
                     <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-4 hover:border-[#475569] transition-colors cursor-pointer">
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-[#F8FAFC] mb-1 truncate">
-                            {report.title || '(Untitled)'}
-                          </h3>
+                          <div className="flex items-center gap-2 mb-1">
+                            {report.is_ptaas && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                report.is_sla_breached 
+                                  ? 'bg-red-500/10 border-red-500/50 text-red-400' 
+                                  : report.sla_hours_left < 12
+                                    ? 'bg-orange-500/10 border-orange-500/50 text-orange-400'
+                                    : 'bg-blue-500/10 border-blue-500/50 text-blue-400'
+                              }`}>
+                                {report.is_sla_breached ? 'SLA BREACHED' : `SLA: ${report.sla_hours_left}h`}
+                              </span>
+                            )}
+                            <h3 className="font-semibold text-[#F8FAFC] truncate">
+                              {report.title || '(Untitled)'}
+                            </h3>
+                          </div>
                           <p className="text-sm text-[#94A3B8] truncate">
                             {report.researcher_name || 'Unknown researcher'}
                             {report.program_name ? ` · ${report.program_name}` : ''}

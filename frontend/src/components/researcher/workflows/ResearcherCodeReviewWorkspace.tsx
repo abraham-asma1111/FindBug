@@ -12,11 +12,14 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import { api } from '@/lib/api';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
+import Spinner from '@/components/ui/Spinner';
 import {
   Banner,
   EmptyCollection,
   MetricGrid,
   PillList,
+  ProgramGuide,
+  ProgramHighlights,
   SectionCard,
   StatusBadge,
   WorkflowPickerCard,
@@ -25,6 +28,19 @@ import {
   formatStatusLabel,
   formatWorkflowDate,
 } from './shared';
+import { codeReviewProgramGuide } from './programGuideContent';
+
+function normalizeApiError(error: unknown, fallback: string): string {
+  const axiosErr = error as { response?: { data?: { detail?: string | { msg: string; loc?: string[] }[] } } };
+  const detail = axiosErr.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    return detail.map((e) => `${(e.loc || []).join('.')}: ${e.msg}`).join('; ');
+  }
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  return fallback;
+}
 
 interface CodeReviewEngagement {
   id: string;
@@ -55,6 +71,25 @@ interface CodeReviewStats {
   by_status: Record<string, number>;
   by_issue_type: Record<string, number>;
 }
+
+const codeReviewHighlights = [
+  {
+    title: 'Full code access',
+    description: 'Review private repositories, configs, and dependencies inside scoped trust boundaries.',
+  },
+  {
+    title: 'Logic vulnerabilities',
+    description: 'Find business-logic flaws, race conditions, and architectural issues invisible to black-box testing.',
+  },
+  {
+    title: 'Precise references',
+    description: 'Report with file paths and line numbers for engineering-ready remediation.',
+  },
+  {
+    title: 'Secure handoff',
+    description: 'Submit a final review package and track verification through remediation.',
+  },
+];
 
 const codeReviewSteps = [
   {
@@ -181,8 +216,8 @@ export default function ResearcherCodeReviewWorkspace() {
       await api.post(`/code-review/engagements/${selectedEngagementId}/start`);
       setPageSuccess('Code review moved into progress. Start logging findings with file-level precision.');
       await Promise.all([refetchEngagements(), refetchStats()]);
-    } catch (error: any) {
-      setPageError(error.response?.data?.detail || 'Failed to start the code review.');
+    } catch (error: unknown) {
+      setPageError(normalizeApiError(error, 'Failed to start the code review.'));
     } finally {
       setIsStarting(false);
     }
@@ -190,6 +225,14 @@ export default function ResearcherCodeReviewWorkspace() {
 
   async function handleSubmitFinding() {
     if (!selectedEngagementId) {
+      return;
+    }
+    if (selectedEngagement?.status !== 'in_progress') {
+      setPageError('Start the review from the Overview tab before logging findings.');
+      return;
+    }
+    if (!findingForm.title.trim() || !findingForm.description.trim()) {
+      setPageError('Title and description are required.');
       return;
     }
 
@@ -218,8 +261,8 @@ export default function ResearcherCodeReviewWorkspace() {
       setPageSuccess('Code review finding logged successfully.');
       await Promise.all([refetchFindings(), refetchStats(), refetchEngagements()]);
       setActiveTab('findings');
-    } catch (error: any) {
-      setPageError(error.response?.data?.detail || 'Failed to add the code review finding.');
+    } catch (error: unknown) {
+      setPageError(normalizeApiError(error, 'Failed to add the code review finding.'));
     } finally {
       setIsSubmittingFinding(false);
     }
@@ -254,15 +297,17 @@ export default function ResearcherCodeReviewWorkspace() {
           navItems={getPortalNavItems(user.role)}
           headerAlign="center"
           eyebrowText="Researcher Portal"
-          eyebrowClassName="text-sm tracking-[0.25em]"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           <div className="space-y-6">
             <Banner
-              title="Expert Code Review"
-              subtitle="This page now behaves like a real code-review delivery surface: assigned repositories, file-based findings, workflow state changes, and final report submission."
-              badge="White-Box Review Lifecycle"
-              icon="CR"
               tone="emerald"
+              title="Expert Code Review"
+              subtitle="White-box security assessment with repository access, precise file-level findings, and a structured report handoff."
+              badge="White-box review lifecycle"
+              icon="⌘"
+              asideTitle="Repository review desk"
+              asideDescription="Start reviews, log findings with line references, and submit the final package."
             />
 
             {pageError ? (
@@ -283,9 +328,15 @@ export default function ResearcherCodeReviewWorkspace() {
               </Alert>
             ) : null}
 
+            <ProgramHighlights items={codeReviewHighlights} tone="emerald" />
+
+            <ProgramGuide guide={codeReviewProgramGuide} tone="emerald" defaultOpen />
+
             <SectionCard title="Assigned reviews" description="Pick a repository review assignment to continue the white-box workflow.">
               {isLoadingEngagements ? (
-                <p className="text-sm text-[#6d6760]">Loading code review assignments...</p>
+                <div className="flex justify-center py-12">
+                  <Spinner size="lg" />
+                </div>
               ) : engagements.length ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {engagements.map((engagement) => (
@@ -407,7 +458,9 @@ export default function ResearcherCodeReviewWorkspace() {
                   <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
                     <SectionCard title="Recorded findings" description="Every finding should be precise enough for engineering remediation and later verification.">
                       {isLoadingFindings ? (
-                        <p className="text-sm text-[#6d6760]">Loading findings...</p>
+                        <div className="flex justify-center py-8">
+                          <Spinner size="md" />
+                        </div>
                       ) : findings.length ? (
                         <div className="space-y-4">
                           {findings.map((finding) => (
@@ -469,7 +522,17 @@ export default function ResearcherCodeReviewWorkspace() {
                           <Input label="File path" value={findingForm.file_path} onChange={(event) => setFindingForm((current) => ({ ...current, file_path: event.target.value }))} />
                           <Input label="Line number" type="number" min={1} value={findingForm.line_number} onChange={(event) => setFindingForm((current) => ({ ...current, line_number: event.target.value }))} />
                         </div>
-                        <Button variant="primary" isLoading={isSubmittingFinding} onClick={handleSubmitFinding}>
+                        {selectedEngagement.status !== 'in_progress' ? (
+                          <p className="text-sm text-amber-700">
+                            Use <strong>Start review</strong> on the Overview tab before adding findings.
+                          </p>
+                        ) : null}
+                        <Button
+                          variant="primary"
+                          isLoading={isSubmittingFinding}
+                          disabled={selectedEngagement.status !== 'in_progress'}
+                          onClick={handleSubmitFinding}
+                        >
                           Add reviewer finding
                         </Button>
                       </div>
@@ -506,9 +569,17 @@ export default function ResearcherCodeReviewWorkspace() {
                         <p className="text-sm leading-6 text-[#6d6760]">
                           The submit action closes the reviewer delivery phase for this engagement and marks the report as ready for organization follow-up.
                         </p>
-                        <Button variant="primary" isLoading={isSubmittingReport} onClick={handleSubmitReport}>
+                        <Button
+                          variant="primary"
+                          isLoading={isSubmittingReport}
+                          disabled={selectedEngagement.status === 'completed' || findings.length === 0}
+                          onClick={handleSubmitReport}
+                        >
                           Submit final report
                         </Button>
+                        {findings.length === 0 ? (
+                          <p className="text-xs text-[#8b8177]">Add at least one finding before submitting the report.</p>
+                        ) : null}
                       </div>
                     </SectionCard>
                   </div>

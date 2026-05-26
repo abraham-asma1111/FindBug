@@ -108,6 +108,9 @@ export default function ResearcherSettingsPage() {
           title="Settings"
           subtitle="Maintain your researcher profile, public identity, and baseline account configuration."
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Researcher Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           <div className="grid gap-4 md:grid-cols-3">
             <StatCard label="Email" value={user.email} helper={user.emailVerified ? 'Verified account' : 'Email not verified'} />
@@ -139,7 +142,7 @@ export default function ResearcherSettingsPage() {
               ) : null}
 
               <div className="space-y-2">
-                <label htmlFor="fullName" className="block text-sm font-medium text-[#4f4943]">
+                <label htmlFor="fullName" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                   Full Name
                 </label>
                 <input
@@ -153,7 +156,7 @@ export default function ResearcherSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="bio" className="block text-sm font-medium text-[#4f4943]">
+                <label htmlFor="bio" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                   Bio
                 </label>
                 <textarea
@@ -169,7 +172,7 @@ export default function ResearcherSettingsPage() {
 
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label htmlFor="website" className="block text-sm font-medium text-[#4f4943]">
+                  <label htmlFor="website" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                     Website
                   </label>
                   <input
@@ -183,7 +186,7 @@ export default function ResearcherSettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="github" className="block text-sm font-medium text-[#4f4943]">
+                  <label htmlFor="github" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                     GitHub
                   </label>
                   <input
@@ -198,7 +201,7 @@ export default function ResearcherSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="twitter" className="block text-sm font-medium text-[#4f4943]">
+                <label htmlFor="twitter" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                   X / Twitter
                 </label>
                 <input
@@ -226,15 +229,15 @@ export default function ResearcherSettingsPage() {
             description="Quick status checks for visibility and security posture."
           >
             <div className="space-y-4 text-sm text-[#6d6760]">
-              <div className="rounded-2xl bg-[#faf6f1] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">Verification</p>
-                <p className="mt-2 font-semibold text-[#2d2a26]">
+              <div className="rounded-2xl bg-[#faf6f1] p-4 dark:bg-gray-800">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">Verification</p>
+                <p className="mt-2 font-semibold text-[#2d2a26] dark:text-gray-100">
                   {user.emailVerified ? 'Verified and active' : 'Verification pending'}
                 </p>
               </div>
-              <div className="rounded-2xl bg-[#faf6f1] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">Security</p>
-                <p className="mt-2 font-semibold text-[#2d2a26]">
+              <div className="rounded-2xl bg-[#faf6f1] p-4 dark:bg-gray-800">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">Security</p>
+                <p className="mt-2 font-semibold text-[#2d2a26] dark:text-gray-100">
                   {user.mfaEnabled ? 'MFA enabled' : 'MFA not enabled yet'}
                 </p>
               </div>

@@ -14,8 +14,20 @@ interface LineChartProps {
 }
 
 export default function LineChart({ data, xKey, lines, height = 300 }: LineChartProps) {
+  if (!data?.length) {
+    return (
+      <div
+        className="flex w-full items-center justify-center text-sm text-slate-400"
+        style={{ height, minHeight: height, minWidth: 0 }}
+      >
+        No chart data
+      </div>
+    );
+  }
+
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div className="w-full" style={{ height, minHeight: height, minWidth: 0 }}>
+    <ResponsiveContainer width="100%" height={height} minWidth={0}>
       <AreaChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 10 }}>
         <defs>
           {lines.map((line) => (
@@ -72,5 +84,6 @@ export default function LineChart({ data, xKey, lines, height = 300 }: LineChart
         ))}
       </AreaChart>
     </ResponsiveContainer>
+    </div>
   );
 }

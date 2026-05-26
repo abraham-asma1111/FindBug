@@ -30,6 +30,7 @@ interface Report {
   bounty_amount: number | null;
   submitted_at: string;
   updated_at: string;
+  is_ptaas?: boolean;
   // Database relations
   program_name?: string;
   researcher_name?: string;
@@ -63,6 +64,7 @@ export default function TriageQueuePage() {
   
   const [statusFilter, setStatusFilter] = useState<string>(urlStatus);
   const [severityFilter, setSeverityFilter] = useState<string>('');
+  const [ptaasOnly, setPtaasOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [page, setPage] = useState(0);
   const limit = 20;
@@ -104,6 +106,7 @@ export default function TriageQueuePage() {
   const queryParams = new URLSearchParams();
   if (statusFilter) queryParams.append('status_filter', mapStatusToBackend(statusFilter));
   if (severityFilter) queryParams.append('severity_filter', severityFilter);
+  if (ptaasOnly) queryParams.append('ptaas_only', 'true');
   queryParams.append('limit', limit.toString());
   queryParams.append('offset', (page * limit).toString());
 
@@ -141,6 +144,10 @@ export default function TriageQueuePage() {
 
   // Handle opening review modal
   const handleReviewReport = (report: Report) => {
+    if (report.is_ptaas) {
+      router.push(`/triage/ptaas/${report.id}`);
+      return;
+    }
     setSelectedReport(report);
     setTriageStatus('');
     setAssignedSeverity(report.assigned_severity || report.suggested_severity);
@@ -253,8 +260,12 @@ export default function TriageQueuePage() {
   };
 
   // Handle viewing report details
-  const handleViewDetails = (reportId: string) => {
-    router.push(`/triage/reports/${reportId}`);
+  const handleViewDetails = (report: Report) => {
+    if (report.is_ptaas) {
+      router.push(`/triage/ptaas/${report.id}`);
+      return;
+    }
+    router.push(`/triage/reports/${report.id}`);
   };
 
   // Toast auto-hide
@@ -462,6 +473,24 @@ export default function TriageQueuePage() {
                 Low
               </button>
             </div>
+
+            {/* PTaaS Toggle */}
+            <div className="flex gap-2 border-l border-[#334155] pl-2 ml-auto">
+              <button
+                onClick={() => {
+                  setPtaasOnly(!ptaasOnly);
+                  setPage(0);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  ptaasOnly
+                    ? 'bg-orange-600 text-white border-orange-500'
+                    : 'bg-[#1E293B] text-slate-300 hover:bg-[#334155] border-[#334155]'
+                } border`}
+              >
+                <span className="w-2 h-2 rounded-full bg-current"></span>
+                PTaaS Only
+              </button>
+            </div>
             
             <div className="ml-auto flex items-center gap-2 bg-[#1E293B] rounded-lg px-4 py-2 border border-[#334155]">
               <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -595,7 +624,7 @@ export default function TriageQueuePage() {
                       Review Report
                     </button>
                     <button 
-                      onClick={() => handleViewDetails(report.id)}
+                      onClick={() => handleViewDetails(report)}
                       className="px-4 py-2 bg-[#1E293B] hover:bg-[#334155] text-slate-300 rounded-lg text-sm font-medium transition-colors border border-[#334155]"
                     >
                       View Details
