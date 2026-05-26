@@ -425,6 +425,18 @@ class RegistrationService:
             request
         )
         
+        # Notify admins of new registration
+        try:
+            from src.services.notification_service import NotificationService
+            notification_svc = NotificationService(self.db)
+            notification_svc.notify_admin_user_registered(
+                user_email=user.email,
+                user_role=user.role,
+                user_id=user.id
+            )
+        except Exception as e:
+            logger.error(f"Failed to send admin notification for new user registration: {str(e)}")
+        
         return {
             "success": True,
             "message": "Registration completed successfully. You can now log in.",

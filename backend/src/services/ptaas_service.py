@@ -9,7 +9,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from src.domain.repositories.ptaas_repository import PTaaSRepository
 from src.domain.models.ptaas import PTaaSEngagement, PTaaSFinding, PTaaSDeliverable
+from src.domain.models.ptaas_retest import PTaaSRetestRequest
 from src.services.audit_service import AuditService
+from src.services.notification_service import NotificationService
+from src.domain.models.notification import NotificationType, NotificationPriority
 
 
 class PTaaSService:
@@ -19,6 +22,7 @@ class PTaaSService:
         self.db = db
         self.repository = PTaaSRepository(db)
         self.audit_service = AuditService(db)
+        self.notification_service = NotificationService(db)
     
     def create_engagement(
         self, 
@@ -498,3 +502,168 @@ class PTaaSService:
                 }
             }
         }
+
+    # Retest and Workflow Additions
+    def request_retest(self, finding_id: UUID, requested_by: UUID, fix_description: str) -> Optional[PTaaSFinding]:
+        """Request a retest for a fixed finding (Org -> Researcher)"""
+        finding = self.get_finding(finding_id)
+        if not finding:
+            return None
+
+        # Update finding status
+        update_data = {
+            'status': 'RETEST_REQUESTED',
+            'retest_required': True
+        }
+        updated_finding = self.update_finding(finding_id, update_data, requested_by)
+
+        # Create Retest Request record
+        retest_request = PTaaSRetestRequest(
+            finding_id=finding_id,
+            engagement_id=finding.engagement_id,
+            requested_by=requested_by,
+            fix_description=fix_description,
+            status='PENDING'
+        )
+        self.db.add(retest_request)
+        self.db.commit()
+
+        # Notify researcher
+        if finding.discovered_by:
+            self.notification_service.create_notification(
+                user_id=finding.discovered_by,
+                notification_type=NotificationType.REPORT_STATUS_CHANGED,
+                title="Retest Requested for PTaaS Finding",
+                message=f"Organization requested a retest for finding '{finding.title}'.",
+                priority=NotificationPriority.HIGH,
+                related_entity_type="ptaas_finding",
+                related_entity_id=finding.id,
+                action_url=f"/researcher/programs/ptaas/{finding.engagement_id}/findings/{finding.id}"
+            )
+
+        return updated_finding
+
+    def submit_retest_result(self, finding_id: UUID, researcher_id: UUID, is_fixed: bool, retest_notes: str) -> Optional[PTaaSFinding]:
+        """Submit a retest result (Researcher -> Org)"""
+        finding = self.get_finding(finding_id)
+        if not finding:
+            return None
+
+        # Update finding status
+        new_status = 'VERIFIED' if is_fixed else 'IN_PROGRESS'
+        update_data = {
+            'status': new_status,
+            'retest_notes': retest_notes,
+            'retest_required': False if is_fixed else True
+        }
+        updated_finding = self.update_finding(finding_id, update_data, researcher_id)
+
+        # Update latest pending retest request
+        retest_request = self.db.query(PTaaSRetestRequest).filter(
+            PTaaSRetestRequest.finding_id == finding_id,
+            PTaaSRetestRequest.status == 'PENDING'
+        ).order_by(PTaaSRetestRequest.created_at.desc()).first()
+
+        if retest_request:
+            retest_request.status = 'COMPLETED'
+            retest_request.retest_completed_at = datetime.utcnow()
+            retest_request.retest_result = 'FIXED' if is_fixed else 'NOT_FIXED'
+            retest_request.retest_notes = retest_notes
+            self.db.commit()
+
+        # Notify engagement owner / org
+        engagement = self.get_engagement(finding.engagement_id)
+        if engagement and engagement.created_by:
+            status_str = "fixed" if is_fixed else "not fixed"
+            self.notification_service.create_notification(
+                user_id=engagement.created_by,
+                notification_type=NotificationType.REPORT_STATUS_CHANGED,
+                title=f"Retest Result: {status_str.upper()}",
+                message=f"Researcher verified finding '{finding.title}' is {status_str}.",
+                priority=NotificationPriority.HIGH,
+                related_entity_type="ptaas_finding",
+                related_entity_id=finding.id,
+                action_url=f"/organization/services/ptaas/{finding.engagement_id}/findings/{finding.id}"
+            )
+
+        return updated_finding
+
+    def approve_ptaas_bounty(self, finding_id: UUID, approved_by: UUID) -> Optional[PTaaSFinding]:
+        """Approve bounty for verified finding and push to finance workflow"""
+        finding = self.get_finding(finding_id)
+        if not finding:
+            return None
+
+        # Change status to CLOSED (bounty approved)
+        update_data = {
+            'status': 'CLOSED'
+        }
+        updated_finding = self.update_finding(finding_id, update_data, approved_by)
+
+        engagement = self.get_engagement(finding.engagement_id)
+        
+        # Integrate with WalletService to automate the financial payout
+        from src.services.wallet_service import WalletService
+        from decimal import Decimal
+        wallet_service = WalletService(self.db)
+        
+        bounty_amount = Decimal('0.00')
+        severity = finding.severity.lower() if finding.severity else 'info'
+        if severity == 'critical':
+            bounty_amount = Decimal('10000.00')
+        elif severity == 'high':
+            bounty_amount = Decimal('5000.00')
+        elif severity == 'medium':
+            bounty_amount = Decimal('2000.00')
+        elif severity == 'low':
+            bounty_amount = Decimal('500.00')
+            
+        if bounty_amount > 0 and finding.discovered_by and engagement:
+            try:
+                wallet_service.credit_wallet(
+                    owner_id=finding.discovered_by,
+                    owner_type="researcher",
+                    amount=bounty_amount,
+                    saga_id=f"ptaas-bounty-{finding_id}",
+                    reference_type="ptaas_bounty",
+                    reference_id=finding_id
+                )
+                
+                # Deduct from organization's wallet
+                wallet_service.debit_wallet(
+                    owner_id=engagement.organization_id,
+                    owner_type="organization",
+                    amount=bounty_amount,
+                    saga_id=f"ptaas-bounty-{finding_id}",
+                    from_reserved=False,
+                    reference_type="ptaas_bounty",
+                    reference_id=finding_id
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to process wallet transaction for PTaaS bounty: {str(e)}")
+        
+        self.audit_service.log_action(
+            action_type="APPROVE_PTAAS_BOUNTY",
+            action_category="finance",
+            target_type="PTaaSFinding",
+            description=f"Bounty approved for PTaaS finding",
+            actor_id=approved_by,
+            target_id=finding_id,
+            metadata={"engagement_id": str(finding.engagement_id)}
+        )
+
+        # Notify researcher
+        if finding.discovered_by:
+            self.notification_service.create_notification(
+                user_id=finding.discovered_by,
+                notification_type=NotificationType.BOUNTY_APPROVED,
+                title="Bounty Approved for PTaaS",
+                message=f"Bounty approved for PTaaS finding '{finding.title}'.",
+                priority=NotificationPriority.HIGH,
+                related_entity_type="ptaas_finding",
+                related_entity_id=finding.id,
+                action_url=f"/researcher/programs/ptaas/{finding.engagement_id}/findings/{finding.id}"
+            )
+
+        return updated_finding

@@ -21,7 +21,9 @@ from src.api.v1.schemas.ptaas import (
     PTaaSDeliverableCreate,
     PTaaSDeliverableResponse,
     PTaaSProgressUpdateCreate,
-    PTaaSProgressUpdateResponse
+    PTaaSProgressUpdateResponse,
+    PTaaSRetestRequestCreate,
+    PTaaSRetestResultSubmit
 )
 from src.domain.models.user import User
 
@@ -330,6 +332,119 @@ def get_finding_template(
     """
     service = PTaaSService(db)
     return service.get_finding_template()
+
+
+@router.post("/findings/{finding_id}/request-retest", response_model=PTaaSFindingResponse)
+def request_retest(
+    finding_id: UUID,
+    request_data: PTaaSRetestRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Request a retest for a fixed finding (Org -> Researcher)
+    """
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Check access - must be from the engagement's org or staff
+    engagement = service.get_engagement(finding.engagement_id)
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id and not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+        
+    updated_finding = service.request_retest(finding_id, current_user.id, request_data.fix_description)
+    if not updated_finding:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not process retest request")
+        
+    return updated_finding
+
+
+@router.post("/findings/{finding_id}/submit-retest", response_model=PTaaSFindingResponse)
+def submit_retest_result(
+    finding_id: UUID,
+    submit_data: PTaaSRetestResultSubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit a retest result (Researcher -> Org)
+    """
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Check access - must be the researcher or staff
+    if finding.discovered_by != current_user.id and not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the assigned researcher can submit a retest result"
+        )
+        
+    updated_finding = service.submit_retest_result(
+        finding_id, 
+        current_user.id, 
+        submit_data.is_fixed, 
+        submit_data.retest_notes
+    )
+    if not updated_finding:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not process retest result")
+        
+    return updated_finding
+
+
+@router.post("/findings/{finding_id}/approve-bounty", response_model=PTaaSFindingResponse)
+def approve_ptaas_bounty(
+    finding_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Approve bounty for verified finding
+    """
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Only staff or org can approve
+    engagement = service.get_engagement(finding.engagement_id)
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id and not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+        
+    if finding.status != 'VERIFIED':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Finding must be verified before bounty approval"
+        )
+        
+    updated_finding = service.approve_ptaas_bounty(finding_id, current_user.id)
+    if not updated_finding:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not approve bounty")
+        
+    return updated_finding
 
 
 # Deliverable Endpoints
@@ -784,15 +899,14 @@ def get_pending_triage(
     return triage_service.get_pending_triage(limit)
 
 
-@router.get("/triage/queue", response_model=List[PTaaSPendingTriageResponse])
-def get_triage_queue(
+@router.get("/triage/pending-queue", response_model=List[PTaaSPendingTriageResponse])
+def get_ptaas_triage_queue(
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get triage queue (alias for /triage/pending) - FREQ-35
-    Only triage specialists can access
+    PTaaS-only pending triage list. Use GET /triage/queue for the unified bug bounty queue.
     """
     if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(

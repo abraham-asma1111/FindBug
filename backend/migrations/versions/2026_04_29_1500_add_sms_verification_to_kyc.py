@@ -17,16 +17,27 @@ depends_on = None
 
 
 def upgrade():
-    # Add SMS verification fields to kyc_verifications table
-    op.add_column('kyc_verifications', sa.Column('phone_number', sa.String(20), nullable=True))
-    op.add_column('kyc_verifications', sa.Column('phone_verified', sa.Boolean(), default=False, nullable=False, server_default='false'))
-    op.add_column('kyc_verifications', sa.Column('phone_verification_code', sa.String(10), nullable=True))
-    op.add_column('kyc_verifications', sa.Column('phone_verification_code_expires', sa.DateTime(), nullable=True))
-    op.add_column('kyc_verifications', sa.Column('phone_verification_attempts', sa.Integer(), default=0, nullable=False, server_default='0'))
-    op.add_column('kyc_verifications', sa.Column('phone_verified_at', sa.DateTime(), nullable=True))
-    
-    # Add index on phone_number for faster lookups
-    op.create_index('ix_kyc_verifications_phone_number', 'kyc_verifications', ['phone_number'])
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    if not insp.has_table("kyc_verifications"):
+        return
+    cols = {c["name"] for c in insp.get_columns("kyc_verifications")}
+    if "phone_number" not in cols:
+        op.add_column("kyc_verifications", sa.Column("phone_number", sa.String(20), nullable=True))
+    if "phone_verified" not in cols:
+        op.add_column("kyc_verifications", sa.Column("phone_verified", sa.Boolean(), default=False, nullable=False, server_default="false"))
+    if "phone_verification_code" not in cols:
+        op.add_column("kyc_verifications", sa.Column("phone_verification_code", sa.String(10), nullable=True))
+    if "phone_verification_code_expires" not in cols:
+        op.add_column("kyc_verifications", sa.Column("phone_verification_code_expires", sa.DateTime(), nullable=True))
+    if "phone_verification_attempts" not in cols:
+        op.add_column("kyc_verifications", sa.Column("phone_verification_attempts", sa.Integer(), default=0, nullable=False, server_default="0"))
+    if "phone_verified_at" not in cols:
+        op.add_column("kyc_verifications", sa.Column("phone_verified_at", sa.DateTime(), nullable=True))
+
+    indexes = {idx["name"] for idx in insp.get_indexes("kyc_verifications")}
+    if "ix_kyc_verifications_phone_number" not in indexes:
+        op.create_index("ix_kyc_verifications_phone_number", "kyc_verifications", ["phone_number"])
 
 
 def downgrade():

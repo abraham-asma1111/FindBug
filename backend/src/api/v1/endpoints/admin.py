@@ -140,6 +140,7 @@ def update_user_status(
     
     try:
         user = service.update_user_status(
+            admin_id=current_user.id,
             user_id=user_id,
             is_active=is_active,
             reason=reason
@@ -716,7 +717,7 @@ def create_staff_member(
     service = AdminService(db)
     
     try:
-        staff = service.create_staff_member(
+        staff, temp_pwd = service.create_staff_member(
             admin_id=current_user.id,
             email=email,
             full_name=full_name,
@@ -727,7 +728,8 @@ def create_staff_member(
         return {
             "message": "Staff member created successfully",
             "staff_id": str(staff.id),
-            "email": email
+            "email": email,
+            "temporary_password": temp_pwd
         }
     
     except ValueError as e:

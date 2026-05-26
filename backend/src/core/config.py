@@ -44,6 +44,24 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     MINIO_BUCKET: str = os.getenv("MINIO_BUCKET", "bugcrowd-uploads")
+
+    # Frontend (portal lab pages live here — port 3000 in dev)
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+    # Simulation labs (Docker backend) — never use 3000 (reserved for Next.js frontend)
+    SIMULATION_LAB_HOST: str = os.getenv("SIMULATION_LAB_HOST", "127.0.0.1")
+    SIMULATION_LAB_PORT: int = int(os.getenv("SIMULATION_LAB_PORT", "5050"))
+    SIMULATION_CONTAINER_START_TIMEOUT: int = int(
+        os.getenv("SIMULATION_CONTAINER_START_TIMEOUT", "90")
+    )
+    # Use shared local compose stack (simulation/docker-compose.yml) when per-user container fails
+    SIMULATION_USE_SHARED_LABS: bool = os.getenv(
+        "SIMULATION_USE_SHARED_LABS", "true"
+    ).lower() in ("1", "true", "yes")
+    # Always use shared academy-lab on 5050 (avoid random Docker ports that break iframes)
+    SIMULATION_FORCE_SHARED_LAB: bool = os.getenv(
+        "SIMULATION_FORCE_SHARED_LAB", "true"
+    ).lower() in ("1", "true", "yes")
     
     model_config = {
         "env_file": ".env",

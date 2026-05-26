@@ -17,7 +17,17 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    if not insp.has_table("kyc_verifications"):
+        return
+    cols = {c["name"] for c in insp.get_columns("kyc_verifications")}
+    if "email_address" in cols:
+        return
+
     # Rename phone_number to email_address and increase length
+    if "phone_number" not in cols:
+        return
     op.alter_column('kyc_verifications', 'phone_number',
                     new_column_name='email_address',
                     existing_type=sa.VARCHAR(length=20),

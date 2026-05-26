@@ -17,12 +17,20 @@ depends_on = None
 
 
 def upgrade():
-    # Increase phone_number column length from VARCHAR(20) to VARCHAR(255)
-    # to accommodate email addresses
-    op.alter_column('kyc_verifications', 'phone_number',
-                    existing_type=sa.VARCHAR(length=20),
-                    type_=sa.VARCHAR(length=255),
-                    existing_nullable=True)
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    if not insp.has_table("kyc_verifications"):
+        return
+    cols = {c["name"] for c in insp.get_columns("kyc_verifications")}
+    if "phone_number" not in cols:
+        return
+    op.alter_column(
+        "kyc_verifications",
+        "phone_number",
+        existing_type=sa.VARCHAR(length=20),
+        type_=sa.VARCHAR(length=255),
+        existing_nullable=True,
+    )
 
 
 def downgrade():

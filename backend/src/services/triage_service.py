@@ -589,19 +589,21 @@ class TriageService:
         severity: Optional[str] = None,
         program_id: Optional[UUID] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
+        all_statuses: bool = False,
     ) -> List[VulnerabilityReport]:
         """
         Get triage queue - FREQ-07.
         
         Default: shows new and triaged reports.
+        When all_statuses=True, returns every status (used on program detail pages).
         """
         query = self.db.query(VulnerabilityReport)
         
         # Filter by status
         if status:
             query = query.filter(VulnerabilityReport.status == status)
-        else:
+        elif not all_statuses:
             # Default: show reports needing attention
             query = query.filter(
                 VulnerabilityReport.status.in_(['new', 'triaged'])

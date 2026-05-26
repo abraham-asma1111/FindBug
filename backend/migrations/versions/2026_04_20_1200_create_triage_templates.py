@@ -10,13 +10,17 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '2026_04_20_1200_create_triage_templates'
-down_revision = '2026_03_29_1400_create_vrt_tables'
+revision = 'tri_tpl_20260420'
+down_revision = '2026_03_29_1400'
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    if sa.inspect(bind).has_table("triage_templates"):
+        return
+
     # Create triage_templates table
     op.create_table(
         'triage_templates',

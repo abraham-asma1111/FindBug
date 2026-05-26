@@ -33,7 +33,7 @@ class SimulationChallenge(Base):
     docker_registry = Column(String(255))
     container_memory_limit = Column(String(20), default="256m")
     container_cpu_limit = Column(String(20), default="0.5")
-    exposed_port = Column(Integer, default=80)
+    exposed_port = Column(Integer, default=5050)
     environment_variables = Column(JSON)
     
     # Learning Resources
@@ -111,6 +111,7 @@ class SimulationProgress(Base):
     status = Column(String(20), default="not_started")  # not_started, in_progress, completed
     attempts = Column(Integer, default=0)
     hints_used = Column(Integer, default=0)
+    hints_unlocked = Column(JSON, default=list)  # list of hint indices unlocked
     
     completed_at = Column(TIMESTAMP)
     time_spent_seconds = Column(Integer, default=0)
@@ -135,11 +136,13 @@ class SimulationReport(Base):
     impact_assessment = Column(Text)
     suggested_severity = Column(String(20))
     proof_of_concept = Column(Text)
+    remediation = Column(Text)
     
     status = Column(String(20), default="submitted")  # submitted, validated, invalid
     is_correct = Column(Boolean)
     feedback = Column(Text)
-    points_awarded = Column(Integer, default=0)
+    score = Column(Integer, default=0)  # automated or admin score 0-100
+    points_awarded = Column(Integer, default=0)  # XP awarded after review
     
     submitted_at = Column(TIMESTAMP, default=datetime.utcnow)
     validated_at = Column(TIMESTAMP)
@@ -213,8 +216,10 @@ class SimulationLeaderboard(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False)
     
-    total_points = Column(Integer, default=0)
+    total_points = Column(Integer, default=0)  # total XP
     challenges_completed = Column(Integer, default=0)
+    rank_title = Column(String(64), default="Newbie")
+    current_streak = Column(Integer, default=0)
     rank = Column(Integer)
     last_updated = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
     

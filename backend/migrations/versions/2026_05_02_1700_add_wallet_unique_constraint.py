@@ -18,7 +18,14 @@ depends_on = None
 
 def upgrade():
     """Add unique constraint to prevent duplicate wallets."""
-    
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    if not insp.has_table("wallets"):
+        return
+    uqs = {uc["name"] for uc in insp.get_unique_constraints("wallets")}
+    if "uq_wallets_owner_id_owner_type" in uqs:
+        return
+
     # First, clean up any existing duplicates
     # This SQL will keep only the wallet with the highest balance for each owner_id+owner_type combination
     op.execute("""

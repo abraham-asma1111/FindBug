@@ -18,10 +18,19 @@ depends_on = None
 
 def upgrade():
     """Add branding configuration columns to organizations table."""
-    op.add_column('organizations', sa.Column('logo_url', sa.String(length=500), nullable=True))
-    op.add_column('organizations', sa.Column('cover_image_url', sa.String(length=500), nullable=True))
-    op.add_column('organizations', sa.Column('brand_color', sa.String(length=7), nullable=True))
-    op.add_column('organizations', sa.Column('theme_settings', sa.Text(), nullable=True))
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    if not insp.has_table("organizations"):
+        return
+    existing = {c["name"] for c in insp.get_columns("organizations")}
+    if "logo_url" not in existing:
+        op.add_column("organizations", sa.Column("logo_url", sa.String(length=500), nullable=True))
+    if "cover_image_url" not in existing:
+        op.add_column("organizations", sa.Column("cover_image_url", sa.String(length=500), nullable=True))
+    if "brand_color" not in existing:
+        op.add_column("organizations", sa.Column("brand_color", sa.String(length=7), nullable=True))
+    if "theme_settings" not in existing:
+        op.add_column("organizations", sa.Column("theme_settings", sa.Text(), nullable=True))
 
 
 def downgrade():

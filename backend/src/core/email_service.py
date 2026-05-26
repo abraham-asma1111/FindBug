@@ -1,10 +1,11 @@
 """
 Email Service - Email verification and notifications
+Uses Gmail SMTP over SSL (Port 465) to bypass network restrictions on port 587.
 """
-import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
+import smtplib
 import os
 from datetime import datetime, timedelta
 import secrets
@@ -13,7 +14,50 @@ import re
 
 
 class EmailService:
-    """Email service for verification and notifications"""
+    """Email service for verification and notifications via Gmail SMTP SSL"""
+
+    @staticmethod
+    def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str = "") -> bool:
+        """
+        Central helper: send an email via SMTP SSL.
+        Falls back to mock-mode console output if SMTP_MOCK_MODE=true.
+        """
+        smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+        if smtp_mock_mode:
+            # Caller already printed mock output; just return True
+            return True
+
+        smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '465'))  # Force 465 for SSL
+        smtp_user = os.getenv('SMTP_USER')
+        smtp_password = os.getenv('SMTP_PASSWORD')
+        smtp_from = os.getenv('SMTP_FROM', smtp_user or 'noreply@findbugplatform.com')
+
+        if not smtp_user or not smtp_password:
+            print("⚠️  SMTP credentials not configured. Email not sent.")
+            return False
+
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = smtp_from
+            msg['To'] = to_email
+
+            if text_body:
+                msg.attach(MIMEText(text_body, 'plain'))
+            if html_body:
+                msg.attach(MIMEText(html_body, 'html'))
+
+            # Use SMTP_SSL for port 465 to bypass port 587 blocks
+            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+                
+            print(f"✅ Email sent to {to_email} via SMTP SSL")
+            return True
+        except Exception as e:
+            print(f"❌ SMTP SSL failed: {e}")
+            return False
     
     @staticmethod
     def generate_verification_token() -> str:
@@ -32,7 +76,7 @@ class EmailService:
         return ''.join([str(random.randint(0, 9)) for _ in range(6)])
     
     @staticmethod
-    def send_email_verification_link(email: str, token: str, user_type: str) -> bool:
+    def send_verification_email(email: str, token: str, user_type: str) -> bool:
         """
         Send email verification link (no OTP, just click to verify)
         
@@ -42,6 +86,24 @@ class EmailService:
             user_type: 'researcher' or 'organization'
         """
         try:
+            # Check if mock mode is enabled
+            smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+            
+            # Create verification link
+            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3002')
+            verification_link = f"{base_url}/verify-email?token={token}&type={user_type}"
+            
+            if smtp_mock_mode:
+                print(f"\n{'='*60}")
+                print(f"📧 MOCK MODE: VERIFICATION EMAIL")
+                print(f"{'='*60}")
+                print(f"To: {email}")
+                print(f"Subject: Verify Your FindBug Account - Complete Registration")
+                print(f"\nVerification Link: {verification_link}")
+                print(f"This link expires in 24 hours.")
+                print(f"{'='*60}\n")
+                return True
+                
             # Email configuration from environment
             smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
             smtp_port = int(os.getenv('SMTP_PORT', '587'))
@@ -129,21 +191,12 @@ class EmailService:
             </html>
             """
             
-            # Attach both plain text and HTML versions
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Send email
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            print(f"✅ Email verification link sent to {email}")
-            print(f"   Link: {verification_link}")
-            return True
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Verify Your FindBug Account - Complete Registration',
+                html_body=html_body,
+                text_body=text_body,
+            )
             
         except Exception as e:
             print(f"❌ Failed to send verification email: {e}")
@@ -160,6 +213,21 @@ class EmailService:
             first_name: User's first name
         """
         try:
+            # Check if mock mode is enabled
+            smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+            
+            if smtp_mock_mode:
+                print(f"\n{'='*60}")
+                print(f"📧 MOCK MODE: REGISTRATION OTP EMAIL")
+                print(f"{'='*60}")
+                print(f"To: {email}")
+                print(f"User: {first_name}")
+                print(f"Subject: Verify Your FindBug Account - Registration Code")
+                print(f"\n🔐 VERIFICATION CODE: {otp}")
+                print(f"\nThis code expires in 10 minutes.")
+                print(f"{'='*60}\n")
+                return True
+                
             # Email configuration from environment
             smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
             smtp_port = int(os.getenv('SMTP_PORT', '587'))
@@ -230,21 +298,12 @@ class EmailService:
             </html>
             """
             
-            # Attach both plain text and HTML versions
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Send email
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            print(f"✅ Registration OTP sent to {email}")
-            print(f"   OTP: {otp} (expires in 10 minutes)")
-            return True
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Verify Your FindBug Account - Registration Code',
+                html_body=html_body,
+                text_body=text_body,
+            )
             
         except Exception as e:
             print(f"❌ Failed to send registration OTP: {e}")
@@ -262,6 +321,26 @@ class EmailService:
             user_type: 'researcher' or 'organization'
         """
         try:
+            # Check if mock mode is enabled
+            smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+            
+            # Create verification link (backup method)
+            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3002')
+            verification_link = f"{base_url}/verify-email?token={token}&type={user_type}"
+            
+            if smtp_mock_mode:
+                print(f"\n{'='*60}")
+                print(f"📧 MOCK MODE: REGISTRATION VERIFICATION EMAIL")
+                print(f"{'='*60}")
+                print(f"To: {email}")
+                print(f"User Type: {user_type}")
+                print(f"Subject: Verify Your FindBug Account - Complete Registration")
+                print(f"\n🔐 VERIFICATION CODE: {otp}")
+                print(f"🔗 Backup Link: {verification_link}")
+                print(f"\nThis code expires in 10 minutes.")
+                print(f"{'='*60}\n")
+                return True
+                
             # Email configuration from environment
             smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
             smtp_port = int(os.getenv('SMTP_PORT', '587'))
@@ -348,123 +427,35 @@ class EmailService:
             </html>
             """
             
-            # Attach both plain text and HTML versions
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Send email
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            print(f"✅ Registration verification email sent to {email}")
-            print(f"   OTP: {otp} (expires in 10 minutes)")
-            return True
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Verify Your FindBug Account - Complete Registration',
+                html_body=html_body,
+                text_body=text_body,
+            )
             
         except Exception as e:
             print(f"❌ Failed to send registration email: {e}")
-            return False
-        """
-        Send email verification link
-        
-        Args:
-            email: User email address
-            token: Verification token
-            user_type: 'researcher' or 'organization'
-        """
-        try:
-            # Email configuration from environment
-            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-            smtp_port = int(os.getenv('SMTP_PORT', '587'))
-            smtp_user = os.getenv('SMTP_USER')
-            smtp_password = os.getenv('SMTP_PASSWORD')
-            smtp_from = os.getenv('SMTP_FROM', 'noreply@bugbounty.com')
-            
-            if not smtp_user or not smtp_password:
-                print("⚠️  SMTP credentials not configured. Email not sent.")
-                return False
-            
-            # Create verification link
-            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-            verification_link = f"{base_url}/verify-email?token={token}&type={user_type}"
-            
-            # Create email message
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = 'Verify Your Bug Bounty Platform Account'
-            msg['From'] = smtp_from
-            msg['To'] = email
-            
-            # Email body
-            text_body = f"""
-            Welcome to Bug Bounty Platform!
-            
-            Please verify your email address by clicking the link below:
-            {verification_link}
-            
-            This link will expire in 24 hours.
-            
-            If you didn't create this account, please ignore this email.
-            
-            Best regards,
-            Bug Bounty Platform Team
-            """
-            
-            html_body = f"""
-            <html>
-              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <h2 style="color: #2563eb;">Welcome to Bug Bounty Platform!</h2>
-                  <p>Thank you for registering as a {user_type}.</p>
-                  <p>Please verify your email address by clicking the button below:</p>
-                  <div style="text-align: center; margin: 30px 0;">
-                    <a href="{verification_link}" 
-                       style="background-color: #2563eb; color: white; padding: 12px 30px; 
-                              text-decoration: none; border-radius: 5px; display: inline-block;">
-                      Verify Email Address
-                    </a>
-                  </div>
-                  <p style="color: #666; font-size: 14px;">
-                    This link will expire in 24 hours.
-                  </p>
-                  <p style="color: #666; font-size: 14px;">
-                    If you didn't create this account, please ignore this email.
-                  </p>
-                  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                  <p style="color: #999; font-size: 12px;">
-                    Bug Bounty Platform Team<br>
-                    Bahir Dar University
-                  </p>
-                </div>
-              </body>
-            </html>
-            """
-            
-            # Attach both plain text and HTML versions
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            # Send email
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            print(f"✅ Verification email sent to {email}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Failed to send email: {e}")
             return False
     
     @staticmethod
     def send_mfa_code(email: str, code: str) -> bool:
         """Send MFA code via email"""
         try:
+            # Check if mock mode is enabled
+            smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+            
+            if smtp_mock_mode:
+                print(f"\n{'='*60}")
+                print(f"📧 MOCK MODE: MFA CODE EMAIL")
+                print(f"{'='*60}")
+                print(f"To: {email}")
+                print(f"Subject: Your Bug Bounty Platform Verification Code")
+                print(f"\n🔐 MFA CODE: {code}")
+                print(f"\nThis code expires in 10 minutes.")
+                print(f"{'='*60}\n")
+                return True
+                
             smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
             smtp_port = int(os.getenv('SMTP_PORT', '587'))
             smtp_user = os.getenv('SMTP_USER')
@@ -507,18 +498,12 @@ class EmailService:
             </html>
             """
             
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            print(f"✅ MFA code sent to {email}")
-            return True
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Your Bug Bounty Platform Verification Code',
+                html_body=html_body,
+                text_body=text_body,
+            )
             
         except Exception as e:
             print(f"❌ Failed to send MFA code: {e}")
@@ -619,19 +604,12 @@ class EmailService:
             </html>
             """
             
-            part1 = MIMEText(text_body, 'plain')
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part1)
-            msg.attach(part2)
-            
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            print(f"✅ KYC verification code sent to {email}")
-            print(f"   Code: {code} (expires in 10 minutes)")
-            return True
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Your KYC Verification Code - FindBug Platform',
+                html_body=html_body,
+                text_body=text_body,
+            )
             
         except Exception as e:
             print(f"❌ Failed to send KYC verification email: {e}")
@@ -646,20 +624,122 @@ class EmailService:
             email: User email address
             reset_token: Password reset token
         """
-        reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
-
-        print(f"\n{'='*60}")
-        print(f"📧 PASSWORD RESET EMAIL")
-        print(f"{'='*60}")
-        print(f"To: {email}")
-        print(f"Subject: Reset Your Password")
-        print(f"\nClick the link below to reset your password:")
-        print(f"{reset_link}")
-        print(f"\nThis link will expire in 15 minutes.")
-        print(f"If you didn't request this, please ignore this email.")
-        print(f"{'='*60}\n")
-
-        # TODO: Replace with actual email service (SendGrid, AWS SES, etc.)
+        try:
+            # Check if mock mode is enabled
+            smtp_mock_mode = os.getenv('SMTP_MOCK_MODE', 'false').lower() == 'true'
+            
+            # Create reset link
+            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+            reset_link = f"{base_url}/auth/reset-password?token={reset_token}"
+            
+            if smtp_mock_mode:
+                print(f"\n{'='*60}")
+                print(f" MOCK MODE: PASSWORD RESET EMAIL")
+                print(f"{'='*60}")
+                print(f"To: {email}")
+                print(f"Subject: Reset Your Password")
+                print(f"\nClick the link below to reset your password:")
+                print(f"{reset_link}")
+                print(f"\nOr copy the token: {reset_token}")
+                print(f"This link expires in 15 minutes.")
+                print(f"{'='*60}\n")
+                return True
+                
+            # Email configuration from environment
+            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USER')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            smtp_from = os.getenv('SMTP_FROM', 'noreply@findbugplatform.com')
+            # Create reset link
+            base_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+            reset_link = f"{base_url}/auth/reset-password?token={reset_token}"
+            
+            # Create email message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = 'Reset Your Password - FindBug Platform'
+            msg['From'] = smtp_from
+            msg['To'] = email
+            
+            # Email body
+            text_body = f"""
+            Password Reset Request
+            
+            We received a request to reset your password for your FindBug Platform account.
+            
+            Click the link below to reset your password:
+            {reset_link}
+            
+            This link will expire in 15 minutes.
+            
+            If you didn't request this password reset, please ignore this email.
+            Your password will remain unchanged.
+            
+            Best regards,
+            FindBug Platform Team
+            Bahir Dar University
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                  <div style="background: #7C3AED; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                    <h1 style="margin: 0; font-size: 24px;">🔐 Reset Your Password</h1>
+                  </div>
+                  
+                  <div style="background: #f8f9fa; padding: 30px; border: 1px solid #dee2e6; border-top: none;">
+                    <h2 style="color: #7C3AED; margin-top: 0;">Password Reset Request</h2>
+                    <p>We received a request to reset your password for your FindBug Platform account.</p>
+                    <p>Click the button below to reset your password:</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="{reset_link}" 
+                         style="background-color: #7C3AED; color: white; padding: 15px 30px; 
+                                text-decoration: none; border-radius: 8px; display: inline-block; 
+                                font-weight: bold; font-size: 16px;">
+                        🔑 Reset Password
+                      </a>
+                    </div>
+                    
+                    <p style="color: #e74c3c; font-size: 14px; text-align: center;">
+                      ⏰ This link expires in 15 minutes
+                    </p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                    
+                    <div style="background: #f1f3f4; padding: 15px; border-radius: 5px;">
+                      <p style="margin: 0; color: #666; font-size: 14px;">
+                        <strong>Can't click the button?</strong> Copy and paste this link in your browser:<br>
+                        <a href="{reset_link}" style="color: #7C3AED; word-break: break-all;">{reset_link}</a>
+                      </p>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                      If you didn't request this password reset, please ignore this email.
+                      Your password will remain unchanged.
+                    </p>
+                  </div>
+                  
+                  <div style="background: #f1f3f4; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;">
+                    <p style="margin: 0;">FindBug Platform - Bug Bounty & Security Research</p>
+                    <p style="margin: 5px 0 0;">Bahir Dar University - Cyber Security Program</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Reset Your Password - FindBug Platform',
+                html_body=html_body,
+                text_body=text_body,
+            )
+            
+        except Exception as e:
+            print(f"❌ Failed to send password reset email: {e}")
+            return False
 
     @staticmethod
     def send_html_email(
@@ -668,57 +748,90 @@ class EmailService:
         html_body: str,
         text_body: Optional[str] = None
     ) -> bool:
+        """Send arbitrary HTML email via Resend."""
+        return EmailService._send_via_smtp(
+            to_email=to_email,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body or "",
+        )
+
+    @staticmethod
+    def send_staff_welcome_email(email: str, full_name: str, role: str, temp_password: str) -> bool:
         """
-        Send HTML email using SMTP
-        
-        Args:
-            to_email: Recipient email address
-            subject: Email subject
-            html_body: HTML email body
-            text_body: Plain text fallback (optional)
-            
-        Returns:
-            True if sent successfully
+        Send a welcome email to a newly provisioned staff member containing their temporary credentials.
         """
         try:
-            # Email configuration from environment
-            smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-            smtp_port = int(os.getenv('SMTP_PORT', '587'))
-            smtp_user = os.getenv('SMTP_USER')
-            smtp_password = os.getenv('SMTP_PASSWORD')
-            smtp_from = os.getenv('SMTP_FROM', 'noreply@bugbounty.com')
+            frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+            login_url = f"{frontend_url}/auth/login"
             
-            if not smtp_user or not smtp_password:
-                print("⚠️  SMTP credentials not configured. Email not sent.")
-                return False
+            text_body = f"""
+            Welcome to FindBug Platform, {full_name}!
             
-            # Create email message
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = smtp_from
-            msg['To'] = to_email
+            An administrator has provisioned a new staff account for you.
+            Your role: {role.replace('_', ' ').title()}
             
-            # Add plain text part if provided
-            if text_body:
-                part1 = MIMEText(text_body, 'plain')
-                msg.attach(part1)
+            You can log in using the following temporary credentials:
+            Email: {email}
+            Temporary Password: {temp_password}
             
-            # Add HTML part
-            part2 = MIMEText(html_body, 'html')
-            msg.attach(part2)
+            Login URL: {login_url}
             
-            # Send email
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
+            Please log in and change your password immediately.
             
-            print(f"✅ HTML email sent to {to_email}")
-            return True
+            Best regards,
+            FindBug Platform Administration
+            """
+            
+            html_body = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f5f7; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  <div style="background: #1E293B; color: white; padding: 20px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px; letter-spacing: 1px;">FindBug Platform</h1>
+                  </div>
+                  
+                  <div style="padding: 30px;">
+                    <h2 style="color: #334155; margin-top: 0;">Welcome, {full_name}!</h2>
+                    <p>An administrator has successfully provisioned a new staff account for you.</p>
+                    <p>Your designated role is: <strong>{role.replace('_', ' ').title()}</strong></p>
+                    
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0; margin: 25px 0;">
+                      <p style="margin: 0 0 10px 0; font-size: 14px; color: #64748B; text-transform: uppercase; font-weight: bold;">Your Temporary Credentials</p>
+                      <p style="margin: 0 0 5px 0;"><strong>Email:</strong> {email}</p>
+                      <p style="margin: 0;"><strong>Password:</strong> <code style="background: #E2E8F0; padding: 2px 6px; border-radius: 4px; color: #0F172A;">{temp_password}</code></p>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="{login_url}" style="background-color: #EF4444; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                        Log In to Platform
+                      </a>
+                    </div>
+                    
+                    <p style="color: #EF4444; font-size: 14px; text-align: center; font-weight: bold;">
+                      ⚠️ You will be required to change your password upon your first login.
+                    </p>
+                  </div>
+                  
+                  <div style="background: #F1F5F9; padding: 20px; text-align: center; font-size: 12px; color: #64748B;">
+                    <p style="margin: 0;">This is an automated system message. Please do not reply.</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+            """
+            
+            return EmailService._send_via_smtp(
+                to_email=email,
+                subject='Welcome to FindBug Platform - Your Staff Account',
+                html_body=html_body,
+                text_body=text_body,
+            )
             
         except Exception as e:
-            print(f"❌ Failed to send HTML email: {e}")
+            print(f"❌ Failed to send staff welcome email: {e}")
             return False
+
 
 
 class BusinessEmailValidator:

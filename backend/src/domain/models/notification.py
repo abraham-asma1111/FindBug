@@ -42,6 +42,8 @@ class NotificationType(str, enum.Enum):
     ACCOUNT_VERIFIED = "account_verified"
     PASSWORD_CHANGED = "password_changed"
     MFA_ENABLED = "mfa_enabled"
+    USER_REGISTERED = "user_registered"
+    USER_PROVISIONED = "user_provisioned"
     
     # KYC events
     KYC_SUBMITTED = "kyc_submitted"

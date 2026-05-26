@@ -51,9 +51,9 @@ class AdminService:
         
         self.notification_service.create_notification(
             user_id=user.id,
-            notification_type=NotificationType.SYSTEM,
+            notification_type=NotificationType.ACCOUNT_VERIFIED,
             title="Welcome to FindBug Platform!",
-            message=f"Welcome {staff.first_name}! Your staff account has been created. You now have access to admin features.",
+            message=f"Welcome {staff.full_name}! Your staff account has been created. You now have access to platform features.",
             priority=NotificationPriority.HIGH,
             action_url="/admin/dashboard",
             action_text="Go to Dashboard",
@@ -817,7 +817,7 @@ class AdminService:
         full_name: str,
         department: str,
         role: str = "triage_specialist"
-    ) -> Staff:
+    ) -> tuple[Staff, str]:
         """Create new staff member - FREQ-01, FREQ-14."""
         role_map = {
             "triage_specialist": UserRole.TRIAGE_SPECIALIST,
@@ -838,13 +838,14 @@ class AdminService:
         
         temp_password = secrets.token_urlsafe(16)
         
+        from datetime import datetime
         user = User(
             email=email,
-            full_name=full_name,
             password_hash=get_password_hash(temp_password),
             role=user_role,
             is_active=True,
-            email_verified=True
+            is_verified=True,
+            email_verified_at=datetime.utcnow()
         )
         
         self.db.add(user)
@@ -874,10 +875,19 @@ class AdminService:
             }
         )
         
-        # Send welcome email to new staff member
+        # Send in-app notification
         self.send_welcome_email(staff.id)
         
-        return staff
+        # Send actual email with credentials via SMTP
+        from src.core.email_service import EmailService
+        EmailService.send_staff_welcome_email(
+            email=email,
+            full_name=full_name,
+            role=role,
+            temp_password=temp_password
+        )
+        
+        return staff, temp_password
     
     def get_staff_statistics(self) -> Dict:
         """Get staff statistics - FREQ-14."""

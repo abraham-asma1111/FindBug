@@ -17,6 +17,10 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    if sa.inspect(bind).has_table("triage_templates"):
+        return
+
     # Create triage_templates table
     op.create_table(
         'triage_templates',

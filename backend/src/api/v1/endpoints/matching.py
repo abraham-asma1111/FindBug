@@ -331,47 +331,99 @@ def get_program_recommendations(
 
 @router.get("/organization/researchers")
 def list_researchers_for_organization(
+    search: Optional[str] = None,
+    min_reputation: Optional[int] = None,
     limit: int = 100,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    List all researchers available for assignment.
-    
-    Organizations use this to browse and select researchers for engagements.
+    List researchers for assignment, ordered by reputation (highest first).
+
+    Each item includes ``reputation_rank`` (1 = highest reputation on the platform).
     """
-    if current_user.role not in ["organization", "admin"]:
+    if not (current_user.is_organization() or current_user.is_admin()):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only organizations and admins can list researchers"
+            detail="Only organizations and admins can list researchers",
         )
-    
+
+    from sqlalchemy import func
+    from sqlalchemy.orm import joinedload
     from src.domain.models.researcher import Researcher
-    
-    # Get all researchers with their profiles
-    researchers = db.query(Researcher).limit(limit).all()
-    
-    return [
-        {
-            "id": str(r.id),
-            "user": {
-                "id": str(r.user.id),
-                "email": r.user.email,
-                "full_name": f"{r.first_name or ''} {r.last_name or ''}".strip() or r.user.email.split('@')[0],
-                "username": r.username or r.user.email.split('@')[0]
-            },
-            "reputation_score": float(r.reputation_score) if r.reputation_score else 0,
-            "total_reports": r.total_reports or 0,
-            "verified_reports": r.verified_reports or 0,
-            "profile": {
-                "experience_years": 0,  # Not in current model
-                "skills": r.skills.split(',') if r.skills else [],
-                "specializations": [],  # Not in current model
-                "bio": r.bio
+    from src.domain.models.user import User as UserModel
+    from src.domain.models.matching import ResearcherProfile
+
+    query = (
+        db.query(Researcher)
+        .options(joinedload(Researcher.user))
+        .join(UserModel, Researcher.user_id == UserModel.id)
+        .outerjoin(ResearcherProfile, Researcher.id == ResearcherProfile.researcher_id)
+        .filter(Researcher.is_active == True)
+    )
+
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.filter(
+            func.lower(UserModel.email).like(search_term)
+            | func.lower(Researcher.first_name).like(search_term)
+            | func.lower(Researcher.last_name).like(search_term)
+            | func.lower(Researcher.username).like(search_term)
+        )
+
+    if min_reputation is not None:
+        query = query.filter(Researcher.reputation_score >= min_reputation)
+
+    researchers = (
+        query.order_by(Researcher.reputation_score.desc().nullslast(), Researcher.total_reports.desc())
+        .limit(limit)
+        .all()
+    )
+
+    result = []
+    for rank, researcher in enumerate(researchers, start=1):
+        profile = researcher.profile if hasattr(researcher, "profile") and researcher.profile else None
+        skills: list = []
+        specializations: list = []
+        experience_years = 0
+        if profile:
+            if getattr(profile, "skills", None):
+                skills = profile.skills if isinstance(profile.skills, list) else []
+            if getattr(profile, "specializations", None):
+                specializations = (
+                    profile.specializations if isinstance(profile.specializations, list) else []
+                )
+            experience_years = getattr(profile, "experience_years", 0) or 0
+        elif researcher.skills:
+            skills = [s.strip() for s in researcher.skills.split(",") if s.strip()]
+
+        full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip()
+        if not full_name and researcher.user:
+            full_name = researcher.user.email.split("@")[0]
+
+        result.append(
+            {
+                "id": str(researcher.id),
+                "reputation_rank": rank,
+                "user": {
+                    "id": str(researcher.user.id),
+                    "email": researcher.user.email,
+                    "full_name": full_name,
+                    "username": researcher.username or researcher.user.email.split("@")[0],
+                },
+                "reputation_score": float(researcher.reputation_score or 0),
+                "total_reports": researcher.total_reports or 0,
+                "verified_reports": researcher.verified_reports or 0,
+                "profile": {
+                    "experience_years": experience_years,
+                    "skills": skills,
+                    "specializations": specializations,
+                    "bio": researcher.bio,
+                },
             }
-        }
-        for r in researchers
-    ]
+        )
+
+    return result
 
 
 @router.post("/feedback")
@@ -1323,91 +1375,4 @@ def get_matching_dashboard(
     }
 
 
-# ============================================
-# ORGANIZATION RESEARCHER LISTING
-# ============================================
-
-@router.get("/organization/researchers")
-def get_researchers_for_organization(
-    search: Optional[str] = None,
-    min_reputation: Optional[int] = None,
-    limit: int = 100,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get all researchers for organization to browse and invite.
-    
-    This endpoint is used by the researcher management page.
-    Organizations can search, filter, and view all active researchers.
-    """
-    if current_user.role != "organization":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only organizations can access this endpoint"
-        )
-    
-    from src.domain.models.researcher import Researcher
-    from src.domain.models.user import User as UserModel
-    from src.domain.models.matching import ResearcherProfile
-    from sqlalchemy import func, or_
-    
-    # Query all active researchers
-    query = db.query(Researcher).join(
-        UserModel,
-        Researcher.user_id == UserModel.id
-    ).outerjoin(
-        ResearcherProfile,
-        Researcher.id == ResearcherProfile.researcher_id
-    ).filter(
-        Researcher.is_active == True
-    )
-    
-    # Apply search filter
-    if search:
-        search_term = f"%{search.lower()}%"
-        query = query.filter(
-            func.lower(UserModel.email).like(search_term)
-        )
-    
-    # Apply reputation filter
-    if min_reputation:
-        query = query.filter(Researcher.reputation_score >= min_reputation)
-    
-    researchers = query.limit(limit).all()
-    
-    # Format response
-    result = []
-    for researcher in researchers:
-        profile_data = None
-        # Check if researcher has a profile (backref creates a single object, not a list)
-        if hasattr(researcher, 'profile') and researcher.profile:
-            profile = researcher.profile
-            profile_data = {
-                'experience_years': profile.experience_years if hasattr(profile, 'experience_years') else 0,
-                'skills': profile.skills if hasattr(profile, 'skills') and profile.skills else [],
-                'specializations': profile.specializations if hasattr(profile, 'specializations') and profile.specializations else [],
-                'bio': researcher.bio  # Bio is on Researcher model, not profile
-            }
-        else:
-            # If no profile, use researcher's own fields
-            profile_data = {
-                'experience_years': 0,
-                'skills': [],
-                'specializations': [],
-                'bio': researcher.bio
-            }
-        
-        result.append({
-            'id': str(researcher.id),
-            'user': {
-                'username': researcher.user.email.split('@')[0],  # Use email prefix as username
-                'email': researcher.user.email
-            },
-            'reputation_score': researcher.reputation_score,
-            'total_reports': researcher.total_reports,
-            'verified_reports': researcher.verified_reports,
-            'profile': profile_data
-        })
-    
-    return result
+# Organization researcher listing: see list_researchers_for_organization above

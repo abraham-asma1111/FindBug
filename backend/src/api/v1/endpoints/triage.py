@@ -1,7 +1,7 @@
 """Triage Specialist API Endpoints - FREQ-07, FREQ-08."""
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from src.core.role_access import (
 from src.api.v1.middlewares.auth import get_current_user
 from src.domain.models.user import User
 from src.domain.models.report import VulnerabilityReport
+from src.domain.models.ptaas import PTaaSFinding, PTaaSEngagement
 from src.services.triage_service import TriageService
 from src.api.v1.schemas.report import (
     TriageUpdate,
@@ -30,11 +31,34 @@ from src.api.v1.schemas.report import (
 router = APIRouter()
 
 
+def _hours_since_timestamp(value: Optional[datetime]) -> float:
+    """Safe elapsed hours for DB timestamps (naive or aware)."""
+    if not value:
+        return 0.0
+    now = datetime.now(timezone.utc)
+    ts = value
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    else:
+        ts = ts.astimezone(timezone.utc)
+    return max(0.0, (now - ts).total_seconds() / 3600)
+
+
+def _safe_lower(value: Optional[str], default: str = "") -> str:
+    return value.lower() if value else default
+
+
 @router.get("/triage/queue", status_code=status.HTTP_200_OK)
 def get_triage_queue(
     status_filter: Optional[str] = Query(None, description="Filter by status: new, triaged, valid, invalid, duplicate, resolved"),
     severity_filter: Optional[str] = Query(None, description="Filter by severity: critical, high, medium, low"),
-    program_id: Optional[UUID] = Query(None, description="Filter by program"),
+    program_id: Optional[UUID] = Query(None, description="Filter by bounty program (bug bounty reports only)"),
+    ptaas_only: bool = Query(False, description="Filter for PTaaS findings only"),
+    bug_bounty_only: bool = Query(False, description="Exclude PTaaS findings from the queue"),
+    include_all_statuses: bool = Query(
+        False,
+        description="Include all bug bounty report statuses (not only new/triaged)",
+    ),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -55,87 +79,172 @@ def get_triage_queue(
         )
     
     service = TriageService(db)
-    
-    reports = service.get_triage_queue(
-        status=status_filter,
-        severity=severity_filter,
-        program_id=program_id,
-        limit=limit,
-        offset=offset
-    )
-    
-    # Get total count for pagination (without limit/offset)
-    query = db.query(VulnerabilityReport)
-    
-    # Apply same filters as service
-    if status_filter:
-        query = query.filter(VulnerabilityReport.status == status_filter)
-    else:
-        # Default: show 'new' and 'triaged' reports
-        query = query.filter(VulnerabilityReport.status.in_(['new', 'triaged']))
-    
-    if severity_filter:
-        query = query.filter(
-            func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == severity_filter
-        )
-    
-    if program_id:
-        query = query.filter(VulnerabilityReport.program_id == program_id)
-    
-    total_count = query.count()
-    
-    # Enrich reports with program and researcher names from database
     from src.domain.models.program import BountyProgram
     from src.domain.models.researcher import Researcher
     from src.domain.models.user import User as UserModel
     
+    total_count = 0
     enriched_reports = []
-    for report in reports:
-        report_dict = {
-            "id": str(report.id),
-            "report_number": report.report_number,
-            "program_id": str(report.program_id) if report.program_id else None,
-            "researcher_id": str(report.researcher_id) if report.researcher_id else None,
-            "title": report.title,
-            "description": report.description,
-            "status": report.status,
-            "assigned_severity": report.assigned_severity,
-            "suggested_severity": report.suggested_severity,
-            "triaged_by": str(report.triaged_by) if report.triaged_by else None,
-            "triaged_at": report.triaged_at.isoformat() if report.triaged_at else None,
-            "is_duplicate": report.is_duplicate,
-            "bounty_amount": float(report.bounty_amount) if report.bounty_amount else None,
-            "submitted_at": report.submitted_at.isoformat() if report.submitted_at else None,
-            "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+    
+    # Bounty program pages must not mix PTaaS engagement findings (different IDs/tables).
+    show_bug_bounty = not ptaas_only
+    show_ptaas = ptaas_only or (not bug_bounty_only and program_id is None)
+    all_statuses = include_all_statuses or (program_id is not None and not status_filter)
+    
+    if show_bug_bounty:
+        reports = service.get_triage_queue(
+            status=status_filter,
+            severity=severity_filter,
+            program_id=program_id,
+            limit=limit,
+            offset=offset,
+            all_statuses=all_statuses,
+        )
+        
+        # Get total count for pagination (without limit/offset)
+        query = db.query(VulnerabilityReport)
+        
+        # Apply same filters as service
+        if status_filter:
+            query = query.filter(VulnerabilityReport.status == status_filter)
+        elif not all_statuses:
+            # Default: show 'new' and 'triaged' reports
+            query = query.filter(VulnerabilityReport.status.in_(['new', 'triaged']))
+        
+        if severity_filter:
+            query = query.filter(
+                func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == severity_filter
+            )
+        
+        if program_id:
+            query = query.filter(VulnerabilityReport.program_id == program_id)
+        
+        total_count = query.count()
+        
+        for report in reports:
+            report_dict = {
+                "id": str(report.id),
+                "report_number": report.report_number,
+                "program_id": str(report.program_id) if report.program_id else None,
+                "researcher_id": str(report.researcher_id) if report.researcher_id else None,
+                "title": report.title,
+                "description": report.description,
+                "status": report.status,
+                "assigned_severity": report.assigned_severity,
+                "suggested_severity": report.suggested_severity,
+                "triaged_by": str(report.triaged_by) if report.triaged_by else None,
+                "triaged_at": report.triaged_at.isoformat() if report.triaged_at else None,
+                "is_duplicate": report.is_duplicate,
+                "duplicate_of": str(report.duplicate_of) if report.duplicate_of else None,
+                "is_ptaas": False,
+                "bounty_amount": float(report.bounty_amount) if report.bounty_amount else None,
+                "submitted_at": report.submitted_at.isoformat() if report.submitted_at else None,
+                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+            }
+
+            # Get program name from database
+            if report.program_id:
+                program = db.query(BountyProgram).filter(BountyProgram.id == report.program_id).first()
+                if program:
+                    report_dict["program_name"] = program.name
+
+            # Get researcher name from database
+            if report.researcher_id:
+                researcher = db.query(Researcher).filter(Researcher.id == report.researcher_id).first()
+                if researcher:
+                    # Construct name, use email as fallback if name is NULL
+                    full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip()
+
+                    # Get email from user
+                    user = db.query(UserModel).filter(UserModel.id == researcher.user_id).first()
+                    if user:
+                        report_dict["researcher_email"] = user.email
+                        # Use email username if no name available
+                        if not full_name:
+                            report_dict["researcher_name"] = user.email.split('@')[0]
+                        else:
+                            report_dict["researcher_name"] = full_name
+
+            # Always append — regardless of whether researcher_id exists
+            enriched_reports.append(report_dict)
+    
+    # -------------------------------------------------------------
+    # MERGE PTaaS Findings into Triage Queue (global queue only)
+    # -------------------------------------------------------------
+    if not show_ptaas:
+        paginated_reports = enriched_reports[offset:offset + limit]
+        return {
+            "reports": paginated_reports,
+            "total": total_count,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    ptaas_query = db.query(PTaaSFinding)
+    
+    # Map filters to PTaaSFinding
+    if status_filter:
+        ptaas_query = ptaas_query.filter(PTaaSFinding.status == status_filter)
+    else:
+        # Default: show 'SUBMITTED' and 'RETEST_REQUESTED'
+        ptaas_query = ptaas_query.filter(PTaaSFinding.status.in_(['SUBMITTED', 'RETEST_REQUESTED']))
+        
+    if severity_filter:
+        ptaas_query = ptaas_query.filter(func.lower(PTaaSFinding.severity) == severity_filter)
+        
+    ptaas_findings = ptaas_query.all()
+    total_count += len(ptaas_findings)
+    
+    for finding in ptaas_findings:
+        # Get engagement to get program/org name
+        engagement = db.query(PTaaSEngagement).filter(PTaaSEngagement.id == finding.engagement_id).first()
+        
+        # Calculate SLA tag
+        hours_passed = _hours_since_timestamp(finding.discovered_at)
+        sla_hours_left = max(0, 24 - int(hours_passed))
+        is_sla_breached = hours_passed > 24
+        
+        finding_dict = {
+            "id": str(finding.id),
+            "report_number": f"PTAAS-{str(finding.id)[:8].upper()}",
+            "program_id": str(finding.engagement_id),
+            "program_name": engagement.name if engagement else "PTaaS Engagement",
+            "researcher_id": str(finding.discovered_by) if finding.discovered_by else None,
+            "title": f"[PTaaS] {finding.title}",
+            "description": finding.description,
+            "status": _safe_lower(finding.status, "new"),
+            "assigned_severity": _safe_lower(finding.severity, "medium"),
+            "suggested_severity": _safe_lower(finding.severity, "medium"),
+            "triaged_by": str(finding.validated_by) if finding.validated_by else None,
+            "triaged_at": finding.validated_at.isoformat() if finding.validated_at else None,
+            "is_duplicate": False,
+            "bounty_amount": None, # PTaaS bounties are handled differently
+            "submitted_at": finding.discovered_at.isoformat() if finding.discovered_at else None,
+            "updated_at": finding.discovered_at.isoformat() if finding.discovered_at else None,
+            
+            # PTaaS specific SLA fields that frontend can use
+            "is_ptaas": True,
+            "sla_hours_left": sla_hours_left,
+            "is_sla_breached": is_sla_breached
         }
         
-        # Get program name from database
-        if report.program_id:
-            program = db.query(BountyProgram).filter(BountyProgram.id == report.program_id).first()
-            if program:
-                report_dict["program_name"] = program.name
-        
-        # Get researcher name from database
-        if report.researcher_id:
-            researcher = db.query(Researcher).filter(Researcher.id == report.researcher_id).first()
+        # Get researcher info
+        if finding.discovered_by:
+            researcher = db.query(UserModel).filter(UserModel.id == finding.discovered_by).first()
             if researcher:
-                # Construct name, use email as fallback if name is NULL
-                full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip()
+                finding_dict["researcher_email"] = researcher.email
+                finding_dict["researcher_name"] = researcher.email.split('@')[0]
                 
-                # Get email from user
-                user = db.query(UserModel).filter(UserModel.id == researcher.user_id).first()
-                if user:
-                    report_dict["researcher_email"] = user.email
-                    # Use email username if no name available
-                    if not full_name:
-                        report_dict["researcher_name"] = user.email.split('@')[0]
-                    else:
-                        report_dict["researcher_name"] = full_name
-        
-        enriched_reports.append(report_dict)
+        enriched_reports.append(finding_dict)
+    
+    # Sort the combined list by submission date (newest first)
+    enriched_reports.sort(key=lambda x: x.get('submitted_at') or '', reverse=True)
+    
+    # Manual pagination on the combined list
+    paginated_reports = enriched_reports[offset:offset+limit]
     
     return {
-        "reports": enriched_reports,
+        "reports": paginated_reports,
         "total": total_count,
         "limit": limit,
         "offset": offset

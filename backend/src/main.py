@@ -3,14 +3,14 @@ Bug Bounty Platform - Main Application
 FastAPI Backend Server
 """
 
-from fastapi import FastAPI, Response, status, Request
+from fastapi import FastAPI, Response, status, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration, finance_reports, finance_settings, persona_kyc, sms_verification, bounty_payments, organization_branding, financial_analytics
-from src.api.v1.endpoints import simulation_gateway
+from src.api.v1.endpoints import simulation_gateway, admin_settings, system_health
 from src.core.database import get_database_status
 
 # Version and metadata
@@ -27,6 +27,22 @@ app = FastAPI(
 )
 
 # Add validation exception handler for debugging
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Return JSON 500 so CORS headers still apply (avoids opaque browser CORS errors)."""
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": str(exc) or "Internal server error"},
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Log validation errors for debugging"""
@@ -99,6 +115,8 @@ app.include_router(payment_methods.router, prefix="/api/v1")
 app.include_router(duplicate_detection.router, prefix="/api/v1")
 app.include_router(bounty_payments.router, prefix="/api/v1")
 app.include_router(organization_branding.router, prefix="/api/v1")
+app.include_router(admin_settings.router, prefix="/api/v1")
+app.include_router(system_health.router, prefix="/api/v1")
 
 # Health Check Endpoint
 @app.get("/health", tags=["Health"])

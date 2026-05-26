@@ -436,10 +436,45 @@ class NotificationService:
                 f"Finance processed a ${amount:,.2f} payout to {researcher_email} "
                 f"for report '{report_title}'."
             ),
-            action_url=f"/admin/reports/{report_id}",
-            action_text="View Report",
             related_entity_type="report",
             related_entity_id=report_id,
+        )
+
+    def notify_admin_user_registered(
+        self,
+        user_email: str,
+        user_role: str,
+        user_id: UUID,
+    ) -> List["Notification"]:
+        """Notify admins when a new user registers on the platform."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.USER_REGISTERED,
+            priority=NotificationPriority.MEDIUM,
+            title=f"New User Registered: {user_email}",
+            message=f"A new user ({user_email}) has successfully registered as a {user_role.title()}.",
+            action_url=f"/admin/users",
+            action_text="View Users",
+            related_entity_type="user",
+            related_entity_id=user_id,
+        )
+
+    def notify_admin_user_provisioned(
+        self,
+        user_email: str,
+        user_role: str,
+        provisioner_email: str,
+        user_id: UUID,
+    ) -> List["Notification"]:
+        """Notify admins when an admin provisions a new staff or user account."""
+        return self._notify_all_admins(
+            notification_type=NotificationType.USER_PROVISIONED,
+            priority=NotificationPriority.MEDIUM,
+            title=f"New Account Provisioned: {user_email}",
+            message=f"Admin {provisioner_email} provisioned a new {user_role.title()} account for {user_email}.",
+            action_url=f"/admin/staff" if user_role in ["staff", "admin"] else f"/admin/users",
+            action_text="View Users",
+            related_entity_type="user",
+            related_entity_id=user_id,
         )
 
     # Report Notifications

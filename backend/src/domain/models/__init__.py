@@ -130,3 +130,4 @@ __all__ = [
     "SimulationChallenge", "SimulationInstance", "SimulationProgress", "SimulationReport",
     "SimulationSolution", "SimulationSolutionComment", "SimulationSolutionLike", "SimulationLeaderboard",
 ]
+from .system_setting import SystemSetting

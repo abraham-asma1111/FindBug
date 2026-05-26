@@ -262,6 +262,17 @@ class PTaaSFindingValidation(BaseModel):
     retest_notes: Optional[str] = None
 
 
+class PTaaSRetestRequestCreate(BaseModel):
+    """Schema for requesting a retest"""
+    fix_description: str = Field(..., min_length=10)
+
+
+class PTaaSRetestResultSubmit(BaseModel):
+    """Schema for submitting a retest result"""
+    is_fixed: bool
+    retest_notes: str = Field(..., min_length=10)
+
+
 # Deliverable Schemas
 class PTaaSDeliverableCreate(BaseModel):
     engagement_id: UUID
