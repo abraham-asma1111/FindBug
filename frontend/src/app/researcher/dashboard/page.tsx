@@ -23,6 +23,7 @@ import {
   ResearcherDashboardInsightsSection,
   ResearcherDashboardJumpboardSection,
 } from '@/components/researcher/dashboard/ResearcherDashboardSections';
+import { formatCvssLabel } from '@/lib/numbers';
 import { useAuthStore } from '@/store/authStore';
 
 const submissionTabs = ['new', 'triaged', 'valid', 'invalid', 'closed'] as const;
@@ -507,9 +508,8 @@ export default function ResearcherDashboardPage() {
                                       'bg-[#f3ede6] dark:bg-neutral-800 text-[#5f5851] dark:text-gray-300'
                                     }`}
                                   >
-                                    {submission.cvss_score
-                                      ? `CVSS ${submission.cvss_score.toFixed(1)}`
-                                      : formatDashboardMetricLabel(submission.assigned_severity || 'unscored')}
+                                    {formatCvssLabel(submission.cvss_score) ??
+                                      formatDashboardMetricLabel(submission.assigned_severity || 'unscored')}
                                   </span>
                                 </td>
                                 <td className="py-3 pr-4">

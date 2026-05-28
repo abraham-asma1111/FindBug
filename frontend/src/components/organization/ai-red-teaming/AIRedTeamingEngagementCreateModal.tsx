@@ -59,10 +59,22 @@ export default function AIRedTeamingEngagementCreateModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const payload = {
+      name: formData.name,
+      target_ai_system: formData.target_ai_system,
+      model_type: formData.model_type,
+      testing_environment: formData.testing_environment,
+      ethical_guidelines: formData.ethical_guidelines,
+      scope_description: formData.scope_description || undefined,
+      allowed_attack_types: formData.allowed_attack_types.length
+        ? formData.allowed_attack_types
+        : undefined,
+    };
+
     try {
-      await createEngagement(formData);
+      await createEngagement(payload);
       onSuccess();
-    } catch (err) {
+    } catch {
       // Error is handled by useApiMutation
     }
   };

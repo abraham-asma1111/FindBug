@@ -13,6 +13,7 @@ import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import { AlertCircle, X, CheckCircle, XCircle } from 'lucide-react';
+import { getTriageReportDetailPath } from '@/lib/triageRoutes';
 
 interface Report {
   id: string;
@@ -145,7 +146,7 @@ export default function TriageQueuePage() {
   // Handle opening review modal
   const handleReviewReport = (report: Report) => {
     if (report.is_ptaas) {
-      router.push(`/triage/ptaas/${report.id}`);
+      router.push(getTriageReportDetailPath(report.id));
       return;
     }
     setSelectedReport(report);
@@ -231,23 +232,21 @@ export default function TriageQueuePage() {
   };
 
   // Handle assigning report to current user (mark as in progress)
-  const handleAssignToMe = async (reportId: string) => {
+  const handleAssignToMe = async (report: Report) => {
     setIsAssigning(true);
     try {
-      const response = await api.post(`/triage/reports/${reportId}/update`, { 
+      await api.post(`/triage/reports/${report.id}/update`, { 
         status: 'triaged'
       });
 
       // Mark this report as assigned
-      setAssignedReports(prev => new Set(prev).add(reportId));
+      setAssignedReports(prev => new Set(prev).add(report.id));
 
       setShowToast(true);
-      setToastMessage('Report assigned to you and marked as In Progress!');
+      setToastMessage('Assigned — opening report for triage…');
       setToastType('success');
-      
-      // Refetch data to update the UI immediately
-      await refetch();
-      await refetchStats();
+
+      router.push(getTriageReportDetailPath(report.id));
     } catch (error: any) {
       console.error('Assign error:', error);
       const errorDetail = error?.response?.data?.detail || error?.message || 'Failed to assign report';
@@ -261,11 +260,7 @@ export default function TriageQueuePage() {
 
   // Handle viewing report details
   const handleViewDetails = (report: Report) => {
-    if (report.is_ptaas) {
-      router.push(`/triage/ptaas/${report.id}`);
-      return;
-    }
-    router.push(`/triage/reports/${report.id}`);
+    router.push(getTriageReportDetailPath(report.id));
   };
 
   // Toast auto-hide
@@ -630,7 +625,7 @@ export default function TriageQueuePage() {
                       View Details
                     </button>
                     <button 
-                      onClick={() => handleAssignToMe(report.id)}
+                      onClick={() => handleAssignToMe(report)}
                       disabled={isAssigning || assignedReports.has(report.id) || report.status === 'triaged'}
                       className="px-4 py-2 bg-[#1E293B] hover:bg-[#334155] text-slate-300 rounded-lg text-sm font-medium transition-colors border border-[#334155] disabled:opacity-50 disabled:cursor-not-allowed"
                     >

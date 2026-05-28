@@ -43,8 +43,8 @@ export default function PaymentDetailPage() {
   const handleConfirmAction = async (notes?: string) => {
     if (confirmDialog.type === 'approve') {
       await approveMutation.mutateAsync({
-        endpoint: `/payments/bounty/${paymentId}/process`,
-        data: { payment_method: 'bank_transfer', payment_gateway: 'manual', notes },
+        endpoint: `/payments/${paymentId}/approve`,
+        data: { notes },
       });
     } else {
       await rejectMutation.mutateAsync({

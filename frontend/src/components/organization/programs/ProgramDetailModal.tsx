@@ -9,6 +9,8 @@ import { formatCurrency, formatDateTime } from '@/lib/portal';
 import Card from '@/components/ui/Card';
 import RewardEditModal from './RewardEditModal';
 import ScopeAddModal from './ScopeAddModal';
+import ScopeVerificationWizard from './ScopeVerificationWizard';
+import VerificationStatusBadge from './VerificationStatusBadge';
 import { api } from '@/lib/api';
 
 interface Program {
@@ -45,6 +47,22 @@ export default function ProgramDetailModal({
   const [activeTab, setActiveTab] = useState('overview');
   const [showRewardEditModal, setShowRewardEditModal] = useState(false);
   const [showScopeAddModal, setShowScopeAddModal] = useState(false);
+  // Verification wizard state
+  const [verifyingScope, setVerifyingScope] = useState<{ id: string; domain: string } | null>(null);
+
+  // Fetch per-program verification summary (for publish gate + scope badges)
+  const { data: verificationSummary, refetch: refetchVerification } = useApiQuery(
+    `/programs/${program.id}/verification-status`,
+    { enabled: true }
+  );
+
+  // Helper: get verification status for a specific scope
+  const getScopeVerification = (scopeId: string) => {
+    if (!verificationSummary?.scopes) return null;
+    return verificationSummary.scopes.find((s: any) => s.scope_id === scopeId) || null;
+  };
+
+  const VERIFIABLE_TYPES = new Set(['domain', 'web_app', 'api']);
 
   // Fetch program details
   const { data: programDetails } = useApiQuery(`/programs/${program.id}`, {
@@ -261,8 +279,8 @@ export default function ProgramDetailModal({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">In-Scope Assets</h4>
-        <Button 
-          variant="secondary" 
+        <Button
+          variant="secondary"
           size="sm"
           onClick={() => setShowScopeAddModal(true)}
         >
@@ -270,28 +288,78 @@ export default function ProgramDetailModal({
         </Button>
       </div>
 
+      {/* Verification summary banner */}
+      {verificationSummary && !verificationSummary.all_verified && program.status === 'draft' && (
+        <div style={{
+          background: 'rgba(99,102,241,0.08)',
+          border: '1px solid rgba(99,102,241,0.25)',
+          borderRadius: 10,
+          padding: '10px 14px',
+          fontSize: 13,
+          color: '#818cf8',
+        }}>
+          🔐 Some scopes require domain verification before this program can be published.
+        </div>
+      )}
+
       {scopes && scopes.length > 0 ? (
         <div className="space-y-3">
-          {scopes.map((scope: any) => (
-            <Card key={scope.id} className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">{scope.asset_type}</p>
-                  <p className="text-sm text-[#6d6760] dark:text-slate-300 mt-1">{scope.asset_identifier}</p>
-                  {scope.description && (
-                    <p className="text-xs text-[#8b8177] dark:text-slate-400 mt-1">{scope.description}</p>
-                  )}
+          {scopes.map((scope: any) => {
+            const ver = getScopeVerification(scope.id);
+            const needsVerification = VERIFIABLE_TYPES.has(scope.asset_type) && scope.is_in_scope;
+            const isVerified = ver?.verification_status === 'verified';
+
+            return (
+              <Card key={scope.id} className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">{scope.asset_type}</p>
+                      {needsVerification && (
+                        <VerificationStatusBadge
+                          status={ver?.verification_status || 'unverified'}
+                          size="sm"
+                        />
+                      )}
+                    </div>
+                    <p className="text-sm text-[#6d6760] dark:text-slate-300 mt-1">{scope.asset_identifier}</p>
+                    {scope.description && (
+                      <p className="text-xs text-[#8b8177] dark:text-slate-400 mt-1">{scope.description}</p>
+                    )}
+                    {ver?.verified_at && (
+                      <p className="text-xs text-emerald-500 mt-1">✓ Verified {new Date(ver.verified_at).toLocaleDateString()}</p>
+                    )}
+                    {ver?.failure_reason && !isVerified && (
+                      <p className="text-xs text-red-400 mt-1 truncate max-w-xs" title={ver.failure_reason}>
+                        ✗ {ver.failure_reason}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      scope.is_in_scope
+                        ? 'bg-[#e6f7ed] text-[#0d7a3d] dark:bg-green-900 dark:text-green-200'
+                        : 'bg-[#fde9e7] text-[#9d1f1f] dark:bg-red-900 dark:text-red-200'
+                    }`}>
+                      {scope.is_in_scope ? 'In Scope' : 'Out of Scope'}
+                    </span>
+                    {needsVerification && !isVerified && (
+                      <button
+                        onClick={() => setVerifyingScope({ id: scope.id, domain: scope.asset_identifier })}
+                        style={{
+                          fontSize: 11, fontWeight: 700, color: '#818cf8',
+                          background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)',
+                          borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+                        }}
+                      >
+                        🔐 Verify Now
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  scope.is_in_scope 
-                    ? 'bg-[#e6f7ed] text-[#0d7a3d] dark:bg-green-900 dark:text-green-200'
-                    : 'bg-[#fde9e7] text-[#9d1f1f] dark:bg-red-900 dark:text-red-200'
-                }`}>
-                  {scope.is_in_scope ? 'In Scope' : 'Out of Scope'}
-                </span>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card className="bg-[#faf6f1] dark:bg-[#111111] dark:border-gray-700">
@@ -349,26 +417,57 @@ export default function ProgramDetailModal({
   );
 
   const renderSettings = () => {
-    console.log('renderSettings called, program.status:', program.status);
-    console.log('Should show publish button:', program.status === 'draft');
-    
+    // Collect unverified verifiable scopes for the publish gate
+    const unverifiedScopes = verificationSummary?.scopes?.filter(
+      (s: any) => s.needs_verification && s.verification_status !== 'verified'
+    ) || [];
+    const canPublish = unverifiedScopes.length === 0;
+
     return (
       <div className="space-y-6">
         <div>
           <h4 className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100 mb-4">Program Actions</h4>
           <div className="space-y-3">
             {program.status === 'draft' && (
-              <Button
-                type="button"
-                onClick={(e) => {
-                  console.log('Button clicked!');
-                  handlePublish(e);
-                }}
-                disabled={isPublishing}
-                className="w-full"
-              >
-                {isPublishing ? 'Publishing...' : 'Publish Program'}
-              </Button>
+              <>
+                {/* Verification gate banner */}
+                {!canPublish && (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.25)',
+                    borderRadius: 10,
+                    padding: '12px 16px',
+                    marginBottom: 8,
+                  }}>
+                    <p style={{ color: '#fca5a5', fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>
+                      🔐 Cannot publish — unverified scopes:
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: '#f87171', fontSize: 12 }}>
+                      {unverifiedScopes.map((s: any) => (
+                        <li key={s.scope_id}>
+                          {s.asset_identifier}
+                          {' '}
+                          <button
+                            onClick={() => setVerifyingScope({ id: s.scope_id, domain: s.asset_identifier })}
+                            style={{ color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, textDecoration: 'underline', padding: 0 }}
+                          >
+                            Verify
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  onClick={(e) => { handlePublish(e); }}
+                  disabled={isPublishing || !canPublish}
+                  className="w-full"
+                  title={!canPublish ? 'Verify all domain scopes before publishing' : undefined}
+                >
+                  {isPublishing ? 'Publishing...' : 'Publish Program'}
+                </Button>
+              </>
             )}
 
           {program.status === 'public' && (
@@ -479,7 +578,6 @@ export default function ProgramDetailModal({
           onClose={() => setShowRewardEditModal(false)}
           onSuccess={() => {
             setShowRewardEditModal(false);
-            // Refetch rewards
             window.location.reload();
           }}
         />
@@ -493,6 +591,23 @@ export default function ProgramDetailModal({
           onSuccess={() => {
             setShowScopeAddModal(false);
             refetchScopes();
+            refetchVerification();
+          }}
+        />
+      )}
+
+      {/* Scope Verification Wizard */}
+      {verifyingScope && (
+        <ScopeVerificationWizard
+          scopeId={verifyingScope.id}
+          domain={verifyingScope.domain}
+          onClose={() => {
+            setVerifyingScope(null);
+            refetchVerification();
+          }}
+          onVerified={() => {
+            setVerifyingScope(null);
+            refetchVerification();
           }}
         />
       )}

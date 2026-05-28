@@ -9,6 +9,7 @@ import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
+import { formatCvssScore } from '@/lib/numbers';
 
 export default function AdminReportDetailPage() {
   const user = useAuthStore((state) => state.user);
@@ -155,7 +156,7 @@ export default function AdminReportDetailPage() {
                 <Field label="VRT Category" value={report.vrt_category} />
                 <Field label="Suggested Severity" value={getSeverityBadge(report.suggested_severity)} />
                 <Field label="Assigned Severity" value={getSeverityBadge(report.assigned_severity)} />
-                <Field label="CVSS Score" value={report.cvss_score != null ? report.cvss_score : null} />
+                <Field label="CVSS Score" value={formatCvssScore(report.cvss_score)} />
                 <Field label="Bounty Amount" value={report.bounty_amount != null ? `${Number(report.bounty_amount).toLocaleString()} ETB` : null} />
                 <Field label="Submitted" value={report.submitted_at ? new Date(report.submitted_at).toLocaleString() : null} />
                 <Field label="Triaged At" value={report.triaged_at ? new Date(report.triaged_at).toLocaleString() : null} />

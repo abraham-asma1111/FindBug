@@ -1,49 +1,24 @@
-import { HTMLAttributes } from 'react';
+import React from "react";
 
-export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'new' | 'pending' | 'approved' | 'rejected' | 'resolved';
-  size?: 'sm' | 'md' | 'lg';
+interface BadgeProps {
+  children: React.ReactNode;
+  className?: string;
+  variant?: "default" | "success" | "warning" | "danger" | "info";
 }
 
-export default function Badge({ 
-  variant = 'info', 
-  size = 'md',
-  className = '',
-  children,
-  ...props 
-}: BadgeProps) {
-  const variants = {
-    // Severity badges
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-amber-500 text-white',
-    low: 'bg-emerald-500 text-white',
-    info: 'bg-blue-500 text-white',
-    
-    // Status badges
-    new: 'bg-blue-500 text-white',
-    pending: 'bg-amber-500 text-white',
-    approved: 'bg-emerald-500 text-white',
-    rejected: 'bg-red-600 text-white',
-    resolved: 'bg-slate-500 text-white',
-  };
+export function Badge({ children, className = "", variant = "default" }: BadgeProps) {
+  const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
   
-  const sizes = {
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-0.5 text-xs',
-    lg: 'px-3 py-1 text-sm',
+  const variantClasses = {
+    default: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
+    success: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+    warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+    danger: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    info: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
   };
-  
+
   return (
-    <span
-      className={`
-        inline-flex items-center rounded-full font-medium
-        ${variants[variant]}
-        ${sizes[size]}
-        ${className}
-      `}
-      {...props}
-    >
+    <span className={`${baseClasses} ${variantClasses[variant]} ${className}`}>
       {children}
     </span>
   );

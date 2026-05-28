@@ -13,6 +13,7 @@ import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
 import { api } from '@/lib/api';
 import { AlertCircle, CheckCircle, Clock, Flag, ArrowLeft, FileText, Image, Video } from 'lucide-react';
+import { formatCvssLabel, hasCvssScore } from '@/lib/numbers';
 
 interface Finding {
   id: string;
@@ -20,7 +21,7 @@ interface Finding {
   description: string;
   severity: string;
   status: string;
-  cvss_score?: number;
+  cvss_score?: number | string | null;
   affected_component?: string;
   reproduction_steps?: string;  // Backend field name
   impact_analysis?: string;  // Backend field name
@@ -214,9 +215,9 @@ export default function OrganizationFindingDetailPage() {
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusClass}`}>
                         {finding.status}
                       </span>
-                      {finding.cvss_score && (
+                      {hasCvssScore(finding.cvss_score) && (
                         <span className="text-sm text-[#6d6760]">
-                          CVSS: <span className="font-semibold">{finding.cvss_score}</span>
+                          <span className="font-semibold">{formatCvssLabel(finding.cvss_score, { prefix: 'CVSS: ' })}</span>
                         </span>
                       )}
                       {finding.discovered_at && (

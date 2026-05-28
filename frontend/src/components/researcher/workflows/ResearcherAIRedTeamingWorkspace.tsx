@@ -229,11 +229,19 @@ export default function ResearcherAIRedTeamingWorkspace() {
       await Promise.all([refetchReports(), refetchEngagements()]);
       setActiveTab('reports');
     } catch (error: any) {
-      setPageError(error.response?.data?.detail || 'Failed to submit the AI red teaming report.');
+      const detail = error.response?.data?.detail;
+      const errorMessage = typeof detail === 'string' 
+        ? detail 
+        : Array.isArray(detail) 
+          ? detail.map((d: any) => d.msg).join(', ') 
+          : error.message || 'Failed to submit the AI red teaming report.';
+      setPageError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  console.log('Undefined components check:', Object.entries({ Alert, Button, Input, Select, Textarea, Spinner, ProtectedRoute, PortalShell, Banner, EmptyCollection, MetricGrid, PillList, ProgramGuide, ProgramHighlights, SectionCard, StatusBadge, StructuredValueBlock, WorkflowPickerCard, WorkflowTabs, WorkflowTimeline }).filter(([k, v]) => v === undefined));
 
   return (
     <ProtectedRoute allowedRoles={['researcher']}>
@@ -260,7 +268,7 @@ export default function ResearcherAIRedTeamingWorkspace() {
 
             {pageError ? (
               <Alert variant="error" title="Workflow issue">
-                {pageError}
+                {typeof pageError === 'string' ? pageError : JSON.stringify(pageError)}
               </Alert>
             ) : null}
 
@@ -272,7 +280,7 @@ export default function ResearcherAIRedTeamingWorkspace() {
 
             {engagementsError ? (
               <Alert variant="warning" title="AI engagement data is unavailable">
-                {engagementsError.message}
+                {engagementsError?.message || JSON.stringify(engagementsError)}
               </Alert>
             ) : null}
 
@@ -280,13 +288,13 @@ export default function ResearcherAIRedTeamingWorkspace() {
 
             <ProgramGuide guide={aiRedTeamingProgramGuide} tone="indigo" defaultOpen />
 
-            <SectionCard title="Assigned AI engagements" description="Only engagements explicitly assigned to you appear here.">
+            <SectionCard title="Active AI engagements" description="Published engagements you can test appear here once the organization activates them.">
               {isLoadingEngagements ? (
                 <div className="flex justify-center py-12">
                   <Spinner size="lg" />
                 </div>
               ) : engagements?.length ? (
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-2 lg:grid-cols-2">
                   {engagements.map((engagement) => (
                     <WorkflowPickerCard
                       key={engagement.id}
@@ -306,7 +314,7 @@ export default function ResearcherAIRedTeamingWorkspace() {
               ) : (
                 <EmptyCollection
                   title="No AI red teaming assignments yet"
-                  description="This desk activates when an organization assigns you to an invitation-only AI engagement."
+                  description="Once an organization publishes an AI red teaming engagement, it appears here for testing."
                 />
               )}
             </SectionCard>
@@ -327,54 +335,54 @@ export default function ResearcherAIRedTeamingWorkspace() {
                 />
 
                 {activeTab === 'briefing' ? (
-                  <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
                     <SectionCard title="Engagement brief" description="Scope, approved attack types, and ethics guidance for this model assessment.">
-                      <div className="space-y-5">
+                      <div className="space-y-3">
                         <div>
-                          <p className="text-sm font-semibold text-[#2d2a26]">Target AI system</p>
-                          <p className="mt-2 text-sm leading-6 text-[#6d6760]">{selectedEngagement.target_ai_system}</p>
+                          <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">Target AI system</p>
+                          <p className="mt-1 text-sm leading-6 text-[#6d6760] dark:text-slate-300">{selectedEngagement.target_ai_system}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-[#2d2a26]">Scope description</p>
-                          <p className="mt-2 text-sm leading-6 text-[#6d6760]">
+                          <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">Scope description</p>
+                          <p className="mt-1 text-sm leading-6 text-[#6d6760] dark:text-slate-300">
                             {selectedEngagement.scope_description || 'No additional scope notes were attached.'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-[#2d2a26]">Allowed attack types</p>
-                          <div className="mt-2">
+                          <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">Allowed attack types</p>
+                          <div className="mt-1">
                             <PillList items={(selectedEngagement.allowed_attack_types || []).map((entry) => formatStatusLabel(entry))} />
                           </div>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-[#2d2a26]">Ethical guidelines</p>
-                          <p className="mt-2 text-sm leading-6 text-[#6d6760]">{selectedEngagement.ethical_guidelines}</p>
+                          <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">Ethical guidelines</p>
+                          <p className="mt-1 text-sm leading-6 text-[#6d6760] dark:text-slate-300">{selectedEngagement.ethical_guidelines}</p>
                         </div>
                       </div>
                     </SectionCard>
 
-                    <div className="space-y-6">
-                      <SectionCard title="AI workflow" description="Modeled on how international AI red teaming programs handle scoped probing and evidence.">
+                    <div className="space-y-3">
+                      <SectionCard title="AI workflow" description="Scoped probing and transcript evidence capture.">
                         <WorkflowTimeline steps={aiWorkflow} />
                       </SectionCard>
 
                       <SectionCard title="Safety surface" description="Current pressure points from the engagement counters.">
-                        <div className="space-y-3 text-sm text-[#6d6760]">
+                        <div className="space-y-2 text-sm text-[#6d6760] dark:text-slate-300">
                           <div className="flex items-center justify-between gap-3">
                             <span>Critical findings</span>
-                            <span className="font-semibold text-[#2d2a26]">{selectedEngagement.critical_findings}</span>
+                            <span className="font-semibold text-[#2d2a26] dark:text-slate-100">{selectedEngagement.critical_findings}</span>
                           </div>
                           <div className="flex items-center justify-between gap-3">
                             <span>High findings</span>
-                            <span className="font-semibold text-[#2d2a26]">{selectedEngagement.high_findings}</span>
+                            <span className="font-semibold text-[#2d2a26] dark:text-slate-100">{selectedEngagement.high_findings}</span>
                           </div>
                           <div className="flex items-center justify-between gap-3">
                             <span>Medium findings</span>
-                            <span className="font-semibold text-[#2d2a26]">{selectedEngagement.medium_findings}</span>
+                            <span className="font-semibold text-[#2d2a26] dark:text-slate-100">{selectedEngagement.medium_findings}</span>
                           </div>
                           <div className="flex items-center justify-between gap-3">
                             <span>Low findings</span>
-                            <span className="font-semibold text-[#2d2a26]">{selectedEngagement.low_findings}</span>
+                            <span className="font-semibold text-[#2d2a26] dark:text-slate-100">{selectedEngagement.low_findings}</span>
                           </div>
                         </div>
                       </SectionCard>
@@ -383,18 +391,18 @@ export default function ResearcherAIRedTeamingWorkspace() {
                 ) : null}
 
                 {activeTab === 'reports' ? (
-                  <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+                  <div className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
                     <SectionCard title="Submitted AI reports" description="Prompt, response, and impact evidence already captured in this engagement.">
                       {isLoadingReports ? (
                         <p className="text-sm text-[#6d6760]">Loading AI vulnerability reports...</p>
                       ) : reports?.length ? (
                         <div className="space-y-4">
                           {reports.map((report) => (
-                            <div key={report.id} className="rounded-[24px] border border-[#dbe3ec] bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div key={report.id} className="rounded-xl border border-[#dbe3ec] bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800/80">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div>
-                                  <p className="text-base font-semibold text-[#2d2a26]">{report.title}</p>
-                                  <p className="mt-2 text-sm text-[#6d6760]">{report.impact}</p>
+                                  <p className="text-sm font-semibold text-[#2d2a26] dark:text-slate-100">{report.title}</p>
+                                  <p className="mt-1 text-xs text-[#6d6760] dark:text-slate-300">{report.impact}</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   <StatusBadge status={report.attack_type} />

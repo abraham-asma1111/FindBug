@@ -204,26 +204,26 @@ export default function AIRedTeamingEngagementDetailPage() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-4 mb-6">
-            <Card className="p-4">
+          <div className="mb-4 grid gap-2 md:grid-cols-4">
+            <Card className="p-3">
               <div className="text-sm text-[#6d6760] dark:text-slate-400 mb-1">Total Findings</div>
               <div className="text-2xl font-bold text-[#2d2a26] dark:text-slate-100">
                 {engagement.total_findings || 0}
               </div>
             </Card>
-            <Card className="p-4">
-              <div className="text-sm text-[#6d6760] dark:text-slate-400 mb-1">Critical</div>
-              <div className="text-2xl font-bold text-[#9d1f1f]">
+            <Card className="p-3">
+              <div className="text-xs text-[#6d6760] dark:text-slate-400 mb-0.5">Critical</div>
+              <div className="text-xl font-bold text-red-600 dark:text-red-300">
                 {engagement.critical_findings || 0}
               </div>
             </Card>
-            <Card className="p-4">
-              <div className="text-sm text-[#6d6760] dark:text-slate-400 mb-1">High</div>
-              <div className="text-2xl font-bold text-[#d6561c]">
+            <Card className="p-3">
+              <div className="text-xs text-[#6d6760] dark:text-slate-400 mb-0.5">High</div>
+              <div className="text-xl font-bold text-orange-600 dark:text-orange-300">
                 {engagement.high_findings || 0}
               </div>
             </Card>
-            <Card className="p-4">
+            <Card className="p-3">
               <div className="text-sm text-[#6d6760] dark:text-slate-400 mb-1">Assigned Experts</div>
               <div className="text-2xl font-bold text-[#2d2a26] dark:text-slate-100">
                 {engagement.assigned_experts?.length || 0}
@@ -292,7 +292,7 @@ export default function AIRedTeamingEngagementDetailPage() {
                           {engagement.allowed_attack_types.map((type: string) => (
                             <span
                               key={type}
-                              className="inline-flex items-center rounded-full bg-[#f3ede6] px-3 py-1 text-xs font-medium text-[#2d2a26]"
+                              className="inline-flex items-center rounded-full bg-[#f3ede6] px-2 py-0.5 text-[10px] font-medium text-[#2d2a26] dark:bg-slate-700 dark:text-slate-200"
                             >
                               {type.replace(/_/g, ' ')}
                             </span>

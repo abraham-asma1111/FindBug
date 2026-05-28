@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { api } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 import { AlertCircle, FileCode } from 'lucide-react';
 
 interface CodeReviewEngagement {
@@ -57,11 +60,22 @@ const severityColors: Record<string, string> = {
   info: 'bg-gray-100 text-gray-700',
 };
 
+const FINDING_STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'acknowledged', label: 'Acknowledged' },
+  { value: 'fixed', label: 'Fixed' },
+  { value: 'wont_fix', label: "Won't fix" },
+  { value: 'false_positive', label: 'False positive' },
+];
+
 export default function CodeReviewEngagementReportModal({
   isOpen,
   onClose,
   engagement,
 }: CodeReviewEngagementReportModalProps) {
+  const { showToast } = useToast();
+  const [updatingFindingId, setUpdatingFindingId] = useState<string | null>(null);
+
   const { data: findingsData, isLoading: loadingFindings, error: findingsError, refetch } = useApiQuery<FindingListResponse>(
     isOpen ? `/code-review/engagements/${engagement.id}/findings` : '',
     { enabled: isOpen }
@@ -74,6 +88,20 @@ export default function CodeReviewEngagementReportModal({
 
   const findings = findingsData?.findings ?? [];
   const reportDelivered = Boolean(engagement.report_submitted_at) || engagement.status === 'completed';
+
+  async function handleFindingStatusChange(findingId: string, newStatus: string) {
+    setUpdatingFindingId(findingId);
+    try {
+      await api.patch(`/code-review/findings/${findingId}/status`, { status: newStatus });
+      showToast('Finding status updated.', 'success');
+      await refetch();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } };
+      showToast(axiosErr.response?.data?.detail || 'Failed to update finding status.', 'error');
+    } finally {
+      setUpdatingFindingId(null);
+    }
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Code review report" size="xl">
@@ -183,6 +211,24 @@ export default function CodeReviewEngagementReportModal({
                       {finding.line_number ? `:${finding.line_number}` : ''}
                     </p>
                   ) : null}
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e6ddd4] pt-3">
+                    <label className="text-xs font-medium text-[#8b8177]" htmlFor={`status-${finding.id}`}>
+                      Remediation status
+                    </label>
+                    <select
+                      id={`status-${finding.id}`}
+                      value={finding.status}
+                      disabled={updatingFindingId === finding.id}
+                      onChange={(e) => handleFindingStatusChange(finding.id, e.target.value)}
+                      className="rounded-lg border border-[#e6ddd4] bg-white px-3 py-1.5 text-sm text-[#2d2a26] focus:border-[#10b981] focus:outline-none focus:ring-2 focus:ring-[#10b981]/20"
+                    >
+                      {FINDING_STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>

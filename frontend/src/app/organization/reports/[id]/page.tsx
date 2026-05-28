@@ -13,6 +13,7 @@ import Textarea from '@/components/ui/Textarea';
 import MediaViewer from '@/components/common/MediaViewer';
 import { useState } from 'react';
 import { Eye, Download } from 'lucide-react';
+import { formatCvssLabel, hasCvssScore } from '@/lib/numbers';
 
 export default function OrganizationReportDetailPage() {
   const params = useParams();
@@ -373,9 +374,9 @@ export default function OrganizationReportDetailPage() {
                     {report.status}
                   </span>
                 )}
-                {report.cvss_score && (
+                {hasCvssScore(report.cvss_score) && (
                   <span className="inline-flex items-center rounded-md bg-gray-200 px-3 py-1 text-xs font-bold uppercase text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                    CVSS {report.cvss_score.toFixed(1)}
+                    {formatCvssLabel(report.cvss_score)}
                   </span>
                 )}
               </div>

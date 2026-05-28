@@ -12,6 +12,7 @@ import {
   FileText, Code, Image, Video, Shield, 
   TrendingUp, Users, Database, Wrench, X, RefreshCw
 } from 'lucide-react';
+import { formatCvssLabel, hasCvssScore } from '@/lib/numbers';
 
 interface Finding {
   id: string;
@@ -21,7 +22,7 @@ interface Finding {
   vulnerability_type?: string;
   cwe_id?: string;
   owasp_category?: string;
-  cvss_score?: number;
+  cvss_score?: number | string | null;
   cvss_vector?: string;
   affected_component?: string;
   affected_url?: string;
@@ -162,9 +163,9 @@ export default function FindingDetailModal({ isOpen, onClose, finding, onEdit, o
                 <StatusIcon className="h-3.5 w-3.5" />
                 {statusInfo.label}
               </span>
-              {finding.cvss_score && (
+              {hasCvssScore(finding.cvss_score) && (
                 <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-700">
-                  CVSS: {finding.cvss_score}
+                  {formatCvssLabel(finding.cvss_score, { prefix: 'CVSS: ' })}
                 </span>
               )}
             </div>

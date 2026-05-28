@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { Plus, Code, AlertCircle, CheckCircle, Clock, FileCode, UserPlus, FileText } from 'lucide-react';
 import CodeReviewEngagementCreateModal from './CodeReviewEngagementCreateModal';
 import CodeReviewAssignReviewerModal from './CodeReviewAssignReviewerModal';
-import CodeReviewEngagementReportModal from './CodeReviewEngagementReportModal';
 import CodeReviewEngagementReportModal from './CodeReviewEngagementReportModal';
 
 interface CodeReviewEngagement {
@@ -50,6 +50,7 @@ function formatReviewType(value: string) {
 }
 
 export default function CodeReviewEngagementList() {
+  const searchParams = useSearchParams();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<CodeReviewEngagement | null>(null);
   const [reportTarget, setReportTarget] = useState<CodeReviewEngagement | null>(null);
@@ -59,6 +60,17 @@ export default function CodeReviewEngagementList() {
   );
 
   const engagements = data?.engagements ?? [];
+
+  useEffect(() => {
+    const engagementId = searchParams.get('engagement');
+    if (!engagementId || !engagements.length) {
+      return;
+    }
+    const match = engagements.find((e) => e.id === engagementId);
+    if (match) {
+      setReportTarget(match);
+    }
+  }, [searchParams, engagements]);
 
   if (isLoading) {
     return (
@@ -177,27 +189,40 @@ export default function CodeReviewEngagementList() {
                   </p>
                 ) : null}
 
-                {canAssign ? (
+                <div className="mt-4 flex flex-col gap-2">
+                  {canAssign ? (
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      variant="outline"
+                      icon={UserPlus}
+                      onClick={() => setAssignTarget(engagement)}
+                    >
+                      Assign reviewers
+                    </Button>
+                  ) : reviewerCount > 0 ? (
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      variant="outline"
+                      icon={UserPlus}
+                      onClick={() => setAssignTarget(engagement)}
+                    >
+                      Add more reviewers
+                    </Button>
+                  ) : null}
                   <Button
-                    className="mt-4 w-full"
+                    className="w-full"
                     size="sm"
                     variant="outline"
-                    icon={UserPlus}
-                    onClick={() => setAssignTarget(engagement)}
+                    icon={FileText}
+                    onClick={() => setReportTarget(engagement)}
                   >
-                    Assign reviewers
+                    {engagement.report_submitted_at || engagement.status === 'completed'
+                      ? 'View report'
+                      : 'View findings'}
                   </Button>
-                ) : reviewerCount > 0 ? (
-                  <Button
-                    className="mt-4 w-full"
-                    size="sm"
-                    variant="outline"
-                    icon={UserPlus}
-                    onClick={() => setAssignTarget(engagement)}
-                  >
-                    Add more reviewers
-                  </Button>
-                ) : null}
+                </div>
               </div>
             );
           })}

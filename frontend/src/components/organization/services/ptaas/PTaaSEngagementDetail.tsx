@@ -20,6 +20,7 @@ import PTaaSFindingAssignModal from './findings/PTaaSFindingAssignModal';
 import PTaaSFindingStatusModal from './findings/PTaaSFindingStatusModal';
 import PTaaSRetestRequestModal from './findings/PTaaSRetestRequestModal';
 import PTaaSResearcherAssignModal from './PTaaSResearcherAssignModal';
+import { formatCvssLabel, hasCvssScore } from '@/lib/numbers';
 
 interface PTaaSEngagement {
   id: string;
@@ -1106,10 +1107,10 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
                 <Calendar className="h-3.5 w-3.5" />
                 <span>{new Date(finding.created_at).toLocaleDateString()}</span>
               </div>
-              {finding.cvss_score && (
+              {hasCvssScore(finding.cvss_score) && (
                 <div className="flex items-center gap-1">
                   <Flag className="h-3.5 w-3.5" />
-                  <span>CVSS {finding.cvss_score}</span>
+                  <span>{formatCvssLabel(finding.cvss_score)}</span>
                 </div>
               )}
             </div>
@@ -1143,21 +1144,34 @@ function FindingCard({ finding, onRefresh }: { finding: any; onRefresh: () => vo
               </Button>
             )}
 
-            {/* Show Approve Bounty if status is verified */}
-            {finding.status?.toLowerCase() === 'verified' && (
+            {/* Approve bounty after triage validation (wallet → finance queue) */}
+            {(finding.status?.toUpperCase() === 'VALIDATED' ||
+              finding.validated === true) &&
+              finding.bounty_status !== 'approved' &&
+              finding.bounty_status !== 'paid' && (
               <Button 
                 size="sm" 
                 className="bg-green-600 hover:bg-green-700 text-white"
                 isLoading={isApproving}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (confirm('Are you sure you want to approve the bounty for this verified finding?')) {
+                  const amount = finding.bounty_amount
+                    ? `${Number(finding.bounty_amount).toLocaleString()} ETB`
+                    : 'calculated from engagement base price';
+                  if (
+                    confirm(
+                      `Approve PTaaS bounty (${amount})? This debits your organization wallet and sends the payment to Finance for processing.`
+                    )
+                  ) {
                     approveBounty({});
                   }
                 }}
               >
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Approve Bounty
+                {finding.bounty_amount
+                  ? ` (${Number(finding.bounty_amount).toLocaleString()} ETB)`
+                  : ''}
               </Button>
             )}
 

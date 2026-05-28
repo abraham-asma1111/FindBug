@@ -12,6 +12,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import EmptyState from '@/components/ui/EmptyState';
+import { formatCvssLabel, hasCvssScore } from '@/lib/numbers';
 
 export default function OrganizationReportsPage() {
   const user = useAuthStore((state) => state.user);
@@ -262,9 +263,9 @@ export default function OrganizationReportsPage() {
                       }`}>
                         {report.assigned_severity || report.suggested_severity || 'Unscored'}
                       </span>
-                      {report.cvss_score && (
+                      {hasCvssScore(report.cvss_score) && (
                         <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                          {report.cvss_score.toFixed(1)} scopes
+                          {formatCvssLabel(report.cvss_score)}
                         </span>
                       )}
                     </div>

@@ -1,47 +1,27 @@
-import { InputHTMLAttributes, forwardRef } from 'react';
+import React from "react";
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
-  helperText?: string;
 }
 
-const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className = '', required, ...props }, ref) => {
-    return (
-      <div className="w-full">
-        {label && (
-          <label className="block text-sm font-semibold text-[#2d2a26] mb-2">
-            {label}
-            {required && <span className="text-[#b42318] ml-1">*</span>}
-          </label>
-        )}
-        <input
-          ref={ref}
-          className={`
-            w-full px-4 py-2.5 rounded-xl
-            bg-white
-            border ${error ? 'border-[#f2c0bc]' : 'border-[#e6ddd4]'}
-            text-[#2d2a26]
-            placeholder:text-[#8b8177]
-            focus:outline-none focus:ring-2 ${error ? 'focus:ring-[#f2c0bc]' : 'focus:ring-[#2d2a26]'} focus:border-transparent
-            disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[#faf6f1]
-            transition-all
-            ${className}
-          `}
-          {...props}
-        />
-        {error && (
-          <p className="mt-1.5 text-sm text-[#b42318]">{error}</p>
-        )}
-        {helperText && !error && (
-          <p className="mt-1.5 text-sm text-[#6d6760]">{helperText}</p>
-        )}
-      </div>
-    );
-  }
-);
+export function Input({ error, className = "", ...props }: InputProps) {
+  const baseClasses = "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors";
+  const normalClasses = "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500";
+  const errorClasses = "border-red-500 focus:ring-red-500 focus:border-red-500";
+  const bgClasses = "bg-white dark:bg-gray-800 text-gray-900 dark:text-white";
+  const placeholderClasses = "placeholder-gray-400 dark:placeholder-gray-500";
 
-Input.displayName = 'Input';
+  return (
+    <div className="w-full">
+      <input
+        className={`${baseClasses} ${error ? errorClasses : normalClasses} ${bgClasses} ${placeholderClasses} ${className}`}
+        {...props}
+      />
+      {error && (
+        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </div>
+  );
+}
 
 export default Input;

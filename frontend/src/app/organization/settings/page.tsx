@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 export default function OrganizationSettingsPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const isLoading = useAuthStore((state) => state.isLoading);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -68,6 +69,18 @@ export default function OrganizationSettingsPage() {
       comingSoon: true,
     },
     {
+      id: 'domain-verification',
+      title: 'Domain Verification',
+      description: 'Verify ownership of organization domains before publishing high-trust scopes',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.866-3.134 7-7 7m7-7c0-3.866 3.134-7 7-7m-7 7v10m0-10V3m-7 15h14" />
+        </svg>
+      ),
+      color: 'from-[#7C3AED] to-[#5B21B6]',
+      path: '/organization/settings/domain-verification',
+    },
+    {
       id: 'notifications',
       title: 'Notifications',
       description: 'Manage email notifications and alert preferences',
@@ -95,10 +108,18 @@ export default function OrganizationSettingsPage() {
     },
   ];
 
-  if (!user) return null;
-
   return (
     <ProtectedRoute allowedRoles={['organization']}>
+      {!user ? (
+        <div className="min-h-[50vh] rounded-xl border border-[#334155] bg-[#1E293B] p-6 text-[#F8FAFC]">
+          <h2 className="text-lg font-semibold">
+            {isLoading ? 'Loading settings...' : 'Preparing your organization settings...'}
+          </h2>
+          <p className="mt-2 text-sm text-[#94A3B8]">
+            If this takes too long, refresh once or sign in again.
+          </p>
+        </div>
+      ) : (
       <PortalShell
         user={user}
         title="Settings"
@@ -197,6 +218,7 @@ export default function OrganizationSettingsPage() {
           </div>
         </div>
       </PortalShell>
+      )}
     </ProtectedRoute>
   );
 }

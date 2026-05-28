@@ -6,7 +6,8 @@ import PortalShell from '@/components/portal/PortalShell';
 import { getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 import Button from '@/components/ui/Button';
-import { useApiQuery, useApiMutation } from '@/hooks/useApiQuery';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { useApiMutation } from '@/hooks/useApiMutation';
 
 export default function FinancePaymentMethodsSettingsPage() {
   const user = useAuthStore((state) => state.user);

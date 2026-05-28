@@ -1,210 +1,157 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { Plus, Brain, Users, AlertCircle, CheckCircle, Clock, Shield } from 'lucide-react';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
-import { Plus, Shield, Users, AlertCircle, CheckCircle, Clock, Brain } from 'lucide-react';
-import AIRedTeamingEngagementCreateModal from './AIRedTeamingEngagementCreateModal';
+import AIRedTeamingEngagementCreateModal from '@/components/organization/ai-red-teaming/AIRedTeamingEngagementCreateModal';
+import { aiRt, aiRtModelLabels, aiRtStatusColors } from '@/components/organization/ai-red-teaming/aiRedTeamingStyles';
 
 interface AIRedTeamingEngagement {
-  id: number;
+  id: string;
   name: string;
-  description: string;
   target_ai_system: string;
   model_type: string;
   status: string;
-  start_date: string;
-  end_date: string;
-  assigned_experts: number;
-  reports_count: number;
-  created_at: string;
+  total_findings?: number;
+  assigned_experts?: string[] | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
-const statusConfig = {
-  draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: Clock },
-  active: { label: 'Active', color: 'bg-purple-100 text-purple-700', icon: Shield },
-  testing: { label: 'Testing', color: 'bg-yellow-100 text-yellow-700', icon: Brain },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700', icon: AlertCircle },
-};
-
-const modelTypeLabels: Record<string, string> = {
-  llm: 'LLM',
-  ml_model: 'ML Model',
-  ai_agent: 'AI Agent',
-  chatbot: 'Chatbot',
-  recommendation_system: 'Recommendation',
-  computer_vision: 'Computer Vision',
+const statusIcons: Record<string, typeof Clock> = {
+  draft: Clock,
+  active: Shield,
+  testing: Brain,
+  completed: CheckCircle,
+  cancelled: AlertCircle,
 };
 
 export default function AIRedTeamingEngagementList() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  
-  const { data: engagements, isLoading, error, refetch } = useApiQuery<AIRedTeamingEngagement[]>({
-    endpoint: '/ai-red-teaming/engagements',
-    queryKey: ['ai-red-teaming-engagements'],
-  });
+
+  const { data: engagements, isLoading, error, refetch } = useApiQuery<AIRedTeamingEngagement[]>(
+    '/ai-red-teaming/engagements',
+    { enabled: true }
+  );
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#8b5cf6] border-r-transparent"></div>
-          <p className="mt-4 text-sm text-[#6d6760]">Loading AI Red Teaming engagements...</p>
-        </div>
+      <div className="flex items-center justify-center py-8">
+        <div className="inline-block h-7 w-7 animate-spin rounded-full border-4 border-violet-500 border-r-transparent" />
+        <p className="ml-3 text-xs text-[#6d6760] dark:text-slate-400">Loading engagements...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-900">Error loading engagements</h3>
-            <p className="mt-1 text-sm text-red-700">{error.message}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="mt-3"
-            >
-              Try Again
-            </Button>
-          </div>
-        </div>
+      <div className="rounded-xl border border-red-300 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/40">
+        <p className="text-sm font-medium text-red-800 dark:text-red-200">{error.message}</p>
+        <Button variant="outline" size="sm" className="mt-2" onClick={() => refetch()}>
+          Retry
+        </Button>
       </div>
     );
   }
 
-  if (!engagements || engagements.length === 0) {
+  if (!engagements?.length) {
     return (
       <>
         <EmptyState
-          title="No AI Red Teaming Engagements"
-          description="Create your first AI security testing engagement to identify vulnerabilities in LLMs and AI systems. Test for prompt injection, jailbreaking, data leakage, and model manipulation."
+          title="No AI Red Teaming engagements"
+          description="Create an engagement, set up the sandbox, publish to researchers, and review AI vulnerability reports."
           action={{
-            label: 'Create Engagement',
+            label: 'Create engagement',
             onClick: () => setIsCreateModalOpen(true),
             icon: Plus,
           }}
         />
-        <AIRedTeamingEngagementCreateModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          onSuccess={() => {
-            setIsCreateModalOpen(false);
-            refetch();
-          }}
-        />
+        {isCreateModalOpen ? (
+          <AIRedTeamingEngagementCreateModal
+            onClose={() => setIsCreateModalOpen(false)}
+            onSuccess={() => {
+              setIsCreateModalOpen(false);
+              refetch();
+            }}
+          />
+        ) : null}
       </>
     );
   }
 
   return (
     <>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className={aiRt.page}>
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-2xl font-semibold text-[#2d2a26]">AI Red Teaming Engagements</h2>
-            <p className="mt-1 text-sm text-[#6d6760]">
-              Manage AI security testing and track vulnerability reports
+            <h2 className="text-lg font-semibold text-[#2d2a26] dark:text-slate-100">AI Red Teaming</h2>
+            <p className="text-xs text-[#6d6760] dark:text-slate-400">
+              Prompt injection, jailbreaks, and model safety testing
             </p>
           </div>
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            icon={Plus}
-          >
-            Create Engagement
+          <Button size="sm" onClick={() => setIsCreateModalOpen(true)} icon={Plus}>
+            Create
           </Button>
         </div>
 
-        {/* Engagement Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={aiRt.grid}>
           {engagements.map((engagement) => {
-            const statusInfo = statusConfig[engagement.status as keyof typeof statusConfig] || statusConfig.draft;
-            const StatusIcon = statusInfo.icon;
+            const StatusIcon = statusIcons[engagement.status] || Clock;
+            const statusClass = aiRtStatusColors[engagement.status] || aiRtStatusColors.draft;
+            const experts = engagement.assigned_experts?.length ?? 0;
 
             return (
-              <div
-                key={engagement.id}
-                className="group cursor-pointer rounded-2xl border border-[#e6ddd4] bg-white p-6 transition-all hover:border-[#8b5cf6] hover:shadow-md"
-              >
-                {/* Status Badge */}
-                <div className="flex items-center justify-between">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color}`}>
-                    <StatusIcon className="h-3.5 w-3.5" />
-                    {statusInfo.label}
+              <div key={engagement.id} className={`${aiRt.card} ${aiRt.cardHover} flex flex-col`}>
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>
+                    <StatusIcon className="h-3 w-3" />
+                    {engagement.status}
                   </span>
-                  <span className="text-xs text-[#8b8177]">#{engagement.id}</span>
+                  <span className={aiRt.label}>{aiRtModelLabels[engagement.model_type] || engagement.model_type}</span>
                 </div>
 
-                {/* Engagement Info */}
-                <div className="mt-4">
-                  <h3 className="font-semibold text-[#2d2a26] group-hover:text-[#8b5cf6]">
-                    {engagement.name}
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-[#6d6760]">
-                    {engagement.description}
-                  </p>
+                <h3 className={`${aiRt.title} mt-2`}>{engagement.name}</h3>
+                <p className={`${aiRt.subtitle} mt-1`}>{engagement.target_ai_system}</p>
+
+                <div className={`${aiRt.accentBox} mt-2`}>
+                  <p className={`${aiRt.accentText} truncate`}>{engagement.target_ai_system}</p>
                 </div>
 
-                {/* AI System Info */}
-                <div className="mt-3 flex items-center gap-2 rounded-lg bg-purple-50 px-3 py-2">
-                  <Brain className="h-4 w-4 text-purple-700" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-purple-700">
-                      {engagement.target_ai_system}
-                    </p>
-                    <p className="text-xs text-purple-600">
-                      {modelTypeLabels[engagement.model_type] || engagement.model_type}
-                    </p>
+                <div className={`${aiRt.divider} grid grid-cols-2 gap-2`}>
+                  <div>
+                    <p className={aiRt.label}>Experts</p>
+                    <p className={aiRt.stat}>{experts}</p>
+                  </div>
+                  <div>
+                    <p className={aiRt.label}>Findings</p>
+                    <p className={aiRt.stat}>{engagement.total_findings ?? 0}</p>
                   </div>
                 </div>
 
-                {/* Stats */}
-                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e6ddd4] pt-4">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-[#8b8177]" />
-                    <div>
-                      <p className="text-xs text-[#8b8177]">Experts</p>
-                      <p className="text-sm font-semibold text-[#2d2a26]">
-                        {engagement.assigned_experts || 0}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-[#8b8177]" />
-                    <div>
-                      <p className="text-xs text-[#8b8177]">Reports</p>
-                      <p className="text-sm font-semibold text-[#2d2a26]">
-                        {engagement.reports_count || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Timeline */}
-                <div className="mt-4 text-xs text-[#8b8177]">
-                  {new Date(engagement.start_date).toLocaleDateString()} - {new Date(engagement.end_date).toLocaleDateString()}
-                </div>
+                <Link
+                  href={`/organization/ai-red-teaming/${engagement.id}`}
+                  className="mt-2 block w-full rounded-lg bg-violet-600 px-3 py-1.5 text-center text-xs font-semibold text-white hover:bg-violet-700 dark:bg-violet-700 dark:hover:bg-violet-600"
+                >
+                  Manage
+                </Link>
               </div>
             );
           })}
         </div>
       </div>
 
-      <AIRedTeamingEngagementCreateModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={() => {
-          setIsCreateModalOpen(false);
-          refetch();
-        }}
-      />
+      {isCreateModalOpen ? (
+        <AIRedTeamingEngagementCreateModal
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateModalOpen(false);
+            refetch();
+          }}
+        />
+      ) : null}
     </>
   );
 }

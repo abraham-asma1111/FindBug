@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useApiQuery, useApiMutation } from '@/hooks/useApiQuery';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { useApiMutation } from '@/hooks/useApiMutation';
 import { MessageSquare, Trash2, Edit2, Paperclip } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';

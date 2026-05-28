@@ -12,7 +12,7 @@ export interface ResearcherSubmission {
   submitted_at?: string | null;
   bounty_amount?: number | null;
   program_name?: string | null;
-  cvss_score?: number | null;
+  cvss_score?: number | string | null;
 }
 
 export interface ResearcherDashboardData {

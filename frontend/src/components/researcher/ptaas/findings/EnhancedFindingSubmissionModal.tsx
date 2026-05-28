@@ -7,6 +7,7 @@ import Modal from '@/components/ui/Modal';
 import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import { AlertCircle, Upload, X, CheckCircle } from 'lucide-react';
+import { cvssScoreToFormValue, parseNumeric } from '@/lib/numbers';
 
 interface EnhancedFindingSubmissionModalProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export default function EnhancedFindingSubmissionModal({
     privileges_required: existingFinding?.privileges_required || 'None',
     user_interaction: existingFinding?.user_interaction || 'None',
     
-    cvss_score: existingFinding?.cvss_score?.toString() || ''
+    cvss_score: cvssScoreToFormValue(existingFinding?.cvss_score)
   });
 
   const updateField = (field: string, value: any) => {
@@ -226,7 +227,7 @@ export default function EnhancedFindingSubmissionModal({
         // Update existing finding
         await api.patch(`/ptaas/findings/${existingFinding.id}`, {
           ...formData,
-          cvss_score: formData.cvss_score ? parseFloat(formData.cvss_score) : null
+          cvss_score: parseNumeric(formData.cvss_score)
         });
         alert('Finding updated successfully!');
       } else {
@@ -234,7 +235,7 @@ export default function EnhancedFindingSubmissionModal({
         await api.post('/ptaas/findings', {
           engagement_id: engagementId,
           ...formData,
-          cvss_score: formData.cvss_score ? parseFloat(formData.cvss_score) : null
+          cvss_score: parseNumeric(formData.cvss_score)
         });
         alert('Finding submitted successfully!');
       }

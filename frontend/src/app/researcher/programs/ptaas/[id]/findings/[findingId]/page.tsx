@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import ResearcherPTaaSRetestResultModal from '@/components/researcher/ptaas/ResearcherPTaaSRetestResultModal';
+import { formatCvssLabel, hasCvssScore } from '@/lib/numbers';
 
 export default function ResearcherFindingDetailPage() {
   const params = useParams();
@@ -161,9 +162,9 @@ export default function ResearcherFindingDetailPage() {
                 <StatusIcon className="h-3.5 w-3.5" />
                 {statusInfo.label}
               </span>
-              {finding.cvss_score && (
+              {hasCvssScore(finding.cvss_score) && (
                 <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-700">
-                  CVSS: {finding.cvss_score}
+                  {formatCvssLabel(finding.cvss_score, { prefix: 'CVSS: ' })}
                 </span>
               )}
             </div>

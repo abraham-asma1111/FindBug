@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import { ChevronRight, AlertCircle, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { getTriageReportDetailPath } from '@/lib/triageRoutes';
 
 interface Report {
   id: string;
@@ -30,6 +31,7 @@ interface Report {
   bounty_amount: number | null;
   submitted_at: string;
   updated_at: string;
+  is_ptaas?: boolean;
 }
 
 interface ReportsResponse {
@@ -338,7 +340,7 @@ export default function TriageReportsPage() {
                           {new Date(report.submitted_at).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Link href={`/triage/reports/${report.id}`}>
+                          <Link href={getTriageReportDetailPath(report.id)}>
                             <Button variant="ghost" size="sm" className="gap-2">
                               Review
                               <ChevronRight className="w-4 h-4" />

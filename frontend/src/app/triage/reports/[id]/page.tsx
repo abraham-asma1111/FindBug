@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import PortalShell from '@/components/portal/PortalShell';
@@ -16,6 +16,8 @@ import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import { AlertCircle, ChevronLeft, Save, CheckCircle, Copy, Paperclip, Download, FileText, Image, Video, File, Search, User, X } from 'lucide-react';
 import Link from 'next/link';
+import TriagePtaasReportDetail from '@/components/triage/TriagePtaasReportDetail';
+import { cvssScoreToFormValue, formatCvssScore } from '@/lib/numbers';
 
 interface ReportDetail {
   id: string;
@@ -29,7 +31,7 @@ interface ReportDetail {
   status: string;
   assigned_severity: string | null;
   suggested_severity: string;
-  cvss_score: number | null;
+  cvss_score: number | string | null;
   vrt_category: string | null;
   bounty_amount: number | null;
   submitted_at?: string;
@@ -107,6 +109,7 @@ const statusColors: Record<string, string> = {
 
 export default function TriageReportDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const reportId = params.id as string;
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
@@ -136,22 +139,37 @@ export default function TriageReportDetailPage() {
     endpoint: '/triage/templates?limit=100',
   });
 
+  const {
+    data: ptaasFinding,
+    isLoading: isPtaasLoading,
+    isError: isPtaasError,
+  } = useApiQuery<{ id: string }>({
+    endpoint: `/ptaas/findings/${reportId}`,
+    enabled: !!reportId,
+    retry: 0,
+  });
+
+  const isPtaas = !!ptaasFinding?.id && !isPtaasError;
+  const ptaasProbeDone = !!reportId && !isPtaasLoading;
+
   const { data: report, isLoading, error, refetch } = useApiQuery<ReportDetail>({
     endpoint: `/reports/${reportId}`,
+    enabled: !!reportId && ptaasProbeDone && !isPtaas,
   });
+
   const {
     data: attachmentsResponse,
     isLoading: attachmentsLoading,
     error: attachmentsError,
   } = useApiQuery<ReportAttachmentsResponse>({
     endpoint: `/reports/${reportId}/attachments`,
-    enabled: !!reportId,
+    enabled: !!reportId && ptaasProbeDone && !isPtaas,
   });
 
   // Fetch payment status for this report
   const { data: paymentData } = useApiQuery<any>({
     endpoint: `/payments/bounty?report_id=${reportId}`,
-    enabled: !!reportId,
+    enabled: !!reportId && ptaasProbeDone && !isPtaas,
   });
 
   // Initialize form when report loads
@@ -159,7 +177,7 @@ export default function TriageReportDetailPage() {
     if (report) {
       setStatus(report.status || '');
       setAssignedSeverity(report.assigned_severity || report.suggested_severity || '');
-      setCvssScore(report.cvss_score?.toString() || '');
+      setCvssScore(cvssScoreToFormValue(report.cvss_score));
       setVrtCategory(report.vrt_category || '');
       setTriageNotes(report.triage_notes || '');
       setIsDuplicate(report.is_duplicate || false);
@@ -322,6 +340,35 @@ export default function TriageReportDetailPage() {
       alert(`Failed to view file: ${error.response?.data?.detail || error.message}`);
     }
   };
+
+  if (!ptaasProbeDone) {
+    return (
+      <ProtectedRoute allowedRoles={['triage_specialist', 'admin', 'super_admin']}>
+        {user ? (
+          <PortalShell
+            user={user}
+            title="Report Details"
+            subtitle="Loading..."
+            navItems={getPortalNavItems(user.role)}
+            headerAlign="left"
+            hideThemeToggle
+          >
+            <div className="bg-[#1E293B] rounded-lg border border-[#334155] p-8 text-center">
+              <p className="text-[#94A3B8]">Loading...</p>
+            </div>
+          </PortalShell>
+        ) : null}
+      </ProtectedRoute>
+    );
+  }
+
+  if (isPtaas) {
+    return (
+      <ProtectedRoute allowedRoles={['triage_specialist', 'admin', 'super_admin']}>
+        <TriagePtaasReportDetail findingId={reportId} />
+      </ProtectedRoute>
+    );
+  }
 
   const reportData = report;
   const evidenceAttachments = mergeEvidenceAttachments(
@@ -982,7 +1029,7 @@ export default function TriageReportDetailPage() {
                 <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">
                   <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">CVSS Score</p>
                   <p className="mt-2 text-lg font-bold text-[#F8FAFC]">
-                    {reportData.cvss_score || '-'}
+                    {formatCvssScore(reportData.cvss_score) ?? '-'}
                   </p>
                 </div>
                 <div className="bg-[#1E293B] rounded-lg p-4 border border-[#334155]">

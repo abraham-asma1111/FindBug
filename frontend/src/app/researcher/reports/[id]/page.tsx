@@ -71,10 +71,26 @@ export default function ReportDetailPage() {
   const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false);
   const [selectedAttachmentIndex, setSelectedAttachmentIndex] = useState(0);
 
-  const { data: report, isLoading, isError } = useApiQuery<ReportDetail>(
+  const { data: report, isLoading, isError, error } = useApiQuery<ReportDetail>(
     `/reports/${reportId}`,
     { enabled: !!reportId }
   );
+
+  // Check if this is actually a PTaaS finding (404 from reports endpoint)
+  // If so, try to fetch it as a PTaaS finding and redirect
+  const { data: ptaasCheck } = useApiQuery<any>(
+    `/ptaas/findings/${reportId}`,
+    { 
+      enabled: !!reportId && isError,
+      retry: false
+    }
+  );
+
+  // Auto-redirect if this is a PTaaS finding
+  if (ptaasCheck && ptaasCheck.engagement_id) {
+    router.replace(`/researcher/programs/ptaas/${ptaasCheck.engagement_id}/findings/${reportId}`);
+    return null;
+  }
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this report? This action cannot be undone.')) {

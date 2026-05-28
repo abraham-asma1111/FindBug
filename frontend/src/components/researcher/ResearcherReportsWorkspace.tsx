@@ -14,6 +14,7 @@ import {
   getPortalNavItems,
 } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
+import { formatCvssScore } from '@/lib/numbers';
 
 type ReportListTab =
   | 'all'
@@ -1154,7 +1155,7 @@ export default function ResearcherReportsWorkspace() {
                           <div className="rounded-2xl bg-white dark:bg-[#111111] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b8177]">CVSS</p>
                             <p className="mt-2 text-sm font-semibold text-[#2d2a26]">
-                              {selectedReport.cvss_score ?? '-'}
+                              {formatCvssScore(selectedReport.cvss_score) ?? '-'}
                             </p>
                           </div>
                           <div className="rounded-2xl bg-white dark:bg-[#111111] p-4">

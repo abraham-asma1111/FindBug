@@ -11,6 +11,7 @@ import { useApiQuery } from '@/hooks/useApiQuery';
 import Button from '@/components/ui/Button';
 import { RefreshCw, ChevronLeft, AlertCircle, ExternalLink, Filter } from 'lucide-react';
 import Link from 'next/link';
+import { getTriageReportDetailPath } from '@/lib/triageRoutes';
 
 interface Report {
   id: string;
@@ -351,13 +352,7 @@ export default function TriageProgramDetailPage() {
                         )}
                       </div>
                     </div>
-                    <Link
-                      href={
-                        report.is_ptaas
-                          ? `/triage/ptaas/${report.id}`
-                          : `/triage/reports/${report.id}`
-                      }
-                    >
+                    <Link href={getTriageReportDetailPath(report.id)}>
                       <Button variant="outline" size="sm" className="gap-2">
                         <ExternalLink className="w-4 h-4" />
                         Review

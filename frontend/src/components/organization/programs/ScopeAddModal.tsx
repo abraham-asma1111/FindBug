@@ -6,6 +6,10 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import { useApiMutation } from '@/hooks/useApiMutation';
+import ScopeVerificationWizard from './ScopeVerificationWizard';
+
+// Asset types that require domain ownership verification
+const VERIFIABLE_TYPES = new Set(['domain', 'web_app', 'api']);
 
 interface ScopeAddModalProps {
   programId: string;
@@ -16,14 +20,19 @@ interface ScopeAddModalProps {
 export default function ScopeAddModal({ programId, onClose, onSuccess }: ScopeAddModalProps) {
   const [assetType, setAssetType] = useState('web_app');
   const [assetIdentifier, setAssetIdentifier] = useState('');
+  // After scope creation, hold the new scope ID to open the wizard
+  const [wizardScope, setWizardScope] = useState<{ id: string; domain: string } | null>(null);
   const [isInScope, setIsInScope] = useState(true);
   const [description, setDescription] = useState('');
 
   const { mutate: addScope, isLoading, error } = useApiMutation({
     method: 'POST',
-    onSuccess: () => {
-      alert('Scope added successfully!');
-      onSuccess();
+    onSuccess: (data: any) => {
+      if (VERIFIABLE_TYPES.has(assetType) && isInScope) {
+        setWizardScope({ id: data.id, domain: assetIdentifier });
+      } else {
+        onSuccess();
+      }
     },
   });
 
@@ -43,6 +52,16 @@ export default function ScopeAddModal({ programId, onClose, onSuccess }: ScopeAd
       description: description.trim() || undefined,
     });
   };
+
+  if (wizardScope) {
+    return (
+      <ScopeVerificationWizard
+        scopeId={wizardScope.id}
+        domain={wizardScope.domain}
+        onClose={onSuccess}
+      />
+    );
+  }
 
   return (
     <Modal isOpen={true} onClose={onClose} title="Add Scope" size="md">
@@ -68,6 +87,11 @@ export default function ScopeAddModal({ programId, onClose, onSuccess }: ScopeAd
             <option value="domain">Domain</option>
             <option value="other">Other</option>
           </Select>
+          {VERIFIABLE_TYPES.has(assetType) && (
+            <p className="text-xs mt-1" style={{ color: '#818cf8', fontWeight: 600 }}>
+              🔐 Domain ownership verification required before publishing.
+            </p>
+          )}
         </div>
 
         <div>
