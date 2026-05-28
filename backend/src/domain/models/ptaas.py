@@ -124,6 +124,12 @@ class PTaaSFinding(Base):
     retest_required = Column(Boolean, nullable=True, default=False)
     template_version = Column(String(20), nullable=True)
     mandatory_fields_complete = Column(Boolean, nullable=True, default=False)
+
+    # Bounty (aligned with bug bounty workflow)
+    bounty_amount = Column(Numeric(15, 2), nullable=True)
+    bounty_status = Column(String(50), nullable=True, default="pending")
+    bounty_approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    bounty_approved_at = Column(DateTime, nullable=True)
     
     # Metadata
     discovered_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

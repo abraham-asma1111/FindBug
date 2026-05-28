@@ -588,82 +588,169 @@ class PTaaSService:
 
         return updated_finding
 
-    def approve_ptaas_bounty(self, finding_id: UUID, approved_by: UUID) -> Optional[PTaaSFinding]:
-        """Approve bounty for verified finding and push to finance workflow"""
+    def approve_ptaas_bounty(
+        self,
+        finding_id: UUID,
+        approved_by_user_id: UUID,
+        organization_user_id: UUID,
+    ) -> Optional[PTaaSFinding]:
+        """
+        Organization approves PTaaS bounty: wallet debit + finance queue (same as bug bounty).
+        Researcher is paid by Finance after payment status is processed — not instant credit here.
+        """
+        from decimal import Decimal
+        import uuid as uuid_lib
+        from datetime import datetime
+        from src.services.wallet_service import WalletService
+        from src.services.payment_service import PaymentService
+        from src.domain.models.bounty_payment import BountyPayment
+        from src.domain.models.user import User as UserModel
+
         finding = self.get_finding(finding_id)
         if not finding:
             return None
 
-        # Change status to CLOSED (bounty approved)
-        update_data = {
-            'status': 'CLOSED'
-        }
-        updated_finding = self.update_finding(finding_id, update_data, approved_by)
-
         engagement = self.get_engagement(finding.engagement_id)
-        
-        # Integrate with WalletService to automate the financial payout
-        from src.services.wallet_service import WalletService
-        from decimal import Decimal
+        if not engagement:
+            raise ValueError("Engagement not found")
+
+        status_upper = (finding.status or "").upper()
+        if status_upper not in ("VALIDATED", "VERIFIED") and not finding.validated:
+            raise ValueError(
+                "Only validated findings can receive bounty approval. "
+                f"Current status: {finding.status}"
+            )
+
+        if not finding.bounty_amount or Decimal(str(finding.bounty_amount)) <= 0:
+            from src.services.ptaas_bounty_utils import calculate_ptaas_bounty_amount
+            calculated = calculate_ptaas_bounty_amount(
+                engagement.base_price,
+                finding.severity,
+            )
+            if calculated is None:
+                raise ValueError(
+                    "Bounty amount is not set. Complete triage validation first or set engagement base price."
+                )
+            finding.bounty_amount = calculated
+            finding.bounty_status = "pending"
+            self.db.commit()
+            self.db.refresh(finding)
+
+        if finding.bounty_status in ("approved", "paid"):
+            raise ValueError("Bounty has already been approved for this finding")
+
+        existing_payment = self.db.query(BountyPayment).filter(
+            BountyPayment.ptaas_finding_id == finding_id,
+            BountyPayment.status.in_(["approved", "processing", "completed", "pending"]),
+        ).first()
+        if existing_payment and existing_payment.status in ("approved", "processing", "completed"):
+            raise ValueError("Bounty payment already approved for this finding")
+
+        bounty_amount = Decimal(str(finding.bounty_amount))
+        commission = bounty_amount * Decimal("0.30")
+        total_cost = bounty_amount + commission
+
         wallet_service = WalletService(self.db)
-        
-        bounty_amount = Decimal('0.00')
-        severity = finding.severity.lower() if finding.severity else 'info'
-        if severity == 'critical':
-            bounty_amount = Decimal('10000.00')
-        elif severity == 'high':
-            bounty_amount = Decimal('5000.00')
-        elif severity == 'medium':
-            bounty_amount = Decimal('2000.00')
-        elif severity == 'low':
-            bounty_amount = Decimal('500.00')
-            
-        if bounty_amount > 0 and finding.discovered_by and engagement:
-            try:
-                wallet_service.credit_wallet(
-                    owner_id=finding.discovered_by,
-                    owner_type="researcher",
-                    amount=bounty_amount,
-                    saga_id=f"ptaas-bounty-{finding_id}",
-                    reference_type="ptaas_bounty",
-                    reference_id=finding_id
+        payment_service = PaymentService(self.db)
+
+        org_wallet = wallet_service.get_or_create_wallet(
+            owner_id=organization_user_id,
+            owner_type="organization",
+        )
+        if org_wallet.available_balance < total_cost:
+            raise ValueError(
+                f"Insufficient wallet balance. Required: {float(total_cost)} ETB, "
+                f"Available: {float(org_wallet.available_balance)} ETB"
+            )
+
+        saga_id = f"PTAAS-BOUNTY-{uuid_lib.uuid4().hex[:12].upper()}"
+
+        try:
+            platform_user = self.db.query(UserModel).filter(UserModel.role == "admin").first()
+            if not platform_user:
+                platform_user = self.db.query(UserModel).filter(
+                    UserModel.role == "finance_officer"
+                ).first()
+            if not platform_user:
+                raise ValueError("Platform wallet user not found")
+
+            wallet_service.debit_wallet(
+                owner_id=organization_user_id,
+                owner_type="organization",
+                amount=total_cost,
+                saga_id=saga_id,
+                from_reserved=False,
+                reference_type="ptaas_bounty_approval",
+                reference_id=finding_id,
+            )
+
+            wallet_service.credit_wallet(
+                owner_id=platform_user.id,
+                owner_type="platform",
+                amount=total_cost,
+                saga_id=saga_id,
+                reference_type="ptaas_bounty_approval",
+                reference_id=finding_id,
+            )
+            if not existing_payment:
+                payment = payment_service.create_ptaas_bounty_payment(
+                    finding_id=finding_id,
+                    bounty_amount=bounty_amount,
+                    approved_by=approved_by_user_id,
+                    commit=False,
                 )
-                
-                # Deduct from organization's wallet
-                wallet_service.debit_wallet(
-                    owner_id=engagement.organization_id,
-                    owner_type="organization",
-                    amount=bounty_amount,
-                    saga_id=f"ptaas-bounty-{finding_id}",
-                    from_reserved=False,
-                    reference_type="ptaas_bounty",
-                    reference_id=finding_id
-                )
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).error(f"Failed to process wallet transaction for PTaaS bounty: {str(e)}")
-        
+            else:
+                payment = existing_payment
+
+            payment.status = "approved"
+            payment.approved_by = approved_by_user_id
+            payment.approved_at = datetime.utcnow()
+
+            finding.bounty_status = "approved"
+            finding.bounty_approved_by = approved_by_user_id
+            finding.bounty_approved_at = datetime.utcnow()
+            finding.status = "CLOSED"
+
+            self.db.commit()
+            self.db.refresh(finding)
+            payment_service._add_payment_history(
+                payment_id=payment.payment_id,
+                previous_status="pending",
+                new_status="approved",
+                changed_by=approved_by_user_id,
+                notes="PTaaS bounty approved by organization — finance payout queue",
+            )
+        except Exception:
+            self.db.rollback()
+            raise
+
         self.audit_service.log_action(
             action_type="APPROVE_PTAAS_BOUNTY",
             action_category="finance",
             target_type="PTaaSFinding",
-            description=f"Bounty approved for PTaaS finding",
-            actor_id=approved_by,
+            description="PTaaS bounty approved — sent to finance for payout processing",
+            actor_id=approved_by_user_id,
             target_id=finding_id,
-            metadata={"engagement_id": str(finding.engagement_id)}
+            metadata={
+                "engagement_id": str(finding.engagement_id),
+                "bounty_amount": float(bounty_amount),
+                "payment_id": str(payment.payment_id),
+            },
         )
 
-        # Notify researcher
         if finding.discovered_by:
             self.notification_service.create_notification(
                 user_id=finding.discovered_by,
                 notification_type=NotificationType.BOUNTY_APPROVED,
-                title="Bounty Approved for PTaaS",
-                message=f"Bounty approved for PTaaS finding '{finding.title}'.",
+                title="PTaaS bounty approved",
+                message=(
+                    f"Bounty of {float(bounty_amount):,.2f} ETB approved for '{finding.title}'. "
+                    "Finance will process payout."
+                ),
                 priority=NotificationPriority.HIGH,
                 related_entity_type="ptaas_finding",
                 related_entity_id=finding.id,
-                action_url=f"/researcher/programs/ptaas/{finding.engagement_id}/findings/{finding.id}"
+                action_url=f"/researcher/programs/ptaas/{finding.engagement_id}/findings/{finding.id}",
             )
 
-        return updated_finding
+        return finding

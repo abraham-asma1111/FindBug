@@ -298,7 +298,7 @@ class AdminService:
         if not program:
             raise ValueError("Program not found")
         
-        valid_statuses = ["draft", "public", "private", "paused", "archived"]
+        valid_statuses = ["draft", "pending_review", "public", "private", "paused", "archived"]
         if new_status not in valid_statuses:
             raise ValueError(f"Invalid status: {new_status}")
         
@@ -316,6 +316,70 @@ class AdminService:
             details={
                 "old_status": old_status,
                 "new_status": new_status,
+                "reason": reason
+            }
+        )
+        
+        return program
+    
+    def approve_program(self, admin_id: UUID, program_id: UUID) -> BountyProgram:
+        """Approve a program that is in pending_review status - FREQ-14."""
+        program = self.db.query(BountyProgram).filter(
+            BountyProgram.id == program_id
+        ).first()
+        
+        if not program:
+            raise ValueError("Program not found")
+            
+        if program.status != "pending_review":
+            raise ValueError(f"Program cannot be approved because it is in status: {program.status}")
+            
+        old_status = program.status
+        program.status = "public"
+        program.visibility = "public"
+        self.db.commit()
+        self.db.refresh(program)
+        
+        # Log action
+        self._log_admin_action(
+            admin_id=admin_id,
+            action="program_approved",
+            target_type="program",
+            target_id=program_id,
+            details={
+                "old_status": old_status,
+                "new_status": "public"
+            }
+        )
+        
+        return program
+        
+    def reject_program(self, admin_id: UUID, program_id: UUID, reason: str) -> BountyProgram:
+        """Reject a program that is in pending_review status - FREQ-14."""
+        program = self.db.query(BountyProgram).filter(
+            BountyProgram.id == program_id
+        ).first()
+        
+        if not program:
+            raise ValueError("Program not found")
+            
+        if program.status != "pending_review":
+            raise ValueError(f"Program cannot be rejected because it is in status: {program.status}")
+            
+        old_status = program.status
+        program.status = "draft"
+        self.db.commit()
+        self.db.refresh(program)
+        
+        # Log action
+        self._log_admin_action(
+            admin_id=admin_id,
+            action="program_rejected",
+            target_type="program",
+            target_id=program_id,
+            details={
+                "old_status": old_status,
+                "new_status": "draft",
                 "reason": reason
             }
         )
@@ -1026,7 +1090,7 @@ class AdminService:
         query = self.db.query(Organization)
         
         if verified_only:
-            query = query.filter(Organization.is_verified == True)
+            query = query.filter(Organization.verification_status == "active")
         
         return query.order_by(Organization.created_at.desc()).limit(limit).offset(offset).all()
     
@@ -1043,7 +1107,8 @@ class AdminService:
         if not org:
             raise ValueError("Organization not found")
         
-        org.is_verified = is_verified
+        org.verification_status = "active" if is_verified else "pending"
+        org.domain_verified = bool(is_verified)
         self.db.commit()
         self.db.refresh(org)
         
@@ -1061,7 +1126,7 @@ class AdminService:
         """Get organization statistics - FREQ-14."""
         total_orgs = self.db.query(Organization).count()
         verified_orgs = self.db.query(Organization).filter(
-            Organization.is_verified == True
+            Organization.verification_status == "active"
         ).count()
         
         # Organizations with active programs

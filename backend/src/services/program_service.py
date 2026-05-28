@@ -330,24 +330,32 @@ class ProgramService:
                 detail="Bounty program must have reward tiers before publishing"
             )
         
-        # Update status and visibility
-        program.status = "public"
-        program.visibility = "public"
+        # Verify organization exists and is active
+        org = self.org_repo.get_by_id(organization_id)
+        if not org or org.verification_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your organization account must be activated by an administrator before you can publish programs."
+            )
+        
+        # Update status to pending review (do not make public yet)
+        program.status = "pending_review"
+        program.visibility = "private"
         program.start_date = datetime.utcnow()
         
         result = self.program_repo.update_program(program)
         
-        # Audit log: program published
+        # Audit log: program submitted for review
         try:
             self.audit_service.log_action(
-                action_type="program_published",
+                action_type="program_submitted_for_review",
                 action_category="program",
                 target_type="program",
-                description=f"Program published: {result.name}",
+                description=f"Program submitted for admin review: {result.name}",
                 actor_id=organization_id,
                 actor_role="organization",
                 target_id=program_id,
-                metadata={"program_name": result.name, "status": "public"},
+                metadata={"program_name": result.name, "status": "pending_review"},
                 severity="info"
             )
         except Exception:

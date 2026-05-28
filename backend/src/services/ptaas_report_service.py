@@ -63,7 +63,7 @@ class PTaaSReportService:
                     'title': f.title,
                     'severity': f.severity,
                     'status': f.status,
-                    'cvss_score': f.cvss_score,
+                    'cvss_score': float(f.cvss_score) if f.cvss_score is not None else None,
                     'description': f.description[:200] + '...' if len(f.description) > 200 else f.description,
                 }
                 for f in findings
@@ -100,7 +100,7 @@ class PTaaSReportService:
                     'title': f.title,
                     'severity': f.severity,
                     'status': f.status,
-                    'cvss_score': f.cvss_score,
+                    'cvss_score': float(f.cvss_score) if f.cvss_score is not None else None,
                     'cvss_vector': f.cvss_vector,
                     'description': f.description,
                     'impact': f.impact,

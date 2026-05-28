@@ -286,6 +286,8 @@ def get_program_details(
     from src.domain.models.program import BountyProgram as _BP
     from src.domain.models.organization import Organization as _Org
     from src.domain.models.report import VulnerabilityReport as _VR
+    from src.domain.models.program import ProgramScope as _PS
+    from src.domain.models.scope_verification import ScopeVerification as _SV
 
     program = db.query(_BP).filter(_BP.id == program_id, _BP.deleted_at.is_(None)).first()
     if not program:
@@ -300,6 +302,23 @@ def get_program_details(
     )
     total_reports = sum(report_counts.values())
 
+    scopes_data = []
+    scopes = db.query(_PS).filter(_PS.program_id == program_id).all()
+    for s in scopes:
+        v = db.query(_SV).filter(_SV.scope_id == s.id).first()
+        scopes_data.append({
+            "id": str(s.id),
+            "asset_type": s.asset_type,
+            "asset_identifier": s.asset_identifier,
+            "is_in_scope": s.is_in_scope,
+            "description": s.description,
+            "max_severity": s.max_severity,
+            "verification_status": v.verification_status if v else "unverified",
+            "verification_method": v.verification_method if v else None,
+            "domain": v.domain if v else None,
+            "root_domain": v.root_domain if v else None,
+        })
+
     return {
         "id": str(program.id),
         "name": program.name,
@@ -311,6 +330,7 @@ def get_program_details(
         "policy": getattr(program, "policy", None),
         "scope": getattr(program, "scope", None),
         "out_of_scope": getattr(program, "out_of_scope", None),
+        "scopes": scopes_data,
         "created_at": program.created_at,
         "updated_at": getattr(program, "updated_at", None),
         "total_reports": total_reports,
@@ -376,6 +396,111 @@ def delete_program(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
+
+@router.post("/programs/{program_id}/approve")
+def approve_program(
+    program_id: UUID,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve a program that is pending review - FREQ-14.
+    
+    Admin only.
+    """
+    service = AdminService(db)
+    
+    try:
+        program = service.approve_program(
+            admin_id=current_user.id,
+            program_id=program_id
+        )
+        
+        return {
+            "message": "Program approved successfully",
+            "program_id": str(program.id),
+            "status": program.status
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.post("/programs/{program_id}/reject")
+def reject_program(
+    program_id: UUID,
+    reason: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a program that is pending review - FREQ-14.
+    
+    Admin only.
+    """
+    service = AdminService(db)
+    
+    try:
+        program = service.reject_program(
+            admin_id=current_user.id,
+            program_id=program_id,
+            reason=reason
+        )
+        
+        return {
+            "message": "Program rejected successfully",
+            "program_id": str(program.id),
+            "status": program.status,
+            "reason": reason
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/verifications/pending")
+def get_pending_verifications(
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all pending domain verifications for manual review.
+    
+    Admin only.
+    """
+    from src.services.scope_verification_service import ScopeVerificationService
+    from src.domain.models.organization import Organization as _Org
+    
+    svc = ScopeVerificationService(db)
+    pending_records = svc.get_pending_verifications()
+    
+    results = []
+    for record in pending_records:
+        org = db.query(_Org).filter(_Org.id == record.organization_id).first()
+        results.append({
+            "id": str(record.id),
+            "scope_id": str(record.scope_id),
+            "program_id": str(record.program_id),
+            "organization_id": str(record.organization_id),
+            "organization_name": org.company_name if org else "Unknown",
+            "domain": record.domain,
+            "root_domain": record.root_domain,
+            "verification_method": record.verification_method,
+            "verification_status": record.verification_status,
+            "verification_token": record.verification_token,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "dns_record_name": record.dns_record_name,
+            "dns_record_value": record.dns_record_value,
+            "file_verification_url": record.file_verification_url,
+        })
+        
+    return {"verifications": results, "total": len(results)}
 
 
 # Platform Audits
@@ -863,7 +988,8 @@ def get_all_organizations(
                 "user_id": str(o.user_id),
                 "company_name": o.company_name,
                 "website": o.website,
-                "is_verified": o.is_verified,
+                "verification_status": getattr(o, "verification_status", "pending"),
+                "is_verified": getattr(o, "verification_status", "pending") == "active",
                 "created_at": o.created_at
             }
             for o in organizations
@@ -874,35 +1000,103 @@ def get_all_organizations(
     }
 
 
-@router.post("/organizations/{organization_id}/verify")
-def verify_organization(
-    organization_id: UUID,
-    is_verified: bool,
+@router.get("/organizations/pending-verification")
+def get_pending_verifications(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db)
 ):
     """
-    Verify or unverify organization - FREQ-14.
+    Get organizations pending verification - FREQ-14.
     
-    Admin can verify organizations.
+    Admin can view all organizations awaiting verification approval.
     """
-    service = AdminService(db)
+    from src.services.organization_verification_service import OrganizationVerificationService
+    
+    service = OrganizationVerificationService(db)
+    
+    pending_orgs = service.get_pending_verifications(limit=limit, offset=offset)
+    
+    return {
+        "organizations": pending_orgs,
+        "total": len(pending_orgs),
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@router.post("/organizations/{organization_id}/verify")
+def approve_organization_verification(
+    organization_id: UUID,
+    notes: Optional[str] = None,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve organization verification - FREQ-14.
+    
+    Admin can approve organizations that have submitted verification documents.
+    """
+    from src.services.organization_verification_service import OrganizationVerificationService
+    
+    service = OrganizationVerificationService(db)
     
     try:
-        org = service.verify_organization(
+        org = service.approve_verification(
+            admin_id=current_user.id,
             organization_id=organization_id,
-            is_verified=is_verified
+            notes=notes
         )
         
         return {
-            "message": f"Organization {'verified' if is_verified else 'unverified'} successfully",
+            "message": "Organization verification approved successfully",
             "organization_id": str(org.id),
-            "is_verified": org.is_verified
+            "company_name": org.company_name,
+            "verification_status": org.verification_status
         }
     
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/organizations/{organization_id}/reject-verification")
+def reject_organization_verification(
+    organization_id: UUID,
+    reason: str,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject organization verification - FREQ-14.
+    
+    Admin can reject organizations that don't meet verification requirements.
+    """
+    from src.services.organization_verification_service import OrganizationVerificationService
+    
+    service = OrganizationVerificationService(db)
+    
+    try:
+        org = service.reject_verification(
+            admin_id=current_user.id,
+            organization_id=organization_id,
+            reason=reason
+        )
+        
+        return {
+            "message": "Organization verification rejected",
+            "organization_id": str(org.id),
+            "company_name": org.company_name,
+            "verification_status": org.verification_status,
+            "reason": reason
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
 

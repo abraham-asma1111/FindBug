@@ -10,6 +10,7 @@ from src.core.database import get_db
 from src.domain.models.user import User, UserRole
 from src.domain.models.bounty_payment import BountyPayment
 from src.domain.models.report import VulnerabilityReport
+from src.domain.models.ptaas import PTaaSFinding
 from src.domain.models.researcher import Researcher
 from src.domain.models.organization import Organization
 from src.api.v1.middlewares.auth import get_current_user
@@ -51,31 +52,43 @@ def list_bounty_payments(
     # Enrich with related data
     result = []
     for payment in payments:
-        # Get report
-        report = db.query(VulnerabilityReport).filter(
-            VulnerabilityReport.id == payment.report_id
-        ).first()
-        
-        # Get researcher
+        report = None
+        ptaas_finding = None
+        if payment.report_id:
+            report = db.query(VulnerabilityReport).filter(
+                VulnerabilityReport.id == payment.report_id
+            ).first()
+        if payment.ptaas_finding_id:
+            ptaas_finding = db.query(PTaaSFinding).filter(
+                PTaaSFinding.id == payment.ptaas_finding_id
+            ).first()
+
         researcher = db.query(Researcher).filter(
             Researcher.id == payment.researcher_id
         ).first()
-        
-        # Get organization
+
         organization = db.query(Organization).filter(
             Organization.id == payment.organization_id
         ).first()
-        
+
         result.append({
             "payment_id": str(payment.payment_id),
             "transaction_id": payment.transaction_id,
             "status": payment.status,
+            "payment_source": getattr(payment, "payment_source", "bug_bounty"),
             "report": {
-                "id": str(report.id) if report else None,
-                "report_number": report.report_number if report else None,
-                "title": report.title if report else None,
-                "severity": report.assigned_severity if report else None
+                "id": str(report.id) if report else (str(ptaas_finding.id) if ptaas_finding else None),
+                "report_number": (
+                    report.report_number if report
+                    else (f"PTAAS-{str(ptaas_finding.id)[:8].upper()}" if ptaas_finding else None)
+                ),
+                "title": report.title if report else (ptaas_finding.title if ptaas_finding else None),
+                "severity": (
+                    report.assigned_severity if report
+                    else (ptaas_finding.severity if ptaas_finding else None)
+                ),
             },
+            "ptaas_finding_id": str(payment.ptaas_finding_id) if payment.ptaas_finding_id else None,
             "researcher": {
                 "id": str(researcher.id) if researcher else None,
                 "username": researcher.username if researcher else "Unknown"
@@ -211,12 +224,43 @@ def process_bounty_payment(
     try:
         from src.services.wallet_service import WalletService
         from src.services.payment_service import PaymentService
+        from src.domain.models.researcher import Researcher
         from decimal import Decimal
         from datetime import datetime
-        # The wallet transactions (crediting researcher and platform commission) 
-        # are already handled in approve_bounty_payment. 
-        # Here we only need to update the status to completed.
-
+        
+        # Credit the researcher's wallet
+        wallet_service = WalletService(db)
+        researcher = db.query(Researcher).filter(Researcher.id == payment.researcher_id).first()
+        
+        if not researcher:
+            raise ValueError("Researcher not found for this payment")
+            
+        wallet_service.credit_wallet(
+            owner_id=researcher.user_id,
+            owner_type="researcher",
+            amount=payment.researcher_amount,
+            saga_id=payment.transaction_id,
+            reference_type="bounty_payment",
+            reference_id=payment.payment_id
+        )
+        
+        # If this is an organization bounty, the platform wallet is holding the total cost.
+        # We must debit the researcher's amount from the platform wallet so the platform
+        # accurately retains only the commission.
+        if payment.payment_source == "bug_bounty" or getattr(payment, 'report_id', None) is not None:
+            from src.domain.models.user import User as UserModel
+            platform_user = db.query(UserModel).filter(UserModel.role.in_(["admin", "finance_officer"])).first()
+            if platform_user:
+                # Use a distinct reference_type for the debit to avoid idempotency conflicts with the credit
+                wallet_service.debit_wallet(
+                    owner_id=platform_user.id,
+                    owner_type="platform",
+                    amount=payment.researcher_amount,
+                    saga_id=payment.transaction_id,
+                    from_reserved=False,
+                    reference_type="bounty_payout_transfer",
+                    reference_id=payment.payment_id
+                )
         
         # Step 4: Update payment status
         payment.status = "completed"
@@ -225,7 +269,7 @@ def process_bounty_payment(
         db.refresh(payment)
         
         return {
-            "message": "Bounty payment processed successfully",
+            "message": "Bounty payment processed successfully and wallet credited",
             "payment_id": str(payment.payment_id),
             "researcher_amount": float(payment.researcher_amount),
             "commission_kept": float(payment.commission_amount),

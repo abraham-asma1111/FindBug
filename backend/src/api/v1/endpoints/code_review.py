@@ -26,7 +26,14 @@ from src.api.v1.schemas.code_review import (
     FindingSeverityEnum,
     FindingStatusEnum
 )
-from src.domain.models.code_review import ReviewStatus, ReviewType, FindingSeverity, FindingStatus, IssueType
+from src.domain.models.code_review import (
+    CodeReviewFinding,
+    ReviewStatus,
+    ReviewType,
+    FindingSeverity,
+    FindingStatus,
+    IssueType,
+)
 
 router = APIRouter(prefix="/code-review", tags=["code-review"])
 
@@ -222,16 +229,38 @@ def update_finding_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update finding status"""
+    """Update finding status (organization remediation or reviewer triage)."""
     service = CodeReviewService(db)
-    
+
+    finding = db.query(CodeReviewFinding).filter(CodeReviewFinding.id == finding_id).first()
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found",
+        )
+
+    engagement = service.get_engagement(finding.engagement_id)
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found",
+        )
+
+    if current_user.is_organization() or current_user.is_researcher():
+        _assert_engagement_access(engagement, current_user)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this finding",
+        )
+
     try:
-        finding = service.update_finding_status(finding_id, request.status.value)
+        finding = service.update_finding_status(finding_id, FindingStatus(request.status.value))
         return finding
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
         )
 
 

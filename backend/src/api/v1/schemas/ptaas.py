@@ -2,6 +2,8 @@
 PTaaS Pydantic Schemas
 """
 from pydantic import BaseModel, Field, validator
+
+from src.api.v1.schemas.coercion import coerce_optional_float
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -200,7 +202,7 @@ class PTaaSFindingResponse(BaseModel):
     title: str
     description: str
     severity: str
-    cvss_score: Optional[Decimal]
+    cvss_score: Optional[float] = None
     affected_component: Optional[str]
     
     # Proof of Exploit
@@ -248,11 +250,36 @@ class PTaaSFindingResponse(BaseModel):
     reproduction_steps: Optional[str]
     references: Optional[List[str]]
     status: str
+    bounty_amount: Optional[float] = None
+    bounty_status: Optional[str] = None
+    bounty_approved_at: Optional[datetime] = None
     discovered_by: Optional[UUID]
     discovered_at: datetime
+    created_at: Optional[datetime] = None  # Alias for discovered_at for frontend compatibility
     
+    @validator("cvss_score", pre=True)
+    def _coerce_cvss_score(cls, value):
+        return coerce_optional_float(value)
+
     class Config:
         from_attributes = True
+        
+    @classmethod
+    def from_orm(cls, obj):
+        """Custom from_orm to map discovered_at to created_at"""
+        data = super().from_orm(obj)
+        if hasattr(obj, 'discovered_at') and obj.discovered_at:
+            data.created_at = obj.discovered_at
+        return data
+
+
+def to_ptaas_finding_response(finding) -> PTaaSFindingResponse:
+    """Serialize ORM finding with numeric coercion (cvss_score as float)."""
+    return PTaaSFindingResponse.from_orm(finding)
+
+
+def to_ptaas_finding_responses(findings) -> List[PTaaSFindingResponse]:
+    return [to_ptaas_finding_response(f) for f in findings]
 
 
 class PTaaSFindingValidation(BaseModel):

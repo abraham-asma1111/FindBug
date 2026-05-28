@@ -13,6 +13,7 @@ from src.domain.models.payment_extended import PayoutRequest, Transaction, Payme
 from src.domain.models.kyc import KYCVerification
 from src.domain.models.researcher import Researcher
 from src.domain.models.organization import Organization
+from src.domain.models.ptaas import PTaaSFinding
 from src.domain.models.report import VulnerabilityReport
 from src.core.exceptions import NotFoundException, ForbiddenException, ConflictException
 from src.core.logging import get_logger
@@ -136,6 +137,77 @@ class PaymentService:
             "total": float(total_org_payment)
         })
         
+        return payment
+
+    def create_ptaas_bounty_payment(
+        self,
+        finding_id: UUID,
+        bounty_amount: Decimal,
+        approved_by: UUID,
+        *,
+        commit: bool = True,
+    ) -> BountyPayment:
+        """Create bounty payment record for a validated PTaaS finding."""
+        finding = self.db.query(PTaaSFinding).filter(PTaaSFinding.id == finding_id).first()
+        if not finding:
+            raise NotFoundException("PTaaS finding not found")
+        if not finding.discovered_by:
+            raise ValueError("Finding has no assigned researcher")
+
+        researcher = self.db.query(Researcher).filter(
+            Researcher.user_id == finding.discovered_by
+        ).first()
+        if not researcher:
+            raise NotFoundException("Researcher not found for finding submitter")
+
+        engagement = finding.engagement
+        if not engagement:
+            from src.domain.models.ptaas import PTaaSEngagement
+            engagement = self.db.query(PTaaSEngagement).filter(
+                PTaaSEngagement.id == finding.engagement_id
+            ).first()
+        if not engagement:
+            raise NotFoundException("PTaaS engagement not found")
+
+        org_commission = bounty_amount * self.org_commission_rate
+        researcher_commission = bounty_amount * self.researcher_commission_rate
+        total_commission = org_commission + researcher_commission
+        researcher_net_amount = bounty_amount - researcher_commission
+        total_org_payment = bounty_amount + org_commission
+
+        transaction_id = f"PTAAS-BP-{uuid.uuid4().hex[:12].upper()}"
+
+        payment = BountyPayment(
+            transaction_id=transaction_id,
+            report_id=None,
+            ptaas_finding_id=finding_id,
+            payment_source="ptaas",
+            researcher_id=researcher.id,
+            organization_id=engagement.organization_id,
+            researcher_amount=researcher_net_amount,
+            commission_amount=total_commission,
+            total_amount=total_org_payment,
+            status="pending",
+            approved_by=None,
+            approved_at=None,
+            payout_deadline=None,
+            kyc_verified=False,
+        )
+
+        self.db.add(payment)
+        if commit:
+            self.db.commit()
+            self.db.refresh(payment)
+            self._add_payment_history(
+                payment_id=payment.payment_id,
+                previous_status="none",
+                new_status="pending",
+                changed_by=approved_by,
+                notes="PTaaS bounty payment created",
+            )
+        else:
+            self.db.flush()
+
         return payment
     
     def approve_bounty_payment(

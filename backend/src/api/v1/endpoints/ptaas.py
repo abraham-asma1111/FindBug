@@ -17,6 +17,8 @@ from src.api.v1.schemas.ptaas import (
     PTaaSFindingCreate,
     PTaaSFindingUpdate,
     PTaaSFindingResponse,
+    to_ptaas_finding_response,
+    to_ptaas_finding_responses,
     PTaaSFindingValidation,
     PTaaSDeliverableCreate,
     PTaaSDeliverableResponse,
@@ -218,7 +220,8 @@ def create_finding(
             detail="Engagement not found"
         )
     
-    return service.create_finding(finding.dict(), current_user.id)
+    created = service.create_finding(finding.dict(), current_user.id)
+    return to_ptaas_finding_response(created)
 
 
 @router.get("/engagements/{engagement_id}/findings", response_model=List[PTaaSFindingResponse])
@@ -238,7 +241,7 @@ def list_findings(
             detail="Engagement not found"
         )
     
-    return service.get_engagement_findings(engagement_id)
+    return to_ptaas_finding_responses(service.get_engagement_findings(engagement_id))
 
 
 @router.get("/findings/{finding_id}", response_model=PTaaSFindingResponse)
@@ -257,7 +260,7 @@ def get_finding(
             detail="Finding not found"
         )
     
-    return finding
+    return to_ptaas_finding_response(finding)
 
 
 @router.patch("/findings/{finding_id}", response_model=PTaaSFindingResponse)
@@ -278,7 +281,7 @@ def update_finding(
             detail="Finding not found"
         )
     
-    return finding
+    return to_ptaas_finding_response(finding)
 
 
 @router.post("/findings/{finding_id}/validate", response_model=PTaaSFindingResponse)
@@ -312,13 +315,14 @@ def validate_finding(
                 detail="Access denied"
             )
     
-    return service.validate_finding(
+    validated_finding = service.validate_finding(
         finding_id,
         current_user.id,
         validation.validated,
         validation.retest_required,
         validation.retest_notes
     )
+    return to_ptaas_finding_response(validated_finding)
 
 
 @router.get("/findings/template")
@@ -366,7 +370,7 @@ def request_retest(
     if not updated_finding:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not process retest request")
         
-    return updated_finding
+    return to_ptaas_finding_response(updated_finding)
 
 
 @router.post("/findings/{finding_id}/submit-retest", response_model=PTaaSFindingResponse)
@@ -404,7 +408,7 @@ def submit_retest_result(
     if not updated_finding:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not process retest result")
         
-    return updated_finding
+    return to_ptaas_finding_response(updated_finding)
 
 
 @router.post("/findings/{finding_id}/approve-bounty", response_model=PTaaSFindingResponse)
@@ -434,17 +438,19 @@ def approve_ptaas_bounty(
             detail="Access denied"
         )
         
-    if finding.status != 'VERIFIED':
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Finding must be verified before bounty approval"
+    try:
+        updated_finding = service.approve_ptaas_bounty(
+            finding_id,
+            approved_by_user_id=current_user.id,
+            organization_user_id=current_user.id,
         )
-        
-    updated_finding = service.approve_ptaas_bounty(finding_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
     if not updated_finding:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not approve bounty")
-        
-    return updated_finding
+
+    return to_ptaas_finding_response(updated_finding)
 
 
 # Deliverable Endpoints
@@ -1488,7 +1494,7 @@ def assign_finding_to_team(
     }
     
     updated_finding = service.update_finding(finding_id, update_data, current_user.id)
-    return updated_finding
+    return to_ptaas_finding_response(updated_finding)
 
 
 # Comments & Communication - Step 9

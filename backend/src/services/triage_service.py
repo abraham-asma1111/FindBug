@@ -11,6 +11,8 @@ from src.domain.models.report import (
     VulnerabilityReport,
     ReportStatusHistory
 )
+from src.domain.models.ptaas import PTaaSFinding, PTaaSEngagement
+from src.services.ptaas_bounty_utils import calculate_ptaas_bounty_amount
 from src.domain.models.triage import (
     TriageQueue,
     TriageAssignment,
@@ -626,6 +628,108 @@ class TriageService:
         )
         
         return query.offset(offset).limit(limit).all()
+
+    def update_ptaas_finding_triage(
+        self,
+        finding_id: UUID,
+        actor_user_id: UUID,
+        status: Optional[str] = None,
+        assigned_severity: Optional[str] = None,
+        cvss_score: Optional[Decimal] = None,
+        triage_notes: Optional[str] = None,
+        is_duplicate: Optional[bool] = None,
+        bounty_amount: Optional[Decimal] = None,
+    ) -> PTaaSFinding:
+        """Apply triage queue actions to a PTaaS finding (mixed into triage queue)."""
+        finding = self.db.query(PTaaSFinding).filter(PTaaSFinding.id == finding_id).first()
+        if not finding:
+            raise ValueError("Report not found")
+
+        if is_duplicate:
+            raise ValueError("Duplicate marking is not supported for PTaaS findings in this queue")
+
+        current = (finding.status or "SUBMITTED").upper()
+
+        if status == "triaged":
+            if current not in ("SUBMITTED", "RETEST_REQUESTED", "PENDING", ""):
+                raise ValueError(f"Invalid status transition from {finding.status} to triaged")
+            finding.status = "IN_PROGRESS"
+            finding.validated_by = actor_user_id
+        elif status == "valid":
+            finding.status = "VALIDATED"
+            finding.validated = True
+            finding.validated_by = actor_user_id
+            finding.validated_at = datetime.utcnow()
+            if finding.bounty_status in (None, "", "pending"):
+                engagement = self.db.query(PTaaSEngagement).filter(
+                    PTaaSEngagement.id == finding.engagement_id
+                ).first()
+                if engagement:
+                    severity_for_bounty = assigned_severity or (
+                        finding.severity.lower() if finding.severity else "medium"
+                    )
+                    calculated = calculate_ptaas_bounty_amount(
+                        engagement.base_price,
+                        severity_for_bounty,
+                    )
+                    if calculated is not None:
+                        finding.bounty_amount = calculated
+                        finding.bounty_status = "pending"
+        elif status == "invalid":
+            finding.status = "REJECTED"
+            finding.validated = False
+            finding.validated_by = actor_user_id
+            finding.validated_at = datetime.utcnow()
+        elif status == "resolved":
+            finding.status = "CLOSED"
+        elif status and status not in ("new", "closed"):
+            raise ValueError(f"Unsupported PTaaS triage status: {status}")
+
+        if assigned_severity:
+            if assigned_severity not in ("critical", "high", "medium", "low", "info"):
+                raise ValueError("Invalid severity. Must be: critical, high, medium, low, or info")
+            finding.severity = assigned_severity.capitalize()
+            if finding.status == "VALIDATED" and finding.bounty_status in (None, "", "pending"):
+                engagement = self.db.query(PTaaSEngagement).filter(
+                    PTaaSEngagement.id == finding.engagement_id
+                ).first()
+                if engagement:
+                    calculated = calculate_ptaas_bounty_amount(
+                        engagement.base_price,
+                        assigned_severity,
+                    )
+                    if calculated is not None:
+                        finding.bounty_amount = calculated
+
+        if cvss_score is not None:
+            if cvss_score < 0 or cvss_score > 10:
+                raise ValueError("CVSS score must be between 0.0 and 10.0")
+            finding.cvss_score = cvss_score
+
+        if triage_notes:
+            finding.retest_notes = triage_notes
+
+        if bounty_amount is not None:
+            if bounty_amount < 0:
+                raise ValueError("Bounty amount cannot be negative")
+            finding.bounty_amount = bounty_amount
+            if finding.bounty_status in (None, ""):
+                finding.bounty_status = "pending"
+
+        self.db.commit()
+        self.db.refresh(finding)
+
+        self.audit_service.log_action(
+            action_type="UPDATE_PTAAS_FINDING_TRIAGE",
+            action_category="triage",
+            target_type="PTaaSFinding",
+            description=f"PTaaS finding triage updated (status={finding.status})",
+            actor_id=actor_user_id,
+            target_id=finding_id,
+            metadata={"status": finding.status, "severity": finding.severity},
+        )
+
+        return finding
     
     def update_triage(
         self,

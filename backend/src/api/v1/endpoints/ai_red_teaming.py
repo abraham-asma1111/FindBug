@@ -77,9 +77,9 @@ def create_engagement(
         testing_environment=data.testing_environment,
         ethical_guidelines=data.ethical_guidelines,
         scope_description=data.scope_description,
-        allowed_attack_types=data.allowed_attack_types
+        allowed_attack_types=data.allowed_attack_types or None,
     )
-    
+
     return engagement
 
 
@@ -105,13 +105,29 @@ def list_engagements(
     if current_user.organization:
         engagements = service.list_engagements(
             organization_id=current_user.organization.id,
-            status=status_enum
+            status=status_enum,
         )
+    elif current_user.researcher:
+        researcher_id = current_user.researcher.id
+        all_active = service.list_engagements(status=EngagementStatus.ACTIVE)
+        if status_enum and status_enum != EngagementStatus.ACTIVE:
+            engagements = []
+            for engagement in service.list_engagements(status=status_enum):
+                assigned = engagement.assigned_experts or []
+                if not assigned or str(researcher_id) in assigned:
+                    engagements.append(engagement)
+        else:
+            engagements = []
+            for engagement in all_active:
+                assigned = engagement.assigned_experts or []
+                if not assigned or str(researcher_id) in assigned:
+                    engagements.append(engagement)
     else:
-        # Researcher view - only assigned engagements
-        engagements = service.list_engagements(status=status_enum)
-        # TODO: Filter by assigned researcher
-    
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to list engagements",
+        )
+
     return engagements
 
 

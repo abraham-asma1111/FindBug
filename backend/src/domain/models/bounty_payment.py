@@ -27,8 +27,10 @@ class BountyPayment(Base):
     payment_id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     transaction_id = Column(String(100), unique=True, nullable=False)  # Idempotency key
     
-    # Relationships
-    report_id = Column(PGUUID(as_uuid=True), ForeignKey("vulnerability_reports.id", ondelete="CASCADE"), nullable=False)
+    # Relationships (one of report_id or ptaas_finding_id)
+    report_id = Column(PGUUID(as_uuid=True), ForeignKey("vulnerability_reports.id", ondelete="CASCADE"), nullable=True)
+    ptaas_finding_id = Column(PGUUID(as_uuid=True), ForeignKey("ptaas_findings.id", ondelete="CASCADE"), nullable=True)
+    payment_source = Column(String(50), nullable=False, server_default="bug_bounty")
     researcher_id = Column(PGUUID(as_uuid=True), ForeignKey("researchers.id"), nullable=False)
     organization_id = Column(PGUUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     
@@ -71,6 +73,7 @@ class BountyPayment(Base):
     
     # Relationships
     report = relationship("VulnerabilityReport")
+    ptaas_finding = relationship("PTaaSFinding")
     researcher = relationship("Researcher")
     organization = relationship("Organization")
     approver = relationship("User", foreign_keys=[approved_by])
@@ -79,6 +82,7 @@ class BountyPayment(Base):
     # Indexes
     __table_args__ = (
         Index('ix_bounty_payments_report_id', 'report_id'),
+        Index('ix_bounty_payments_ptaas_finding_id', 'ptaas_finding_id'),
         Index('ix_bounty_payments_researcher_id', 'researcher_id'),
         Index('ix_bounty_payments_organization_id', 'organization_id'),
         Index('ix_bounty_payments_status', 'status'),

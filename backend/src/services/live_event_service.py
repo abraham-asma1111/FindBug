@@ -4,7 +4,7 @@ Implements FREQ-43, FREQ-44: Event Management and Real-time Metrics
 """
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from decimal import Decimal
 
@@ -66,7 +66,7 @@ class LiveEventService:
         if end_time <= start_time:
             raise ValueError("End time must be after start time")
         
-        if start_time < datetime.utcnow():
+        if start_time < datetime.now(timezone.utc):
             raise ValueError("Start time must be in the future")
         
         event = LiveHackingEvent(
@@ -117,7 +117,7 @@ class LiveEventService:
             query = query.filter(LiveHackingEvent.status == status)
         
         if active_only:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             query = query.filter(
                 and_(
                     LiveHackingEvent.start_time <= now,
@@ -153,7 +153,7 @@ class LiveEventService:
             )
         
         event.status = status
-        event.updated_at = datetime.utcnow()
+        event.updated_at = datetime.now(timezone.utc)
         
         self.db.commit()
         self.db.refresh(event)
@@ -186,7 +186,7 @@ class LiveEventService:
             raise ValueError("Can only invite researchers to draft or scheduled events")
         
         invitations = []
-        expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
         
         for researcher_id in researcher_ids:
             # Check if already invited
@@ -258,14 +258,14 @@ class LiveEventService:
             raise ValueError(f"Invitation already {invitation.status}")
         
         # Check expiry
-        if invitation.expires_at and invitation.expires_at < datetime.utcnow():
+        if invitation.expires_at and invitation.expires_at < datetime.now(timezone.utc):
             invitation.status = InvitationStatus.EXPIRED
             self.db.commit()
             raise ValueError("Invitation has expired")
         
         # Update invitation
         invitation.status = InvitationStatus.ACCEPTED if accept else InvitationStatus.DECLINED
-        invitation.responded_at = datetime.utcnow()
+        invitation.responded_at = datetime.now(timezone.utc)
         
         # Update participation
         participation = self.db.query(EventParticipation).filter(
@@ -319,7 +319,7 @@ class LiveEventService:
             )
         ).update({
             "status": ParticipationStatus.COMPLETED,
-            "completed_at": datetime.utcnow()
+            "completed_at": datetime.now(timezone.utc)
         })
         
         self.db.commit()
@@ -340,7 +340,7 @@ class LiveEventService:
         report_id: UUID
     ):
         """
-        Link vulnerability report to event
+        Link vulnerability report to event and calculate score
         
         Args:
             event_id: Event UUID
@@ -376,10 +376,18 @@ class LiveEventService:
             participation.submissions_count += 1
             self.db.commit()
             
+            # Calculate and update score
+            self.update_researcher_score(
+                event_id=event_id,
+                researcher_id=researcher_id,
+                report_id=report_id,
+                severity=report.severity
+            )
+            
             # Update metrics in real-time
             self._update_submission_metrics(event_id)
             
-            logger.info(f"Linked report {report_id} to event {event_id}")
+            logger.info(f"Linked report {report_id} to event {event_id} and updated score")
     
     def get_event_metrics(self, event_id: UUID) -> Optional[EventMetrics]:
         """Get real-time event metrics"""
@@ -448,7 +456,7 @@ class LiveEventService:
                 (metrics.total_accepted / metrics.total_invited) * 100
             ).quantize(Decimal('0.01'))
         
-        metrics.last_updated = datetime.utcnow()
+        metrics.last_updated = datetime.now(timezone.utc)
         self.db.commit()
     
     def _update_participation_metrics(self, event_id: UUID):
@@ -465,7 +473,7 @@ class LiveEventService:
             1 for p in participations if p.status == ParticipationStatus.ACTIVE
         )
         
-        metrics.last_updated = datetime.utcnow()
+        metrics.last_updated = datetime.now(timezone.utc)
         self.db.commit()
     
     def _update_submission_metrics(self, event_id: UUID):
@@ -508,7 +516,7 @@ class LiveEventService:
         if metrics.valid_submissions > 0:
             metrics.average_reward = total_rewards / metrics.valid_submissions
         
-        metrics.last_updated = datetime.utcnow()
+        metrics.last_updated = datetime.now(timezone.utc)
         self.db.commit()
     
     def _update_all_metrics(self, event_id: UUID):
@@ -528,3 +536,346 @@ class LiveEventService:
         
         self.db.commit()
         logger.info(f"Calculated rankings for event {event_id}")
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # SCORING ALGORITHM
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def calculate_finding_score(
+        self,
+        event_id: UUID,
+        report_id: UUID,
+        severity: str
+    ) -> int:
+        """
+        Calculate score for a finding with bonuses
+        
+        Base points by severity:
+        - Critical: 100 points
+        - High: 50 points
+        - Medium: 25 points
+        - Low: 10 points
+        - Info: 5 points
+        
+        Bonuses:
+        - First blood (first to find this vulnerability): +50%
+        - Speed bonus (submitted in first hour): +25%
+        - Uniqueness bonus (unique vulnerability type): +20%
+        - Duplicate: 0 points
+        
+        Args:
+            event_id: Event UUID
+            report_id: Report UUID
+            severity: Vulnerability severity
+            
+        Returns:
+            Total score with bonuses
+        """
+        # Base points by severity
+        base_points = {
+            'critical': 100,
+            'high': 50,
+            'medium': 25,
+            'low': 10,
+            'info': 5
+        }
+        
+        score = base_points.get(severity.lower(), 0)
+        
+        if score == 0:
+            return 0
+        
+        # Get report details
+        report = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.id == report_id
+        ).first()
+        
+        if not report:
+            return score
+        
+        # Get event
+        event = self.get_event(event_id)
+        if not event:
+            return score
+        
+        # Check for duplicate
+        similar_reports = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.event_id == event_id,
+            VulnerabilityReport.id != report_id,
+            VulnerabilityReport.title.ilike(f"%{report.title}%")
+        ).first()
+        
+        if similar_reports:
+            logger.info(f"Duplicate finding detected for report {report_id}")
+            return 0  # Duplicate gets 0 points
+        
+        # First blood bonus (+50%)
+        is_first_blood = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.event_id == event_id,
+            VulnerabilityReport.severity == severity,
+            VulnerabilityReport.created_at < report.created_at
+        ).count() == 0
+        
+        if is_first_blood:
+            score = int(score * 1.5)
+            logger.info(f"First blood bonus applied to report {report_id}")
+        
+        # Speed bonus (+25% if submitted in first hour)
+        time_since_start = (report.created_at - event.start_time).total_seconds() / 3600
+        if time_since_start <= 1:
+            score = int(score * 1.25)
+            logger.info(f"Speed bonus applied to report {report_id}")
+        
+        # Uniqueness bonus (+20% if unique vulnerability type)
+        vulnerability_type = report.vulnerability_type or "unknown"
+        similar_types = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.event_id == event_id,
+            VulnerabilityReport.id != report_id,
+            VulnerabilityReport.vulnerability_type == vulnerability_type
+        ).count()
+        
+        if similar_types == 0:
+            score = int(score * 1.2)
+            logger.info(f"Uniqueness bonus applied to report {report_id}")
+        
+        return score
+    
+    def update_researcher_score(
+        self,
+        event_id: UUID,
+        researcher_id: UUID,
+        report_id: UUID,
+        severity: str
+    ):
+        """
+        Update researcher's score after finding submission
+        
+        Args:
+            event_id: Event UUID
+            researcher_id: Researcher UUID
+            report_id: Report UUID
+            severity: Vulnerability severity
+        """
+        # Calculate score
+        score = self.calculate_finding_score(event_id, report_id, severity)
+        
+        # Update participation
+        participation = self.db.query(EventParticipation).filter(
+            and_(
+                EventParticipation.event_id == event_id,
+                EventParticipation.researcher_id == researcher_id
+            )
+        ).first()
+        
+        if participation:
+            participation.score += score
+            
+            # Update valid submissions count if not duplicate
+            if score > 0:
+                participation.valid_submissions_count += 1
+            
+            self.db.commit()
+            
+            # Recalculate rankings in real-time
+            self._calculate_rankings(event_id)
+            
+            logger.info(f"Updated score for researcher {researcher_id} in event {event_id}: +{score} points")
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # PRIZE DISTRIBUTION
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def distribute_prizes(
+        self,
+        event_id: UUID,
+        approved_by: UUID
+    ) -> List[Dict[str, Any]]:
+        """
+        Distribute prizes to top performers
+        
+        Prize distribution:
+        - 1st place: 40% of prize pool
+        - 2nd place: 25% of prize pool
+        - 3rd place: 15% of prize pool
+        - 4th-10th place: 20% split equally (2.86% each)
+        
+        Args:
+            event_id: Event UUID
+            approved_by: User ID who approved distribution
+            
+        Returns:
+            List of prize distributions
+        """
+        event = self.get_event(event_id)
+        if not event:
+            raise ValueError(f"Event {event_id} not found")
+        
+        if event.status != EventStatus.CLOSED:
+            raise ValueError("Can only distribute prizes for closed events")
+        
+        if not event.prize_pool or event.prize_pool <= 0:
+            raise ValueError("Event has no prize pool")
+        
+        # Get top 10 participants
+        top_participants = self.db.query(EventParticipation).filter(
+            EventParticipation.event_id == event_id,
+            EventParticipation.score > 0
+        ).order_by(EventParticipation.score.desc()).limit(10).all()
+        
+        if not top_participants:
+            logger.warning(f"No participants with score > 0 for event {event_id}")
+            return []
+        
+        # Prize distribution percentages
+        prize_percentages = {
+            1: Decimal("0.40"),  # 40%
+            2: Decimal("0.25"),  # 25%
+            3: Decimal("0.15"),  # 15%
+        }
+        
+        # 4th-10th split 20% equally
+        remaining_percentage = Decimal("0.20")
+        remaining_count = min(len(top_participants) - 3, 7)  # Max 7 people (4th-10th)
+        if remaining_count > 0:
+            per_person_percentage = remaining_percentage / remaining_count
+            for rank in range(4, min(11, len(top_participants) + 1)):
+                prize_percentages[rank] = per_person_percentage
+        
+        # Distribute prizes
+        distributions = []
+        from src.services.payment_service import PaymentService
+        payment_service = PaymentService(self.db)
+        
+        for participation in top_participants:
+            rank = participation.rank
+            if not rank or rank > 10:
+                continue
+            
+            # Calculate prize amount
+            percentage = prize_percentages.get(rank, Decimal("0"))
+            prize_amount = event.prize_pool * percentage
+            
+            # Update participation
+            participation.prize_amount = prize_amount
+            
+            # Create bounty payment (this will handle commission structure)
+            # Note: For live events, we create a special bounty payment without a report
+            try:
+                # Create a dummy report ID or use event_id as reference
+                # In production, you might want to create a special payment type for event prizes
+                payment = payment_service.create_bounty_payment(
+                    report_id=None,  # No specific report for event prizes
+                    bounty_amount=prize_amount,
+                    approved_by=approved_by
+                )
+                
+                # Link payment to event
+                payment.event_id = event_id
+                payment.researcher_id = participation.researcher_id
+                
+                distributions.append({
+                    "rank": rank,
+                    "researcher_id": participation.researcher_id,
+                    "prize_amount": prize_amount,
+                    "payment_id": payment.payment_id
+                })
+                
+                logger.info(f"Prize distributed to rank {rank}: {prize_amount} ETB")
+                
+            except Exception as e:
+                logger.error(f"Failed to create payment for rank {rank}: {str(e)}")
+                continue
+        
+        self.db.commit()
+        
+        logger.info(f"Distributed prizes for event {event_id} to {len(distributions)} participants")
+        return distributions
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # EVENT AUTOMATION
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def auto_start_scheduled_events(self):
+        """
+        Auto-start events that have reached their start time
+        
+        This should be called by a background task (Celery/cron)
+        """
+        now = datetime.now(timezone.utc)
+        
+        # Find scheduled events that should start
+        events_to_start = self.db.query(LiveHackingEvent).filter(
+            and_(
+                LiveHackingEvent.status == EventStatus.SCHEDULED,
+                LiveHackingEvent.start_time <= now
+            )
+        ).all()
+        
+        started_count = 0
+        for event in events_to_start:
+            try:
+                self.start_event(event.id)
+                started_count += 1
+                logger.info(f"Auto-started event {event.id}")
+            except Exception as e:
+                logger.error(f"Failed to auto-start event {event.id}: {str(e)}")
+        
+        return started_count
+    
+    def auto_close_expired_events(self):
+        """
+        Auto-close events that have reached their end time
+        
+        This should be called by a background task (Celery/cron)
+        """
+        now = datetime.now(timezone.utc)
+        
+        # Find active events that should close
+        events_to_close = self.db.query(LiveHackingEvent).filter(
+            and_(
+                LiveHackingEvent.status == EventStatus.ACTIVE,
+                LiveHackingEvent.end_time <= now
+            )
+        ).all()
+        
+        closed_count = 0
+        for event in events_to_close:
+            try:
+                self.close_event(event.id)
+                closed_count += 1
+                logger.info(f"Auto-closed event {event.id}")
+            except Exception as e:
+                logger.error(f"Failed to auto-close event {event.id}: {str(e)}")
+        
+        return closed_count
+    
+    def send_event_notifications(
+        self,
+        event_id: UUID,
+        notification_type: str,
+        message: str
+    ):
+        """
+        Send notifications to event participants
+        
+        Args:
+            event_id: Event UUID
+            notification_type: Type of notification (event_start, event_close, etc.)
+            message: Notification message
+        """
+        # Get all active participants
+        participations = self.db.query(EventParticipation).filter(
+            and_(
+                EventParticipation.event_id == event_id,
+                EventParticipation.status.in_([
+                    ParticipationStatus.ACCEPTED,
+                    ParticipationStatus.ACTIVE
+                ])
+            )
+        ).all()
+        
+        # TODO: Integrate with notification service
+        # For now, just log
+        logger.info(f"Sending {notification_type} notification to {len(participations)} participants")
+        
+        return len(participations)

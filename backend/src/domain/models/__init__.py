@@ -129,5 +129,8 @@ __all__ = [
     # Simulation
     "SimulationChallenge", "SimulationInstance", "SimulationProgress", "SimulationReport",
     "SimulationSolution", "SimulationSolutionComment", "SimulationSolutionLike", "SimulationLeaderboard",
+    # Domain/Scope Verification
+    "ScopeVerification", "VerificationStatus", "VerificationMethod",
 ]
 from .system_setting import SystemSetting
+from .scope_verification import ScopeVerification, VerificationStatus, VerificationMethod

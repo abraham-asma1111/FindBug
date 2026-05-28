@@ -6,7 +6,8 @@ from typing import List, Optional, Dict
 from uuid import UUID
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import cast, func, or_
+from sqlalchemy.dialects.postgresql import JSONB
 
 from src.domain.models.code_review import (
     CodeReviewEngagement,
@@ -21,9 +22,6 @@ from src.services.matching_service import MatchingService
 from src.services.notification_service import NotificationService
 from src.domain.models.notification import NotificationType, NotificationPriority
 from src.domain.models.organization import Organization
-from src.services.notification_service import NotificationService
-from src.domain.models.notification import NotificationType, NotificationPriority
-from src.domain.models.organization import Organization
 
 
 class CodeReviewService:
@@ -32,7 +30,6 @@ class CodeReviewService:
     def __init__(self, db: Session):
         self.db = db
         self.matching_service = MatchingService(db)
-        self.notification_service = NotificationService(db)
         self.notification_service = NotificationService(db)
 
     def _notify_organization(
@@ -219,7 +216,18 @@ class CodeReviewService:
         
         if not engagement:
             raise ValueError("Engagement not found")
-        
+
+        if engagement.status not in (ReviewStatus.IN_PROGRESS, ReviewStatus.UNDER_REVIEW):
+            raise ValueError(
+                f"Review must be in progress before submitting (current: {engagement.status.value})"
+            )
+
+        findings_count = self.db.query(func.count(CodeReviewFinding.id)).filter(
+            CodeReviewFinding.engagement_id == engagement_id
+        ).scalar() or 0
+        if findings_count == 0:
+            raise ValueError("Add at least one finding before submitting the report")
+
         engagement.status = ReviewStatus.COMPLETED
         engagement.report_submitted_at = datetime.utcnow()
 
@@ -282,10 +290,11 @@ class CodeReviewService:
     ) -> List[CodeReviewEngagement]:
         """Get all engagements for a reviewer"""
         rid = str(reviewer_id)
+        assigned_match = cast(CodeReviewEngagement.assigned_reviewer_ids, JSONB).contains([rid])
         query = self.db.query(CodeReviewEngagement).filter(
             or_(
                 CodeReviewEngagement.reviewer_id == reviewer_id,
-                CodeReviewEngagement.assigned_reviewer_ids.contains([rid]),
+                assigned_match,
             )
         )
 

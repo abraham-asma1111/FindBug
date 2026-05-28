@@ -48,6 +48,43 @@ def _safe_lower(value: Optional[str], default: str = "") -> str:
     return value.lower() if value else default
 
 
+def _ptaas_queue_status(status: Optional[str]) -> str:
+    """Map PTaaS DB statuses to bounty-style queue statuses for the triage UI."""
+    normalized = (status or "").upper()
+    if normalized in ("IN_PROGRESS", "TRIAGED"):
+        return "triaged"
+    if normalized in ("VALIDATED", "VERIFIED"):
+        return "valid"
+    if normalized in ("REJECTED", "INVALID"):
+        return "invalid"
+    if normalized == "CLOSED":
+        return "resolved"
+    if normalized in ("SUBMITTED", "RETEST_REQUESTED", "PENDING"):
+        return "new"
+    return _safe_lower(status, "new")
+
+
+def _ptaas_db_statuses_for_queue_filter(status_filter: Optional[str]) -> Optional[list]:
+    """
+    Map triage queue status_filter (bounty-style) to PTaaS DB status values.
+    Returns [] when PTaaS has no rows for that filter (e.g. duplicate).
+    """
+    if not status_filter:
+        # Default queue: new + in-progress (same as bounty new + triaged)
+        return ["SUBMITTED", "RETEST_REQUESTED", "IN_PROGRESS"]
+    key = status_filter.lower()
+    mapping = {
+        "new": ["SUBMITTED", "RETEST_REQUESTED", "PENDING"],
+        "triaged": ["IN_PROGRESS"],
+        "valid": ["VALIDATED", "VERIFIED"],
+        "invalid": ["REJECTED", "INVALID"],
+        "resolved": ["CLOSED"],
+        "closed": ["CLOSED"],
+        "duplicate": [],
+    }
+    return mapping.get(key, ["SUBMITTED", "RETEST_REQUESTED", "IN_PROGRESS"])
+
+
 @router.get("/triage/queue", status_code=status.HTTP_200_OK)
 def get_triage_queue(
     status_filter: Optional[str] = Query(None, description="Filter by status: new, triaged, valid, invalid, duplicate, resolved"),
@@ -132,6 +169,7 @@ def get_triage_queue(
                 "status": report.status,
                 "assigned_severity": report.assigned_severity,
                 "suggested_severity": report.suggested_severity,
+                "cvss_score": float(report.cvss_score) if report.cvss_score is not None else None,
                 "triaged_by": str(report.triaged_by) if report.triaged_by else None,
                 "triaged_at": report.triaged_at.isoformat() if report.triaged_at else None,
                 "is_duplicate": report.is_duplicate,
@@ -181,18 +219,14 @@ def get_triage_queue(
         }
 
     ptaas_query = db.query(PTaaSFinding)
-    
-    # Map filters to PTaaSFinding
-    if status_filter:
-        ptaas_query = ptaas_query.filter(PTaaSFinding.status == status_filter)
+    ptaas_statuses = _ptaas_db_statuses_for_queue_filter(status_filter)
+    if len(ptaas_statuses) == 0:
+        ptaas_findings = []
     else:
-        # Default: show 'SUBMITTED' and 'RETEST_REQUESTED'
-        ptaas_query = ptaas_query.filter(PTaaSFinding.status.in_(['SUBMITTED', 'RETEST_REQUESTED']))
-        
-    if severity_filter:
-        ptaas_query = ptaas_query.filter(func.lower(PTaaSFinding.severity) == severity_filter)
-        
-    ptaas_findings = ptaas_query.all()
+        ptaas_query = ptaas_query.filter(PTaaSFinding.status.in_(ptaas_statuses))
+        if severity_filter:
+            ptaas_query = ptaas_query.filter(func.lower(PTaaSFinding.severity) == severity_filter)
+        ptaas_findings = ptaas_query.all()
     total_count += len(ptaas_findings)
     
     for finding in ptaas_findings:
@@ -212,13 +246,15 @@ def get_triage_queue(
             "researcher_id": str(finding.discovered_by) if finding.discovered_by else None,
             "title": f"[PTaaS] {finding.title}",
             "description": finding.description,
-            "status": _safe_lower(finding.status, "new"),
+            "status": _ptaas_queue_status(finding.status),
             "assigned_severity": _safe_lower(finding.severity, "medium"),
             "suggested_severity": _safe_lower(finding.severity, "medium"),
+            "cvss_score": float(finding.cvss_score) if finding.cvss_score is not None else None,
             "triaged_by": str(finding.validated_by) if finding.validated_by else None,
             "triaged_at": finding.validated_at.isoformat() if finding.validated_at else None,
             "is_duplicate": False,
-            "bounty_amount": None, # PTaaS bounties are handled differently
+            "bounty_amount": float(finding.bounty_amount) if finding.bounty_amount is not None else None,
+            "bounty_status": finding.bounty_status,
             "submitted_at": finding.discovered_at.isoformat() if finding.discovered_at else None,
             "updated_at": finding.discovered_at.isoformat() if finding.discovered_at else None,
             
@@ -317,8 +353,30 @@ async def update_report_triage(
         )
     
     service = TriageService(db)
+
+    # PTaaS findings share the triage queue but live in ptaas_findings, not vulnerability_reports
+    ptaas_finding = db.query(PTaaSFinding).filter(PTaaSFinding.id == report_id).first()
     
     try:
+        if ptaas_finding:
+            finding = service.update_ptaas_finding_triage(
+                finding_id=report_id,
+                actor_user_id=current_user.id,
+                status=triage_data.status,
+                assigned_severity=triage_data.assigned_severity,
+                cvss_score=triage_data.cvss_score,
+                triage_notes=triage_data.triage_notes,
+                is_duplicate=triage_data.is_duplicate,
+                bounty_amount=triage_data.bounty_amount,
+            )
+            return {
+                "message": "PTaaS finding triage updated successfully",
+                "report_id": str(finding.id),
+                "status": _ptaas_queue_status(finding.status),
+                "assigned_severity": _safe_lower(finding.severity, "medium"),
+                "is_ptaas": True,
+            }
+
         report = service.update_triage(
             report_id=report_id,
             triage_staff_id=triage_staff_fk_id(current_user),

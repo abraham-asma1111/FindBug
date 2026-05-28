@@ -9,8 +9,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration, finance_reports, finance_settings, persona_kyc, sms_verification, bounty_payments, organization_branding, financial_analytics
-from src.api.v1.endpoints import simulation_gateway, admin_settings, system_health
+from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration, finance_reports, finance_settings, persona_kyc, sms_verification, bounty_payments, organization_branding, financial_analytics, organization_verification
+from src.api.v1.endpoints import simulation_gateway, admin_settings, system_health, scope_verification
 from src.core.database import get_database_status
 
 # Version and metadata
@@ -115,8 +115,10 @@ app.include_router(payment_methods.router, prefix="/api/v1")
 app.include_router(duplicate_detection.router, prefix="/api/v1")
 app.include_router(bounty_payments.router, prefix="/api/v1")
 app.include_router(organization_branding.router, prefix="/api/v1")
+app.include_router(organization_verification.router, prefix="/api/v1")
 app.include_router(admin_settings.router, prefix="/api/v1")
 app.include_router(system_health.router, prefix="/api/v1")
+app.include_router(scope_verification.router, prefix="/api/v1")
 
 # Health Check Endpoint
 @app.get("/health", tags=["Health"])
@@ -156,6 +158,12 @@ async def startup_event():
     print(f"🚀 {APP_NAME} v{VERSION} starting...")
     print(f"📚 API Documentation: http://localhost:8001/docs")
     print(f"❤️  Health Check: http://localhost:8001/health")
+    # Start daily reverification scheduler
+    try:
+        from src.tasks.verification_tasks import start_reverification_scheduler
+        start_reverification_scheduler()
+    except Exception as exc:
+        print(f"⚠️  Reverification scheduler could not start: {exc}")
 
 
 # Shutdown Event

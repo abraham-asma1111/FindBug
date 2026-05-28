@@ -344,7 +344,14 @@ class AIRedTeamingService:
         if not engagement:
             raise ValueError(f"Engagement {engagement_id} not found")
         
-        engagement.assigned_experts = [str(rid) for rid in researcher_ids]
+        existing = engagement.assigned_experts or []
+        merged = list(existing)
+        for rid in researcher_ids:
+            sid = str(rid)
+            if sid not in merged:
+                merged.append(sid)
+
+        engagement.assigned_experts = merged
         engagement.updated_at = datetime.utcnow()
         
         self.db.commit()
@@ -354,7 +361,7 @@ class AIRedTeamingService:
         if engagement.status == EngagementStatus.ACTIVE:
             self._notify_assigned_researchers(engagement)
         
-        logger.info(f"Assigned {len(researcher_ids)} experts to engagement {engagement_id}")
+        logger.info(f"Assigned {len(researcher_ids)} experts to engagement {engagement_id} (total: {len(merged)})")
         return engagement
     
     # ============================================
@@ -487,9 +494,9 @@ class AIRedTeamingService:
         
         if engagement.status != EngagementStatus.ACTIVE:
             raise ValueError("Engagement is not active")
-        
-        # Verify researcher is assigned
-        if engagement.assigned_experts and str(researcher_id) not in engagement.assigned_experts:
+
+        assigned = engagement.assigned_experts or []
+        if assigned and str(researcher_id) not in assigned:
             raise ValueError("Researcher is not assigned to this engagement")
         
         report = AIVulnerabilityReport(

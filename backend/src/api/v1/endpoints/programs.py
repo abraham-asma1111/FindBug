@@ -30,8 +30,15 @@ def create_program(
     """
     Create a new bounty program.
     
-    Only organizations can create programs.
+    Only verified organizations can create programs.
     """
+    # Check organization verification status
+    if current_user.organization.verification_status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Your organization must be verified before creating programs. Current status: {current_user.organization.verification_status}. Please submit verification documents in your dashboard."
+        )
+    
     try:
         service = ProgramService(db)
         
@@ -431,6 +438,14 @@ def publish_program(
                 detail=f"Unable to verify wallet balance: {str(e)}. Please ensure your wallet is set up and has sufficient funds."
             )
     
+    # ── Scope ownership verification gate ───────────────────────────────────
+    from src.services.scope_verification_service import ScopeVerificationService
+    ver_svc = ScopeVerificationService(db)
+    try:
+        ver_svc.assert_all_scopes_verified(program_id)
+    except Exception as ve:
+        raise ve  # Re-raise the 400 HTTPException with clear message
+
     # Proceed with publish
     program = service.publish_program(
         program_id,

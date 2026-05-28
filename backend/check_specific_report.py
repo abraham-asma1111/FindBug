@@ -1,110 +1,73 @@
 #!/usr/bin/env python3
-"""
-Check specific report that's causing 404/500 errors
-"""
-from sqlalchemy import create_engine, text
+"""Check specific report and database schema"""
+import sys
 import os
-from dotenv import load_dotenv
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Load environment variables
-load_dotenv()
+from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.orm import sessionmaker
+from src.core.config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/bugbounty")
+# Create engine
+engine = create_engine(settings.DATABASE_URL)
+Session = sessionmaker(bind=engine)
+session = Session()
 
-def check_report():
-    """Check if the specific report exists"""
-    engine = create_engine(DATABASE_URL)
-    
-    report_id = "3c34a499-9122-4e2b-9033-0d1336e74170"
-    
-    with engine.connect() as conn:
-        print("=" * 100)
-        print(f"CHECKING REPORT: {report_id}")
-        print("=" * 100)
-        
-        # Check if report exists
-        print("\n1. CHECKING IF REPORT EXISTS:")
-        print("-" * 100)
-        result = conn.execute(text("""
-            SELECT 
-                id,
-                report_number,
-                title,
-                status,
-                deleted_at
-            FROM vulnerability_reports
-            WHERE id = :report_id
-        """), {"report_id": report_id})
-        
-        report = result.fetchone()
-        if report:
-            print(f"✓ Report FOUND:")
-            print(f"  ID: {report[0]}")
-            print(f"  Number: {report[1]}")
-            print(f"  Title: {report[2]}")
-            print(f"  Status: {report[3]}")
-            print(f"  Deleted: {report[4] or 'No'}")
-        else:
-            print(f"✗ Report NOT FOUND in database")
-            print(f"\nSearching for similar IDs...")
-            
-            # Search for reports with similar IDs
-            result = conn.execute(text("""
-                SELECT 
-                    id,
-                    report_number,
-                    title,
-                    status
-                FROM vulnerability_reports
-                ORDER BY submitted_at DESC
-                LIMIT 10
-            """))
-            
-            reports = result.fetchall()
-            print(f"\nFound {len(reports)} recent reports:")
-            for rep in reports:
-                print(f"  • {rep[0]}")
-                print(f"    {rep[1]}: {rep[2]} ({rep[3]})")
-        
-        # Check report_attachments for this report
-        print("\n\n2. CHECKING ATTACHMENTS:")
-        print("-" * 100)
-        result = conn.execute(text("""
-            SELECT COUNT(*)
-            FROM report_attachments
-            WHERE report_id = :report_id
-        """), {"report_id": report_id})
-        
-        count = result.scalar()
-        print(f"  Attachments for this report: {count}")
-        
-        # Check bounty_payments for this report
-        print("\n\n3. CHECKING BOUNTY PAYMENTS:")
-        print("-" * 100)
-        result = conn.execute(text("""
-            SELECT COUNT(*)
-            FROM bounty_payments
-            WHERE report_id = :report_id
-        """), {"report_id": report_id})
-        
-        count = result.scalar()
-        print(f"  Bounty payments for this report: {count}")
-        
-        print("\n" + "=" * 100)
-        print("CONCLUSION:")
-        print("=" * 100)
-        if not report:
-            print("❌ The report ID does NOT exist in the database")
-            print("   This explains the 404 'Report not found' error")
-            print("\n💡 SOLUTION:")
-            print("   The frontend is trying to access a report that doesn't exist.")
-            print("   This could be:")
-            print("   - An old/cached report ID")
-            print("   - A deleted report")
-            print("   - A report from a different database/environment")
-        else:
-            print("✓ Report exists - the 500 error is likely a backend code issue")
-        print("=" * 100)
+print("=" * 80)
+print("CHECKING SPECIFIC REPORT: 3c34a499-9122-4e2b-9033-0d1336e74170")
+print("=" * 80)
 
-if __name__ == "__main__":
-    check_report()
+# Check if report exists
+report_id = '3c34a499-9122-4e2b-9033-0d1336e74170'
+result = session.execute(text("""
+    SELECT id, report_number, title, status, submitted_at, updated_at, deleted_at
+    FROM vulnerability_reports 
+    WHERE id = :report_id
+"""), {"report_id": report_id})
+
+report = result.fetchone()
+if report:
+    print(f"\n✅ Report FOUND:")
+    print(f"   ID: {report[0]}")
+    print(f"   Number: {report[1]}")
+    print(f"   Title: {report[2]}")
+    print(f"   Status: {report[3]}")
+    print(f"   Submitted: {report[4]}")
+    print(f"   Updated: {report[5]}")
+    print(f"   Deleted: {report[6]}")
+else:
+    print(f"\n❌ Report NOT FOUND in database")
+
+# Check vulnerability_reports table schema
+print("\n" + "=" * 80)
+print("VULNERABILITY_REPORTS TABLE SCHEMA")
+print("=" * 80)
+
+inspector = inspect(engine)
+columns = inspector.get_columns('vulnerability_reports')
+
+print("\nColumns in vulnerability_reports table:")
+for col in columns:
+    nullable = "NULL" if col['nullable'] else "NOT NULL"
+    print(f"  - {col['name']:<30} {str(col['type']):<20} {nullable}")
+
+# Check all reports
+print("\n" + "=" * 80)
+print("ALL REPORTS IN DATABASE")
+print("=" * 80)
+
+result = session.execute(text("""
+    SELECT id, report_number, title, status, submitted_at, deleted_at
+    FROM vulnerability_reports 
+    ORDER BY submitted_at DESC
+"""))
+
+reports = result.fetchall()
+print(f"\nTotal reports: {len(reports)}")
+for r in reports:
+    deleted = " (DELETED)" if r[5] else ""
+    print(f"  - {r[1]}: {r[2][:50]}{deleted}")
+    print(f"    ID: {r[0]}")
+    print(f"    Status: {r[3]}, Submitted: {r[4]}")
+
+session.close()

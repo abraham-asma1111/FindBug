@@ -169,6 +169,25 @@ class WalletService:
         """
         wallet = self.get_or_create_wallet(owner_id, owner_type)
         
+        # Idempotency check: prevent double crediting for the same reference
+        if reference_type and reference_id:
+            existing_tx = self.db.query(WalletTransaction).filter(
+                WalletTransaction.wallet_id == wallet.wallet_id,
+                WalletTransaction.reference_type == reference_type,
+                WalletTransaction.reference_id == reference_id,
+                WalletTransaction.transaction_type == "credit"
+            ).first()
+            
+            if existing_tx:
+                return {
+                    "success": True,
+                    "wallet_id": str(wallet.wallet_id),
+                    "transaction_id": str(existing_tx.transaction_id),
+                    "amount": float(amount),
+                    "available_balance": float(wallet.available_balance),
+                    "note": "Idempotent: Transaction already exists"
+                }
+                
         balance_before = wallet.balance
         wallet.balance += amount
         wallet.available_balance = wallet.balance - wallet.reserved_balance
