@@ -11,7 +11,7 @@ class UserRole(str, Enum):
     STAFF = "staff"
     ADMIN = "admin"
     TRIAGE_SPECIALIST = "triage_specialist"
-    FINANCIAL_OFFICER = "financial_officer"
+    FINANCE_OFFICER = "finance_officer"
 
 
 USER_ROLES = [role.value for role in UserRole]

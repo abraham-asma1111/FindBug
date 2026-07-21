@@ -14,6 +14,10 @@ class RegistrationType(str, enum.Enum):
     """Registration type enum"""
     RESEARCHER = "researcher"
     ORGANIZATION = "organization"
+    
+    def __str__(self):
+        """Return the lowercase value for database compatibility"""
+        return self.value
 
 
 class PendingRegistration(Base):
@@ -35,7 +39,7 @@ class PendingRegistration(Base):
     # Basic info
     email = Column(String(255), nullable=False, unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
-    registration_type = Column(Enum(RegistrationType), nullable=False)
+    registration_type = Column(Enum(RegistrationType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     
     # Personal info
     first_name = Column(String(100), nullable=False)

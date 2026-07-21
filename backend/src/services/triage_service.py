@@ -5,12 +5,14 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, case
 
 from src.domain.models.report import (
     VulnerabilityReport,
     ReportStatusHistory
 )
+from src.domain.models.ptaas import PTaaSFinding, PTaaSEngagement
+from src.services.ptaas_bounty_utils import calculate_ptaas_bounty_amount
 from src.domain.models.triage import (
     TriageQueue,
     TriageAssignment,
@@ -34,6 +36,64 @@ class TriageService:
         # Initialize audit service
         from src.services.audit_service import AuditService
         self.audit_service = AuditService(db)
+
+    @staticmethod
+    def _calculate_percentile(sorted_values: List[float], percentile: float) -> float:
+        """Return a simple linear-interpolated percentile for a sorted numeric list."""
+        if not sorted_values:
+            return 0.0
+
+        position = (len(sorted_values) - 1) * (percentile / 100)
+        lower_index = int(position)
+        upper_index = min(lower_index + 1, len(sorted_values) - 1)
+        weight = position - lower_index
+
+        lower_value = sorted_values[lower_index]
+        upper_value = sorted_values[upper_index]
+        return lower_value + ((upper_value - lower_value) * weight)
+
+    def _calculate_avg_triage_time_hours(self, reports: List[VulnerabilityReport]) -> float:
+        """
+        Calculate a sane average submission-to-triage time in hours.
+
+        Ignore rows without a valid submission/triage pair and filter timestamp
+        outliers so one bad record does not poison the whole program metric.
+        """
+        max_allowed_triage_hours = 720.0  # 30 days max
+        triage_durations_hours: List[float] = []
+        triaged_statuses = {"triaged", "valid", "invalid", "duplicate", "resolved", "closed"}
+
+        for report in reports:
+            if report.status not in triaged_statuses or not report.submitted_at or not report.triaged_at:
+                continue
+
+            duration_hours = (report.triaged_at - report.submitted_at).total_seconds() / 3600
+            if duration_hours < 0:
+                continue
+            if duration_hours > max_allowed_triage_hours:
+                continue
+
+            triage_durations_hours.append(duration_hours)
+
+        if not triage_durations_hours:
+            return 0.0
+
+        if len(triage_durations_hours) >= 4:
+            sorted_durations = sorted(triage_durations_hours)
+            q1 = self._calculate_percentile(sorted_durations, 25)
+            q3 = self._calculate_percentile(sorted_durations, 75)
+            iqr = q3 - q1
+            lower_bound = max(0.0, q1 - (1.5 * iqr))
+            upper_bound = q3 + (1.5 * iqr)
+
+            filtered_durations = [
+                duration for duration in triage_durations_hours
+                if lower_bound <= duration <= upper_bound
+            ]
+            if filtered_durations:
+                triage_durations_hours = filtered_durations
+
+        return round(sum(triage_durations_hours) / len(triage_durations_hours), 2)
     
     # ═══════════════════════════════════════════════════════════════════════
     # TRIAGE QUEUE MANAGEMENT (New - using TriageQueue model)
@@ -531,27 +591,31 @@ class TriageService:
         severity: Optional[str] = None,
         program_id: Optional[UUID] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
+        all_statuses: bool = False,
     ) -> List[VulnerabilityReport]:
         """
         Get triage queue - FREQ-07.
         
         Default: shows new and triaged reports.
+        When all_statuses=True, returns every status (used on program detail pages).
         """
         query = self.db.query(VulnerabilityReport)
         
         # Filter by status
         if status:
             query = query.filter(VulnerabilityReport.status == status)
-        else:
+        elif not all_statuses:
             # Default: show reports needing attention
             query = query.filter(
                 VulnerabilityReport.status.in_(['new', 'triaged'])
             )
         
-        # Filter by severity
+        # Filter by severity (use assigned_severity if available, otherwise suggested_severity)
         if severity:
-            query = query.filter(VulnerabilityReport.assigned_severity == severity)
+            query = query.filter(
+                func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == severity
+            )
         
         # Filter by program
         if program_id:
@@ -564,6 +628,108 @@ class TriageService:
         )
         
         return query.offset(offset).limit(limit).all()
+
+    def update_ptaas_finding_triage(
+        self,
+        finding_id: UUID,
+        actor_user_id: UUID,
+        status: Optional[str] = None,
+        assigned_severity: Optional[str] = None,
+        cvss_score: Optional[Decimal] = None,
+        triage_notes: Optional[str] = None,
+        is_duplicate: Optional[bool] = None,
+        bounty_amount: Optional[Decimal] = None,
+    ) -> PTaaSFinding:
+        """Apply triage queue actions to a PTaaS finding (mixed into triage queue)."""
+        finding = self.db.query(PTaaSFinding).filter(PTaaSFinding.id == finding_id).first()
+        if not finding:
+            raise ValueError("Report not found")
+
+        if is_duplicate:
+            raise ValueError("Duplicate marking is not supported for PTaaS findings in this queue")
+
+        current = (finding.status or "SUBMITTED").upper()
+
+        if status == "triaged":
+            if current not in ("SUBMITTED", "RETEST_REQUESTED", "PENDING", ""):
+                raise ValueError(f"Invalid status transition from {finding.status} to triaged")
+            finding.status = "IN_PROGRESS"
+            finding.validated_by = actor_user_id
+        elif status == "valid":
+            finding.status = "VALIDATED"
+            finding.validated = True
+            finding.validated_by = actor_user_id
+            finding.validated_at = datetime.utcnow()
+            if finding.bounty_status in (None, "", "pending"):
+                engagement = self.db.query(PTaaSEngagement).filter(
+                    PTaaSEngagement.id == finding.engagement_id
+                ).first()
+                if engagement:
+                    severity_for_bounty = assigned_severity or (
+                        finding.severity.lower() if finding.severity else "medium"
+                    )
+                    calculated = calculate_ptaas_bounty_amount(
+                        engagement.base_price,
+                        severity_for_bounty,
+                    )
+                    if calculated is not None:
+                        finding.bounty_amount = calculated
+                        finding.bounty_status = "pending"
+        elif status == "invalid":
+            finding.status = "REJECTED"
+            finding.validated = False
+            finding.validated_by = actor_user_id
+            finding.validated_at = datetime.utcnow()
+        elif status == "resolved":
+            finding.status = "CLOSED"
+        elif status and status not in ("new", "closed"):
+            raise ValueError(f"Unsupported PTaaS triage status: {status}")
+
+        if assigned_severity:
+            if assigned_severity not in ("critical", "high", "medium", "low", "info"):
+                raise ValueError("Invalid severity. Must be: critical, high, medium, low, or info")
+            finding.severity = assigned_severity.capitalize()
+            if finding.status == "VALIDATED" and finding.bounty_status in (None, "", "pending"):
+                engagement = self.db.query(PTaaSEngagement).filter(
+                    PTaaSEngagement.id == finding.engagement_id
+                ).first()
+                if engagement:
+                    calculated = calculate_ptaas_bounty_amount(
+                        engagement.base_price,
+                        assigned_severity,
+                    )
+                    if calculated is not None:
+                        finding.bounty_amount = calculated
+
+        if cvss_score is not None:
+            if cvss_score < 0 or cvss_score > 10:
+                raise ValueError("CVSS score must be between 0.0 and 10.0")
+            finding.cvss_score = cvss_score
+
+        if triage_notes:
+            finding.retest_notes = triage_notes
+
+        if bounty_amount is not None:
+            if bounty_amount < 0:
+                raise ValueError("Bounty amount cannot be negative")
+            finding.bounty_amount = bounty_amount
+            if finding.bounty_status in (None, ""):
+                finding.bounty_status = "pending"
+
+        self.db.commit()
+        self.db.refresh(finding)
+
+        self.audit_service.log_action(
+            action_type="UPDATE_PTAAS_FINDING_TRIAGE",
+            action_category="triage",
+            target_type="PTaaSFinding",
+            description=f"PTaaS finding triage updated (status={finding.status})",
+            actor_id=actor_user_id,
+            target_id=finding_id,
+            metadata={"status": finding.status, "severity": finding.severity},
+        )
+
+        return finding
     
     def update_triage(
         self,
@@ -593,8 +759,34 @@ class TriageService:
         # Track old status for history
         old_status = report.status
         
-        # Update status if provided
-        if status:
+        # CRITICAL: Handle duplicate marking first, as it overrides status
+        # This must happen before status validation to allow marking duplicates from any status
+        if is_duplicate is not None and is_duplicate:
+            if not duplicate_of:
+                raise ValueError("duplicate_of is required when marking as duplicate")
+            
+            # Verify original report exists
+            original = self.report_repo.get_by_id(duplicate_of)
+            if not original:
+                raise ValueError("Original report not found")
+            
+            report.is_duplicate = True
+            report.duplicate_of = duplicate_of
+            report.duplicate_detected_at = datetime.utcnow()
+            report.status = 'duplicate'
+            
+            # Create duplicate detection record
+            self.detect_duplicate(
+                report_id=report_id,
+                original_report_id=duplicate_of,
+                detection_method="manual"
+            )
+            
+            # Override status parameter since we're marking as duplicate
+            status = 'duplicate'
+        
+        # Update status if provided (and not already set by duplicate marking)
+        if status and report.status != 'duplicate':
             # Validate status transition
             valid_transitions = {
                 'new': ['triaged', 'invalid'],
@@ -616,6 +808,34 @@ class TriageService:
             if assigned_severity not in ['critical', 'high', 'medium', 'low']:
                 raise ValueError("Invalid severity. Must be: critical, high, medium, or low")
             report.assigned_severity = assigned_severity
+            
+            # AUTO-CALCULATE BOUNTY from program reward tiers
+            # Only auto-set if bounty is not already manually set
+            if report.bounty_amount is None and report.program_id:
+                from src.domain.models.program import RewardTier
+                
+                # Query reward tier for this program + severity
+                reward_tier = self.db.query(RewardTier).filter(
+                    RewardTier.program_id == report.program_id,
+                    RewardTier.severity == assigned_severity
+                ).first()
+                
+                if reward_tier:
+                    # Use max_amount as the default bounty
+                    report.bounty_amount = reward_tier.max_amount
+                    report.bounty_status = 'pending'
+                    
+                    logger.info("Bounty auto-calculated from reward tier", extra={
+                        "report_id": str(report_id),
+                        "severity": assigned_severity,
+                        "bounty_amount": float(reward_tier.max_amount)
+                    })
+                else:
+                    logger.warning("No reward tier found for severity", extra={
+                        "report_id": str(report_id),
+                        "program_id": str(report.program_id),
+                        "severity": assigned_severity
+                    })
         
         # Update CVSS score
         if cvss_score is not None:
@@ -631,31 +851,21 @@ class TriageService:
         if triage_notes:
             report.triage_notes = triage_notes
         
-        # Mark as duplicate
-        if is_duplicate is not None:
-            report.is_duplicate = is_duplicate
-            if is_duplicate and duplicate_of:
-                # Verify original report exists
-                original = self.report_repo.get_by_id(duplicate_of)
-                if not original:
-                    raise ValueError("Original report not found")
-                report.duplicate_of = duplicate_of
-                report.duplicate_detected_at = datetime.utcnow()
-                report.status = 'duplicate'
-                
-                # Create duplicate detection record
-                self.detect_duplicate(
-                    report_id=report_id,
-                    original_report_id=duplicate_of,
-                    detection_method="manual"
-                )
-        
         # Set triage information
-        if triage_staff_id is not None:
-            report.triaged_by = triage_staff_id
+        # IMPORTANT: Only set triaged_at on FIRST triage (when it's None)
+        # This preserves the original triage timestamp for audit purposes
+        
+        # Always set triaged_at on first triage, regardless of triage_staff_id
+        if report.triaged_at is None:
             report.triaged_at = datetime.utcnow()
-            
-            # Update assignment status
+            if triage_staff_id is not None:
+                report.triaged_by = triage_staff_id
+        # If already triaged and we have a staff ID, update triaged_by to track who made the latest change
+        elif triage_staff_id is not None:
+            report.triaged_by = triage_staff_id
+        
+        # Update assignment status if we have a triage_staff_id
+        if triage_staff_id is not None:
             assignment = self.db.query(TriageAssignment).filter(
                 TriageAssignment.report_id == report_id,
                 TriageAssignment.specialist_id == triage_staff_id,
@@ -717,7 +927,16 @@ class TriageService:
                 old_status=old_status,
                 new_status=status
             )
-            
+
+            # Notify all admins about the status change
+            notification_service.notify_admin_report_validated(
+                report_title=report.title,
+                report_number=report.report_number,
+                specialist_email=actor_email,
+                new_status=status,
+                report_id=report.id,
+            )
+
             # Log audit trail (FREQ-17)
             self.audit_service.log_report_status_changed(
                 report_id=report_id,
@@ -728,8 +947,41 @@ class TriageService:
                 changed_by_email=actor_email,
                 reason=triage_notes,
             )
+            
+            # Update researcher reputation score based on status change
+            self._update_researcher_reputation_proper(report, old_status, status)
         
         return report
+    
+    def _update_researcher_reputation_proper(
+        self,
+        report: VulnerabilityReport,
+        old_status: str,
+        new_status: str
+    ) -> None:
+        """
+        Update researcher reputation using the proper ReputationService.
+        
+        Uses BR-09 reputation rules:
+        - Critical: +50, High: +30, Medium: +20, Low: +10
+        - Invalid: -20, Duplicate (>24h): -20
+        """
+        if not report.researcher_id:
+            return
+        
+        # Only update reputation when status changes to a final state
+        if new_status in ['valid', 'invalid', 'duplicate', 'resolved']:
+            from src.services.reputation_service import ReputationService
+            reputation_service = ReputationService(self.db)
+            
+            try:
+                reputation_service.update_reputation(
+                    researcher_id=report.researcher_id,
+                    report=report
+                )
+                logger.info(f"Reputation updated for researcher {report.researcher_id} based on report {report.id}")
+            except Exception as e:
+                logger.error(f"Failed to update reputation: {str(e)}")
     
     def mark_as_duplicate(
         self,
@@ -772,7 +1024,8 @@ class TriageService:
         report.status = 'duplicate'
         if triage_staff_id is not None:
             report.triaged_by = triage_staff_id
-            report.triaged_at = datetime.utcnow()
+            if report.triaged_at is None:
+                report.triaged_at = datetime.utcnow()
         
         # Add note about duplicate bounty eligibility
         if within_24_hours:
@@ -827,18 +1080,30 @@ class TriageService:
         Find similar reports for duplicate detection - FREQ-07.
         
         Uses title and description similarity.
+        IMPORTANT: Only returns reports from OTHER researchers (true duplicates).
+        Same-researcher submissions should be handled as spam/invalid, not duplicates.
         """
         report = self.report_repo.get_by_id(report_id)
         
         if not report:
             raise ValueError("Report not found")
         
-        return self.report_repo.search_similar_reports(
+        # Get similar reports but exclude reports from the same researcher
+        all_similar = self.report_repo.search_similar_reports(
             program_id=report.program_id,
             title=report.title,
             description=report.description,
-            limit=limit
+            limit=limit * 2  # Get more to account for filtering
         )
+        
+        # Filter out reports from the same researcher
+        # Duplicates = different researchers reporting the same vulnerability
+        other_researcher_reports = [
+            r for r in all_similar 
+            if r.researcher_id != report.researcher_id and r.id != report_id
+        ]
+        
+        return other_researcher_reports[:limit]
     
     def acknowledge_report(
         self,
@@ -1050,3 +1315,412 @@ class TriageService:
         }
         
         return stats
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # TRIAGE TEMPLATES METHODS
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def get_templates(
+        self,
+        is_active: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict]:
+        """Get triage response templates from database."""
+        from src.domain.models.triage import TriageTemplate
+        
+        query = self.db.query(TriageTemplate)
+        
+        if is_active is not None:
+            query = query.filter(TriageTemplate.is_active == is_active)
+        
+        query = query.order_by(TriageTemplate.created_at.desc())
+        
+        templates = query.offset(offset).limit(limit).all()
+        
+        return [
+            {
+                "id": str(template.id),
+                "name": template.name,
+                "title": template.title,
+                "content": template.content,
+                "category": template.category,
+                "is_active": template.is_active,
+                "created_at": template.created_at.isoformat() if template.created_at else None,
+                "updated_at": template.updated_at.isoformat() if template.updated_at else None
+            }
+            for template in templates
+        ]
+    
+    def create_template(
+        self,
+        name: str,
+        title: str,
+        content: str,
+        category: str,
+        created_by: UUID
+    ) -> Dict:
+        """Create triage template in database."""
+        from src.domain.models.triage import TriageTemplate
+        
+        # Check if template with same name exists
+        existing = self.db.query(TriageTemplate).filter(TriageTemplate.name == name).first()
+        if existing:
+            raise ValueError(f"Template with name '{name}' already exists")
+        
+        # Validate category
+        valid_categories = ['validation', 'rejection', 'duplicate', 'need_info', 'resolved']
+        if category not in valid_categories:
+            raise ValueError(f"Invalid category. Must be one of: {', '.join(valid_categories)}")
+        
+        template = TriageTemplate(
+            name=name,
+            title=title,
+            content=content,
+            category=category,
+            created_by=created_by,
+            is_active=True
+        )
+        
+        self.db.add(template)
+        self.db.commit()
+        self.db.refresh(template)
+        
+        logger.info("Template created", extra={"template_name": name, "template_category": category})
+        
+        return {
+            "id": str(template.id),
+            "name": template.name,
+            "title": template.title,
+            "content": template.content,
+            "category": template.category,
+            "is_active": template.is_active,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "updated_at": template.updated_at.isoformat() if template.updated_at else None
+        }
+    
+    def get_template(self, template_id: UUID) -> Dict:
+        """Get template by ID from database."""
+        from src.domain.models.triage import TriageTemplate
+        
+        template = self.db.query(TriageTemplate).filter(TriageTemplate.id == template_id).first()
+        
+        if not template:
+            raise ValueError("Template not found")
+        
+        return {
+            "id": str(template.id),
+            "name": template.name,
+            "title": template.title,
+            "content": template.content,
+            "category": template.category,
+            "is_active": template.is_active,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "updated_at": template.updated_at.isoformat() if template.updated_at else None
+        }
+    
+    def update_template(
+        self,
+        template_id: UUID,
+        name: Optional[str] = None,
+        title: Optional[str] = None,
+        content: Optional[str] = None,
+        category: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> Dict:
+        """Update template in database."""
+        from src.domain.models.triage import TriageTemplate
+        
+        template = self.db.query(TriageTemplate).filter(TriageTemplate.id == template_id).first()
+        
+        if not template:
+            raise ValueError("Template not found")
+        
+        # Check if new name conflicts with existing template
+        if name and name != template.name:
+            existing = self.db.query(TriageTemplate).filter(
+                TriageTemplate.name == name,
+                TriageTemplate.id != template_id
+            ).first()
+            if existing:
+                raise ValueError(f"Template with name '{name}' already exists")
+            template.name = name
+        
+        if title:
+            template.title = title
+        if content:
+            template.content = content
+        if category:
+            valid_categories = ['validation', 'rejection', 'duplicate', 'need_info', 'resolved']
+            if category not in valid_categories:
+                raise ValueError(f"Invalid category. Must be one of: {', '.join(valid_categories)}")
+            template.category = category
+        if is_active is not None:
+            template.is_active = is_active
+        
+        template.updated_at = datetime.utcnow()
+        
+        self.db.commit()
+        self.db.refresh(template)
+        
+        logger.info("Template updated", extra={"template_id": str(template_id)})
+        
+        return {
+            "id": str(template.id),
+            "name": template.name,
+            "title": template.title,
+            "content": template.content,
+            "category": template.category,
+            "is_active": template.is_active,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "updated_at": template.updated_at.isoformat() if template.updated_at else None
+        }
+    
+    def delete_template(self, template_id: UUID):
+        """Delete template from database."""
+        from src.domain.models.triage import TriageTemplate
+        
+        template = self.db.query(TriageTemplate).filter(TriageTemplate.id == template_id).first()
+        
+        if not template:
+            raise ValueError("Template not found")
+        
+        self.db.delete(template)
+        self.db.commit()
+        
+        logger.info("Template deleted", extra={"template_id": str(template_id)})
+        return True
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # TRIAGE RESEARCHERS METHODS
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def get_researchers_with_metrics(
+        self,
+        search: Optional[str] = None,
+        sort_by: str = "reports_count",
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict]:
+        """Get researchers with triage metrics."""
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.user import User
+        
+        query = self.db.query(
+            Researcher,
+            User,
+            func.count(VulnerabilityReport.id).label('total_reports'),
+            func.sum(case((VulnerabilityReport.status == 'valid', 1), else_=0)).label('valid_reports'),
+            func.sum(case((VulnerabilityReport.status == 'invalid', 1), else_=0)).label('invalid_reports'),
+            func.sum(case((VulnerabilityReport.is_duplicate == True, 1), else_=0)).label('duplicate_reports')
+        ).join(
+            User, Researcher.user_id == User.id
+        ).outerjoin(
+            VulnerabilityReport, VulnerabilityReport.researcher_id == Researcher.id
+        ).group_by(Researcher.id, User.id)
+        
+        if search:
+            query = query.filter(
+                or_(
+                    User.email.ilike(f"%{search}%"),
+                    Researcher.first_name.ilike(f"%{search}%"),
+                    Researcher.last_name.ilike(f"%{search}%")
+                )
+            )
+        
+        # Sort
+        if sort_by == "reports_count":
+            query = query.order_by(func.count(VulnerabilityReport.id).desc())
+        elif sort_by == "valid_reports":
+            query = query.order_by(func.sum(case((VulnerabilityReport.status == 'valid', 1), else_=0)).desc())
+        elif sort_by == "invalid_reports":
+            query = query.order_by(func.sum(case((VulnerabilityReport.status == 'invalid', 1), else_=0)).desc())
+        
+        results = query.offset(offset).limit(limit).all()
+        
+        researchers = []
+        for researcher, user, total, valid, invalid, duplicates in results:
+            researchers.append({
+                "id": str(researcher.id),
+                "user_id": str(user.id),
+                "email": user.email,
+                "full_name": f"{researcher.first_name or ''} {researcher.last_name or ''}".strip() or user.email,
+                "reputation_score": researcher.reputation_score or 0,
+                "total_reports": total or 0,
+                "valid_reports": valid or 0,
+                "invalid_reports": invalid or 0,
+                "duplicate_reports": duplicates or 0,
+                "validity_rate": round((valid / total * 100) if total > 0 else 0, 2)
+            })
+        
+        return researchers
+    
+    def get_researcher_detail(self, researcher_id: UUID) -> Dict:
+        """Get researcher triage details."""
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.user import User
+        
+        researcher = self.db.query(Researcher).filter(Researcher.id == researcher_id).first()
+        if not researcher:
+            raise ValueError("Researcher not found")
+        
+        user = self.db.query(User).filter(User.id == researcher.user_id).first()
+        
+        # Get report statistics
+        reports = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.researcher_id == researcher_id
+        ).all()
+        
+        total = len(reports)
+        valid = sum(1 for r in reports if r.status == 'valid')
+        invalid = sum(1 for r in reports if r.status == 'invalid')
+        duplicates = sum(1 for r in reports if r.is_duplicate)
+        pending = sum(1 for r in reports if r.status in ['new', 'triaged'])
+        
+        # Get severity breakdown
+        severity_breakdown = {
+            'critical': sum(1 for r in reports if r.assigned_severity == 'critical'),
+            'high': sum(1 for r in reports if r.assigned_severity == 'high'),
+            'medium': sum(1 for r in reports if r.assigned_severity == 'medium'),
+            'low': sum(1 for r in reports if r.assigned_severity == 'low')
+        }
+        
+        return {
+            "id": str(researcher.id),
+            "user_id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "reputation_score": researcher.reputation_score or 0,
+            "rank": researcher.rank,
+            "total_reports": total,
+            "valid_reports": valid,
+            "invalid_reports": invalid,
+            "duplicate_reports": duplicates,
+            "pending_reports": pending,
+            "validity_rate": round((valid / total * 100) if total > 0 else 0, 2),
+            "severity_breakdown": severity_breakdown,
+            "total_earnings": float(researcher.total_earnings or 0)
+        }
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # TRIAGE PROGRAMS METHODS
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    def get_programs_with_metrics(
+        self,
+        search: Optional[str] = None,
+        sort_by: str = "pending_count",
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict]:
+        """Get programs with triage metrics."""
+        from src.domain.models.program import BountyProgram
+        from src.domain.models.organization import Organization
+        
+        # Get all programs with basic aggregations
+        query = self.db.query(BountyProgram).all()
+        
+        programs = []
+        for program in query:
+            # Get organization name
+            org_name = None
+            if program.organization_id:
+                org = self.db.query(Organization).filter(Organization.id == program.organization_id).first()
+                if org:
+                    org_name = org.company_name or org.name
+            
+            # Get all reports for this program
+            reports = self.db.query(VulnerabilityReport).filter(
+                VulnerabilityReport.program_id == program.id
+            ).all()
+            
+            total_reports = len(reports)
+            pending_count = sum(1 for r in reports if r.status in ['new', 'triaged'])
+            valid_count = sum(1 for r in reports if r.status == 'valid')
+            duplicate_count = sum(1 for r in reports if r.status == 'duplicate')
+            
+            avg_triage_time_hours = self._calculate_avg_triage_time_hours(reports)
+            
+            programs.append({
+                "id": str(program.id),
+                "name": program.name,
+                "organization_name": org_name,
+                "status": program.status,
+                "total_reports": total_reports,
+                "pending_count": pending_count,
+                "valid_count": valid_count,
+                "duplicate_count": duplicate_count,
+                "avg_triage_time_hours": avg_triage_time_hours,
+                "created_at": program.created_at.isoformat() if program.created_at else None
+            })
+        
+        # Apply search filter
+        if search:
+            programs = [p for p in programs if search.lower() in p['name'].lower() or (p['organization_name'] and search.lower() in p['organization_name'].lower())]
+        
+        # Sort
+        if sort_by == "pending_count":
+            programs.sort(key=lambda x: x['pending_count'], reverse=True)
+        elif sort_by == "total_reports":
+            programs.sort(key=lambda x: x['total_reports'], reverse=True)
+        elif sort_by == "avg_triage_time":
+            programs.sort(key=lambda x: x['avg_triage_time_hours'], reverse=True)
+        
+        # Apply pagination
+        return programs[offset:offset + limit]
+    
+    def get_program_detail(self, program_id: UUID) -> Dict:
+        """Get program triage details."""
+        from src.domain.models.program import BountyProgram
+        from src.domain.models.organization import Organization
+        
+        program = self.db.query(BountyProgram).filter(BountyProgram.id == program_id).first()
+        if not program:
+            raise ValueError("Program not found")
+        
+        # Get organization name
+        org_name = None
+        if program.organization_id:
+            org = self.db.query(Organization).filter(Organization.id == program.organization_id).first()
+            if org:
+                org_name = org.company_name or org.name
+        
+        # Get report statistics
+        reports = self.db.query(VulnerabilityReport).filter(
+            VulnerabilityReport.program_id == program_id
+        ).all()
+        
+        total = len(reports)
+        pending = sum(1 for r in reports if r.status in ['new', 'triaged'])
+        valid = sum(1 for r in reports if r.status == 'valid')
+        invalid = sum(1 for r in reports if r.status == 'invalid')
+        duplicates = sum(1 for r in reports if r.status == 'duplicate')
+        resolved = sum(1 for r in reports if r.status == 'resolved')
+        
+        # Get severity breakdown
+        severity_breakdown = {
+            'critical': sum(1 for r in reports if r.assigned_severity == 'critical'),
+            'high': sum(1 for r in reports if r.assigned_severity == 'high'),
+            'medium': sum(1 for r in reports if r.assigned_severity == 'medium'),
+            'low': sum(1 for r in reports if r.assigned_severity == 'low')
+        }
+        
+        avg_triage_time = self._calculate_avg_triage_time_hours(reports)
+        
+        return {
+            "id": str(program.id),
+            "name": program.name,
+            "organization_name": org_name,
+            "description": program.description,
+            "status": program.status,
+            "total_reports": total,
+            "pending_count": pending,
+            "valid_count": valid,
+            "invalid_count": invalid,
+            "duplicate_count": duplicates,
+            "resolved_reports": resolved,
+            "validity_rate": round((valid / total * 100) if total > 0 else 0, 2),
+            "severity_breakdown": severity_breakdown,
+            "avg_triage_time_hours": avg_triage_time,
+            "created_at": program.created_at.isoformat() if program.created_at else None
+        }

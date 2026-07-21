@@ -42,6 +42,8 @@ class NotificationType(str, enum.Enum):
     ACCOUNT_VERIFIED = "account_verified"
     PASSWORD_CHANGED = "password_changed"
     MFA_ENABLED = "mfa_enabled"
+    USER_REGISTERED = "user_registered"
+    USER_PROVISIONED = "user_provisioned"
     
     # KYC events
     KYC_SUBMITTED = "kyc_submitted"
@@ -81,8 +83,8 @@ class Notification(Base):
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     
     # Notification Details
-    notification_type = Column(SQLEnum(NotificationType), nullable=False)
-    priority = Column(SQLEnum(NotificationPriority), default=NotificationPriority.MEDIUM)
+    notification_type = Column(SQLEnum(NotificationType, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    priority = Column(SQLEnum(NotificationPriority, values_callable=lambda x: [e.value for e in x]), default=NotificationPriority.MEDIUM)
     
     # Content
     title = Column(String(255), nullable=False)

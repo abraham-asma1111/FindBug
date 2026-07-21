@@ -5,6 +5,7 @@ Implements FREQ-29, FREQ-30, FREQ-31
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from uuid import UUID
 from src.core.database import get_db
 from src.core.role_access import is_ptaas_admin_or_staff
 from src.api.v1.middlewares.auth import get_current_user
@@ -16,11 +17,15 @@ from src.api.v1.schemas.ptaas import (
     PTaaSFindingCreate,
     PTaaSFindingUpdate,
     PTaaSFindingResponse,
+    to_ptaas_finding_response,
+    to_ptaas_finding_responses,
     PTaaSFindingValidation,
     PTaaSDeliverableCreate,
     PTaaSDeliverableResponse,
     PTaaSProgressUpdateCreate,
-    PTaaSProgressUpdateResponse
+    PTaaSProgressUpdateResponse,
+    PTaaSRetestRequestCreate,
+    PTaaSRetestResultSubmit
 )
 from src.domain.models.user import User
 
@@ -54,7 +59,7 @@ def create_engagement(
 
 @router.get("/engagements/{engagement_id}", response_model=PTaaSEngagementResponse)
 def get_engagement(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -98,7 +103,7 @@ def list_engagements(
 
 @router.patch("/engagements/{engagement_id}", response_model=PTaaSEngagementResponse)
 def update_engagement(
-    engagement_id: int,
+    engagement_id: UUID,
     engagement_update: PTaaSEngagementUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -125,10 +130,15 @@ def update_engagement(
     return service.update_engagement(engagement_id, update_data, current_user.id)
 
 
+from pydantic import BaseModel
+
+class ResearcherAssignmentRequest(BaseModel):
+    researcher_ids: List[UUID]
+
 @router.post("/engagements/{engagement_id}/assign", response_model=PTaaSEngagementResponse)
 def assign_researchers(
-    engagement_id: int,
-    researcher_ids: List[int],
+    engagement_id: UUID,
+    request: ResearcherAssignmentRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -151,12 +161,12 @@ def assign_researchers(
                 detail="Access denied"
             )
     
-    return service.assign_researchers(engagement_id, researcher_ids, current_user.id)
+    return service.assign_researchers(engagement_id, request.researcher_ids, current_user.id)
 
 
 @router.post("/engagements/{engagement_id}/start", response_model=PTaaSEngagementResponse)
 def start_engagement(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -175,7 +185,7 @@ def start_engagement(
 
 @router.post("/engagements/{engagement_id}/complete", response_model=PTaaSEngagementResponse)
 def complete_engagement(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -210,12 +220,13 @@ def create_finding(
             detail="Engagement not found"
         )
     
-    return service.create_finding(finding.dict(), current_user.id)
+    created = service.create_finding(finding.dict(), current_user.id)
+    return to_ptaas_finding_response(created)
 
 
 @router.get("/engagements/{engagement_id}/findings", response_model=List[PTaaSFindingResponse])
 def list_findings(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -230,12 +241,31 @@ def list_findings(
             detail="Engagement not found"
         )
     
-    return service.get_engagement_findings(engagement_id)
+    return to_ptaas_finding_responses(service.get_engagement_findings(engagement_id))
+
+
+@router.get("/findings/{finding_id}", response_model=PTaaSFindingResponse)
+def get_finding(
+    finding_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get a single finding by ID"""
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    return to_ptaas_finding_response(finding)
 
 
 @router.patch("/findings/{finding_id}", response_model=PTaaSFindingResponse)
 def update_finding(
-    finding_id: int,
+    finding_id: UUID,
     finding_update: PTaaSFindingUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -251,12 +281,12 @@ def update_finding(
             detail="Finding not found"
         )
     
-    return finding
+    return to_ptaas_finding_response(finding)
 
 
 @router.post("/findings/{finding_id}/validate", response_model=PTaaSFindingResponse)
 def validate_finding(
-    finding_id: int,
+    finding_id: UUID,
     validation: PTaaSFindingValidation,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -285,13 +315,14 @@ def validate_finding(
                 detail="Access denied"
             )
     
-    return service.validate_finding(
+    validated_finding = service.validate_finding(
         finding_id,
         current_user.id,
         validation.validated,
         validation.retest_required,
         validation.retest_notes
     )
+    return to_ptaas_finding_response(validated_finding)
 
 
 @router.get("/findings/template")
@@ -305,6 +336,121 @@ def get_finding_template(
     """
     service = PTaaSService(db)
     return service.get_finding_template()
+
+
+@router.post("/findings/{finding_id}/request-retest", response_model=PTaaSFindingResponse)
+def request_retest(
+    finding_id: UUID,
+    request_data: PTaaSRetestRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Request a retest for a fixed finding (Org -> Researcher)
+    """
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Check access - must be from the engagement's org or staff
+    engagement = service.get_engagement(finding.engagement_id)
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id and not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+        
+    updated_finding = service.request_retest(finding_id, current_user.id, request_data.fix_description)
+    if not updated_finding:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not process retest request")
+        
+    return to_ptaas_finding_response(updated_finding)
+
+
+@router.post("/findings/{finding_id}/submit-retest", response_model=PTaaSFindingResponse)
+def submit_retest_result(
+    finding_id: UUID,
+    submit_data: PTaaSRetestResultSubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit a retest result (Researcher -> Org)
+    """
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Check access - must be the researcher or staff
+    if finding.discovered_by != current_user.id and not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the assigned researcher can submit a retest result"
+        )
+        
+    updated_finding = service.submit_retest_result(
+        finding_id, 
+        current_user.id, 
+        submit_data.is_fixed, 
+        submit_data.retest_notes
+    )
+    if not updated_finding:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not process retest result")
+        
+    return to_ptaas_finding_response(updated_finding)
+
+
+@router.post("/findings/{finding_id}/approve-bounty", response_model=PTaaSFindingResponse)
+def approve_ptaas_bounty(
+    finding_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Approve bounty for verified finding
+    """
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Only staff or org can approve
+    engagement = service.get_engagement(finding.engagement_id)
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id and not is_ptaas_admin_or_staff(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+        
+    try:
+        updated_finding = service.approve_ptaas_bounty(
+            finding_id,
+            approved_by_user_id=current_user.id,
+            organization_user_id=current_user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    if not updated_finding:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not approve bounty")
+
+    return to_ptaas_finding_response(updated_finding)
 
 
 # Deliverable Endpoints
@@ -330,7 +476,7 @@ def submit_deliverable(
 
 @router.get("/engagements/{engagement_id}/deliverables", response_model=List[PTaaSDeliverableResponse])
 def list_deliverables(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -350,7 +496,7 @@ def list_deliverables(
 
 @router.post("/deliverables/{deliverable_id}/approve", response_model=PTaaSDeliverableResponse)
 def approve_deliverable(
-    deliverable_id: int,
+    deliverable_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -390,7 +536,7 @@ def add_progress_update(
 
 @router.get("/engagements/{engagement_id}/progress", response_model=List[PTaaSProgressUpdateResponse])
 def list_progress_updates(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -410,7 +556,7 @@ def list_progress_updates(
 
 @router.get("/engagements/{engagement_id}/subscription-renewal")
 def get_subscription_renewal(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -454,7 +600,7 @@ from src.api.v1.schemas.ptaas_dashboard import (
 
 @router.get("/engagements/{engagement_id}/dashboard", response_model=PTaaSDashboardResponse)
 def get_engagement_dashboard(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -471,9 +617,11 @@ def get_engagement_dashboard(
             detail="Engagement not found"
         )
     
-    # Check access
+    # Check access - allow organization members, assigned researchers, or admin/staff
     org_id = current_user.organization.id if current_user.organization else None
-    if engagement.organization_id != org_id:
+    is_assigned_researcher = str(current_user.id) in engagement.assigned_researchers if engagement.assigned_researchers else False
+    
+    if engagement.organization_id != org_id and not is_assigned_researcher:
         if not is_ptaas_admin_or_staff(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -486,7 +634,7 @@ def get_engagement_dashboard(
 
 @router.post("/engagements/{engagement_id}/initialize-phases", response_model=List[PTaaSTestingPhaseResponse])
 def initialize_engagement_phases(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -503,13 +651,16 @@ def initialize_engagement_phases(
             detail="Engagement not found"
         )
     
-    # Check access
+    # Check access - allow organization members, assigned researchers, or admin/staff
     org_id = current_user.organization.id if current_user.organization else None
-    if engagement.organization_id != org_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
+    is_assigned_researcher = str(current_user.id) in engagement.assigned_researchers if engagement.assigned_researchers else False
+    
+    if engagement.organization_id != org_id and not is_assigned_researcher:
+        if not is_ptaas_admin_or_staff(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
     
     dashboard_service = PTaaSDashboardService(db)
     return dashboard_service.initialize_engagement_phases(
@@ -532,7 +683,7 @@ def create_testing_phase(
 
 @router.patch("/phases/{phase_id}", response_model=PTaaSTestingPhaseResponse)
 def update_testing_phase(
-    phase_id: int,
+    phase_id: UUID,
     phase_update: PTaaSTestingPhaseUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -580,7 +731,7 @@ def create_checklist_item(
 
 @router.get("/phases/{phase_id}/checklist", response_model=List[PTaaSChecklistItemResponse])
 def get_phase_checklist(
-    phase_id: int,
+    phase_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -591,7 +742,7 @@ def get_phase_checklist(
 
 @router.post("/checklist/{item_id}/complete", response_model=PTaaSChecklistItemResponse)
 def complete_checklist_item(
-    item_id: int,
+    item_id: UUID,
     completion: PTaaSChecklistItemComplete,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -621,7 +772,7 @@ def add_collaboration_update(
 
 @router.get("/engagements/{engagement_id}/collaboration", response_model=List[PTaaSCollaborationUpdateResponse])
 def get_collaboration_updates(
-    engagement_id: int,
+    engagement_id: UUID,
     update_type: Optional[str] = None,
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -634,7 +785,7 @@ def get_collaboration_updates(
 
 @router.post("/collaboration/{update_id}/pin", response_model=PTaaSCollaborationUpdateResponse)
 def pin_collaboration_update(
-    update_id: int,
+    update_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -657,7 +808,7 @@ def create_milestone(
 
 @router.get("/engagements/{engagement_id}/milestones", response_model=List[PTaaSMilestoneResponse])
 def get_engagement_milestones(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -668,7 +819,7 @@ def get_engagement_milestones(
 
 @router.post("/milestones/{milestone_id}/complete", response_model=PTaaSMilestoneResponse)
 def complete_milestone(
-    milestone_id: int,
+    milestone_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -692,7 +843,7 @@ from src.api.v1.schemas.ptaas_triage import (
 
 @router.post("/findings/{finding_id}/triage", response_model=PTaaSFindingTriageResponse, status_code=status.HTTP_201_CREATED)
 def triage_finding(
-    finding_id: int,
+    finding_id: UUID,
     triage_data: PTaaSFindingTriageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -717,7 +868,7 @@ def triage_finding(
 
 @router.get("/findings/{finding_id}/triage", response_model=PTaaSFindingTriageResponse)
 def get_finding_triage(
-    finding_id: int,
+    finding_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -754,15 +905,14 @@ def get_pending_triage(
     return triage_service.get_pending_triage(limit)
 
 
-@router.get("/triage/queue", response_model=List[PTaaSPendingTriageResponse])
-def get_triage_queue(
+@router.get("/triage/pending-queue", response_model=List[PTaaSPendingTriageResponse])
+def get_ptaas_triage_queue(
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get triage queue (alias for /triage/pending) - FREQ-35
-    Only triage specialists can access
+    PTaaS-only pending triage list. Use GET /triage/queue for the unified bug bounty queue.
     """
     if not is_ptaas_admin_or_staff(current_user):
         raise HTTPException(
@@ -791,7 +941,7 @@ def get_ptaas_dashboard(
     service = PTaaSService(db)
     
     # Get user's engagements based on role
-    if current_user.role == "organization":
+    if current_user.is_organization():
         if not current_user.organization:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -820,7 +970,7 @@ def get_ptaas_dashboard(
 
 @router.post("/findings/{finding_id}/prioritize", response_model=PTaaSFindingPrioritizationResponse, status_code=status.HTTP_201_CREATED)
 def prioritize_finding(
-    finding_id: int,
+    finding_id: UUID,
     prioritization: PTaaSFindingPrioritizationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -847,7 +997,7 @@ def prioritize_finding(
 
 @router.post("/engagements/{engagement_id}/executive-report", response_model=PTaaSExecutiveReportResponse, status_code=status.HTTP_201_CREATED)
 def generate_executive_report(
-    engagement_id: int,
+    engagement_id: UUID,
     report_data: PTaaSExecutiveReportCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -872,7 +1022,7 @@ def generate_executive_report(
 
 @router.get("/executive-reports/{report_id}", response_model=PTaaSExecutiveReportResponse)
 def get_executive_report(
-    report_id: int,
+    report_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -980,7 +1130,7 @@ from src.api.v1.schemas.ptaas_retest import (
 
 @router.post("/engagements/{engagement_id}/retest-policy", response_model=PTaaSRetestPolicyResponse, status_code=status.HTTP_201_CREATED)
 def create_retest_policy(
-    engagement_id: int,
+    engagement_id: UUID,
     policy_data: PTaaSRetestPolicyCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1013,7 +1163,7 @@ def create_retest_policy(
 
 @router.get("/engagements/{engagement_id}/retest-policy", response_model=PTaaSRetestPolicyResponse)
 def get_retest_policy(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1032,7 +1182,7 @@ def get_retest_policy(
 
 @router.post("/findings/{finding_id}/retest", response_model=PTaaSRetestRequestResponse, status_code=status.HTTP_201_CREATED)
 def request_retest(
-    finding_id: int,
+    finding_id: UUID,
     retest_data: PTaaSRetestRequestCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1044,21 +1194,27 @@ def request_retest(
     retest_service = PTaaSRetestService(db)
     
     try:
-        return retest_service.request_retest(
+        result = retest_service.request_retest(
             finding_id,
             current_user.id,
             retest_data.dict()
         )
+        return result
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @router.get("/findings/{finding_id}/retest-eligibility", response_model=PTaaSRetestEligibilityResponse)
 def check_retest_eligibility(
-    finding_id: int,
+    finding_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1092,7 +1248,7 @@ def check_retest_eligibility(
 
 @router.get("/findings/{finding_id}/retests", response_model=List[PTaaSRetestRequestResponse])
 def get_finding_retests(
-    finding_id: int,
+    finding_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1103,7 +1259,7 @@ def get_finding_retests(
 
 @router.get("/engagements/{engagement_id}/retests", response_model=List[PTaaSRetestRequestResponse])
 def get_engagement_retests(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1152,7 +1308,7 @@ def get_pending_retests(
 
 @router.post("/retests/{retest_id}/approve", response_model=PTaaSRetestRequestResponse)
 def approve_retest(
-    retest_id: int,
+    retest_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1186,7 +1342,7 @@ def approve_retest(
 
 @router.post("/retests/{retest_id}/assign", response_model=PTaaSRetestRequestResponse)
 def assign_retest(
-    retest_id: int,
+    retest_id: UUID,
     assignment: PTaaSRetestAssignment,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1211,7 +1367,7 @@ def assign_retest(
 
 @router.post("/retests/{retest_id}/complete", response_model=PTaaSRetestRequestResponse)
 def complete_retest(
-    retest_id: int,
+    retest_id: UUID,
     completion: PTaaSRetestCompletion,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1220,33 +1376,67 @@ def complete_retest(
     Complete retest with results - FREQ-37
     Assigned researcher or staff can complete
     """
-    retest_service = PTaaSRetestService(db)
-    retest = retest_service.get_retest_request(retest_id)
-    
-    if not retest:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Retest request not found"
-        )
-    
-    # Check if user is assigned or staff
-    if retest.assigned_to != current_user.id:
-        if not is_ptaas_admin_or_staff(current_user):
+    try:
+        retest_service = PTaaSRetestService(db)
+        retest = retest_service.get_retest_request(retest_id)
+        
+        if not retest:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Retest request not found"
+            )
+        
+        # Check if user has permission to complete retest
+        # Allow if: assigned to user, user is staff, or user is assigned to the engagement
+        ptaas_service = PTaaSService(db)
+        engagement = ptaas_service.get_engagement(retest.engagement_id)
+        
+        is_assigned_to_retest = retest.assigned_to == current_user.id if retest.assigned_to else False
+        is_assigned_to_engagement = str(current_user.id) in (engagement.assigned_researchers or []) if engagement else False
+        is_staff = is_ptaas_admin_or_staff(current_user)
+        
+        # Debug logging
+        print(f"🔍 RETEST AUTHORIZATION CHECK")
+        print(f"Current User ID: {current_user.id} (type: {type(current_user.id)})")
+        print(f"Current User Role: {current_user.role}")
+        print(f"Retest Assigned To: {retest.assigned_to}")
+        print(f"Engagement Assigned Researchers: {engagement.assigned_researchers if engagement else None}")
+        print(f"Is Assigned to Retest: {is_assigned_to_retest}")
+        print(f"Is Assigned to Engagement: {is_assigned_to_engagement}")
+        print(f"Is Staff: {is_staff}")
+        
+        if not (is_assigned_to_retest or is_assigned_to_engagement or is_staff):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only assigned researcher or staff can complete retest"
             )
-    
-    return retest_service.complete_retest(
-        retest_id,
-        current_user.id,
-        completion.dict()
-    )
+        
+        # Convert completion data to dict, handling Enum properly
+        completion_data = completion.model_dump()
+        if isinstance(completion_data.get('retest_result'), str):
+            # Already a string, no conversion needed
+            pass
+        
+        return retest_service.complete_retest(
+            retest_id,
+            current_user.id,
+            completion_data
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"ERROR in complete_retest: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal error: {str(e)}"
+        )
 
 
 @router.get("/engagements/{engagement_id}/retest-statistics", response_model=PTaaSRetestStatisticsResponse)
 def get_retest_statistics(
-    engagement_id: int,
+    engagement_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1271,3 +1461,441 @@ def get_retest_statistics(
     
     retest_service = PTaaSRetestService(db)
     return retest_service.get_retest_statistics(engagement_id)
+
+
+# Finding Assignment - Step 8
+from pydantic import BaseModel as PydanticBaseModel
+
+class FindingAssignmentRequest(PydanticBaseModel):
+    assigned_to: UUID
+    notes: Optional[str] = None
+
+
+@router.post("/findings/{finding_id}/assign")
+def assign_finding_to_team(
+    finding_id: UUID,
+    assignment: FindingAssignmentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Assign finding to team member - Step 8"""
+    service = PTaaSService(db)
+    
+    finding = service.get_finding(finding_id)
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found"
+        )
+    
+    # Update finding with assignment
+    update_data = {
+        'assigned_to': assignment.assigned_to,
+    }
+    
+    updated_finding = service.update_finding(finding_id, update_data, current_user.id)
+    return to_ptaas_finding_response(updated_finding)
+
+
+# Comments & Communication - Step 9
+from src.services.ptaas_comments_service import PTaaSCommentsService
+
+class CommentCreateRequest(PydanticBaseModel):
+    content: str
+    attachments: Optional[List[str]] = None
+
+
+class CommentUpdateRequest(PydanticBaseModel):
+    content: str
+
+
+@router.post("/findings/{finding_id}/comments")
+def add_finding_comment(
+    finding_id: UUID,
+    comment: CommentCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Add comment to finding - Step 9"""
+    comments_service = PTaaSCommentsService(db)
+    
+    try:
+        new_comment = comments_service.add_comment(
+            finding_id=finding_id,
+            user_id=current_user.id,
+            content=comment.content,
+            attachments=comment.attachments
+        )
+        return new_comment
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.get("/findings/{finding_id}/comments")
+def get_finding_comments(
+    finding_id: UUID,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all comments for a finding - Step 9"""
+    comments_service = PTaaSCommentsService(db)
+    comments = comments_service.get_comments(finding_id, limit)
+    return comments
+
+
+@router.patch("/comments/{comment_id}")
+def update_comment(
+    comment_id: UUID,
+    comment_update: CommentUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update comment - Step 9"""
+    comments_service = PTaaSCommentsService(db)
+    
+    try:
+        updated_comment = comments_service.update_comment(
+            comment_id=comment_id,
+            content=comment_update.content,
+            user_id=current_user.id
+        )
+        
+        if not updated_comment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Comment not found"
+            )
+        
+        return updated_comment
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+@router.delete("/comments/{comment_id}")
+def delete_comment(
+    comment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete comment - Step 9"""
+    comments_service = PTaaSCommentsService(db)
+    
+    try:
+        success = comments_service.delete_comment(comment_id, current_user.id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Comment not found"
+            )
+        
+        return {"message": "Comment deleted successfully"}
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+@router.post("/findings/{finding_id}/attachments")
+def add_finding_attachment(
+    finding_id: UUID,
+    file_url: str,
+    file_name: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Add attachment to finding - Step 9"""
+    comments_service = PTaaSCommentsService(db)
+    
+    try:
+        attachment = comments_service.add_attachment(
+            finding_id=finding_id,
+            file_url=file_url,
+            file_name=file_name,
+            uploaded_by=current_user.id
+        )
+        return attachment
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@router.get("/findings/{finding_id}/attachments")
+def get_finding_attachments(
+    finding_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all attachments for a finding - Step 9"""
+    comments_service = PTaaSCommentsService(db)
+    attachments = comments_service.get_attachments(finding_id)
+    return attachments
+
+
+# Analytics - Step 11
+from src.services.ptaas_analytics_service import PTaaSAnalyticsService
+
+
+@router.get("/engagements/{engagement_id}/analytics")
+def get_engagement_analytics(
+    engagement_id: UUID,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get comprehensive analytics for engagement - Step 11"""
+    ptaas_service = PTaaSService(db)
+    engagement = ptaas_service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    # Check access
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
+        if not is_ptaas_admin_or_staff(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+    
+    analytics_service = PTaaSAnalyticsService(db)
+    return analytics_service.get_engagement_analytics(engagement_id)
+
+
+@router.get("/engagements/{engagement_id}/researcher-performance")
+def get_researcher_performance(
+    engagement_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get researcher performance metrics - Step 11"""
+    ptaas_service = PTaaSService(db)
+    engagement = ptaas_service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    analytics_service = PTaaSAnalyticsService(db)
+    return analytics_service.get_researcher_performance(engagement_id)
+
+
+# Report Generation - Step 12
+from src.services.ptaas_report_service import PTaaSReportService
+
+
+@router.get("/engagements/{engagement_id}/reports/executive")
+def generate_executive_report(
+    engagement_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate executive summary report - Step 12"""
+    ptaas_service = PTaaSService(db)
+    engagement = ptaas_service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    # Check access
+    org_id = current_user.organization.id if current_user.organization else None
+    if engagement.organization_id != org_id:
+        if not is_ptaas_admin_or_staff(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied"
+            )
+    
+    report_service = PTaaSReportService(db)
+    return report_service.generate_executive_summary(engagement_id)
+
+
+@router.get("/engagements/{engagement_id}/reports/technical")
+def generate_technical_report(
+    engagement_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate detailed technical report - Step 12"""
+    ptaas_service = PTaaSService(db)
+    engagement = ptaas_service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    report_service = PTaaSReportService(db)
+    return report_service.generate_technical_report(engagement_id)
+
+
+@router.get("/engagements/{engagement_id}/reports/compliance")
+def generate_compliance_report(
+    engagement_id: UUID,
+    framework: str = 'PCI_DSS',
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate compliance report - Step 12"""
+    ptaas_service = PTaaSService(db)
+    engagement = ptaas_service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    report_service = PTaaSReportService(db)
+    return report_service.generate_compliance_report(engagement_id, framework)
+
+
+# ============================================
+# RESEARCHER ENDPOINTS
+# ============================================
+
+@router.get("/researcher/engagements", response_model=List[PTaaSEngagementResponse])
+def list_researcher_engagements(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List PTaaS engagements assigned to current researcher
+    Researchers see engagements where they are in assigned_researchers array
+    """
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can access this endpoint"
+        )
+    
+    service = PTaaSService(db)
+    researcher_id = str(current_user.researcher.id)  # Use researcher.id, not user.id
+    
+    # Get all engagements where researcher is assigned
+    from src.domain.models.ptaas import PTaaSEngagement
+    
+    # Get all engagements and filter in Python (most reliable method)
+    query = db.query(PTaaSEngagement)
+    
+    if status:
+        query = query.filter(PTaaSEngagement.status == status.upper())
+    
+    all_engagements = query.order_by(PTaaSEngagement.created_at.desc()).all()
+    
+    # Filter for researcher in Python
+    engagements = [
+        eng for eng in all_engagements
+        if eng.assigned_researchers and researcher_id in eng.assigned_researchers
+    ]
+    
+    return engagements
+
+
+@router.get("/researcher/engagements/{engagement_id}", response_model=PTaaSEngagementResponse)
+def get_researcher_engagement(
+    engagement_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get engagement details for researcher
+    Only accessible if researcher is assigned to the engagement
+    """
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can access this endpoint"
+        )
+    
+    service = PTaaSService(db)
+    engagement = service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    # Check if researcher is assigned (use researcher.id, not user.id)
+    researcher_id = str(current_user.researcher.id)
+    if not engagement.assigned_researchers or researcher_id not in engagement.assigned_researchers:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this engagement"
+        )
+    
+    return engagement
+
+
+@router.post("/researcher/engagements/{engagement_id}/accept")
+def accept_engagement(
+    engagement_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Researcher accepts engagement assignment
+    Updates researcher status to 'accepted'
+    """
+    if not current_user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can accept engagements"
+        )
+    
+    service = PTaaSService(db)
+    engagement = service.get_engagement(engagement_id)
+    
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found"
+        )
+    
+    # Check if researcher is assigned (use researcher.id, not user.id)
+    researcher_id = str(current_user.researcher.id)
+    if not engagement.assigned_researchers or researcher_id not in engagement.assigned_researchers:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this engagement"
+        )
+    
+    # Log acceptance
+    service.audit_service.log_action(
+        action_type="ACCEPT_PTAAS_ENGAGEMENT",
+        action_category="ptaas",
+        target_type="PTaaSEngagement",
+        description=f"Researcher accepted PTaaS engagement",
+        actor_id=current_user.id,
+        target_id=engagement_id,
+        metadata={"engagement_name": engagement.name}
+    )
+    
+    # Change status to IN_PROGRESS when researcher accepts
+    engagement.status = "IN_PROGRESS"
+    db.commit()
+    db.refresh(engagement)
+    
+    return {"message": "Engagement accepted successfully", "engagement_id": str(engagement_id)}

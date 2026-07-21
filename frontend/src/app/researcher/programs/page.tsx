@@ -1,5 +1,15 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function ResearcherProgramsPage() {
-  redirect('/researcher/engagements');
+  const router = useRouter();
+  
+  useEffect(() => {
+    // Redirect to engagements page which shows all programs
+    router.push('/researcher/engagements');
+  }, [router]);
+  
+  return null;
 }

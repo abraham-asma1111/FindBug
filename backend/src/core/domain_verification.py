@@ -20,6 +20,11 @@ class DomainVerificationService:
     """
     
     VERIFICATION_PREFIX = "findbug-verification"
+    PERSONAL_EMAIL_DOMAIN_BLOCKLIST = {
+        "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com",
+        "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com",
+        "gmx.com", "mail.com", "yandex.com", "zoho.com",
+    }
     
     @classmethod
     def generate_verification_token(cls) -> str:
@@ -32,6 +37,12 @@ class DomainVerificationService:
         if '@' not in email:
             return None
         return email.split('@')[1].lower()
+
+    @classmethod
+    def is_personal_email_domain(cls, email: str) -> bool:
+        """Return True when email domain is from common personal providers."""
+        domain = cls.extract_domain_from_email(email or "")
+        return bool(domain and domain in cls.PERSONAL_EMAIL_DOMAIN_BLOCKLIST)
     
     @classmethod
     def extract_domain_from_url(cls, url: str) -> Optional[str]:

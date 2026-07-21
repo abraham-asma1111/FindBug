@@ -16,7 +16,6 @@ class MessageService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.security = SecurityService()
     
     def get_or_create_conversation(
         self,
@@ -89,8 +88,8 @@ class MessageService:
         if len(message_text) > 10000:
             raise ValueError("Message text cannot exceed 10,000 characters")
         
-        # Sanitize message text
-        sanitized_text = self.security.sanitize_html(message_text)
+        # Simple sanitization - just strip whitespace
+        sanitized_text = message_text.strip()
         
         # Verify users exist
         sender = self.db.query(User).filter(User.id == sender_id).first()
@@ -376,8 +375,8 @@ class MessageService:
         if len(new_text) > 10000:
             raise ValueError("Message text cannot exceed 10,000 characters")
         
-        # Sanitize and update
-        sanitized_text = self.security.sanitize_html(new_text)
+        # Simple sanitization - just strip whitespace
+        sanitized_text = new_text.strip()
         message.message_text = sanitized_text
         message.edited = True
         message.updated_at = datetime.utcnow()

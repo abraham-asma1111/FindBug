@@ -2,7 +2,7 @@
 Code Review Domain Models
 Implements FREQ-41: Expert Code Review System
 """
-from sqlalchemy import Column, String, Integer, Text, ForeignKey, TIMESTAMP, Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, Text, ForeignKey, TIMESTAMP, Enum as SQLEnum, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -70,7 +70,8 @@ class CodeReviewEngagement(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     reviewer_id = Column(UUID(as_uuid=True), ForeignKey("researchers.id"), nullable=True)
-    
+    assigned_reviewer_ids = Column(JSON, nullable=True)  # list of researcher UUID strings
+
     title = Column(String(200), nullable=False)
     repository_url = Column(String(500), nullable=False)
     review_type = Column(SQLEnum(ReviewType), nullable=False)

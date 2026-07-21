@@ -2,7 +2,7 @@
 Researcher Model - Security researcher profile
 Based on Extended ERD + Bugcrowd 2026 enhancements
 """
-from sqlalchemy import Column, String, Integer, Text, ForeignKey, DateTime, DECIMAL
+from sqlalchemy import Column, String, Integer, Text, ForeignKey, DateTime, DECIMAL, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -41,6 +41,13 @@ class Researcher(Base):
     reputation_score = Column(DECIMAL(5, 2), default=0)
     rank = Column(Integer, nullable=True)
     total_earnings = Column(DECIMAL(15, 2), default=0)
+    
+    # Report Statistics
+    total_reports = Column(Integer, default=0)
+    verified_reports = Column(Integer, default=0)
+    
+    # Account Status
+    is_active = Column(Boolean, default=True)
     
     # Bugcrowd 2026 Professional Fields
     linkedin = Column(String(255), nullable=True)

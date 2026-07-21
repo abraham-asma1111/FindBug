@@ -12,10 +12,216 @@ from src.api.v1.middlewares.auth import get_current_user
 from src.domain.models.user import User, UserRole
 from src.domain.models.bounty_payment import BountyPayment
 from src.domain.models.subscription import SubscriptionPayment
+from src.domain.models.organization import Organization
 from src.services.subscription_service import SubscriptionService
 from src.services.enhanced_payout_service import EnhancedPayoutService
 
 router = APIRouter(prefix="/financial", tags=["financial"])
+
+
+@router.get("/organizations")
+def get_organizations_for_finance(
+    limit: int = Query(default=100, le=1000),
+    offset: int = Query(default=0),
+    search: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all organizations with subscription info for Finance Officers.
+    
+    Returns organization list with subscription details for financial monitoring.
+    
+    Requires: Finance Officer or Admin
+    """
+    # Authorization check - Finance Officer only
+    if current_user.role not in [UserRole.FINANCE_OFFICER.value, "finance_officer"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only finance officers can view organizations"
+        )
+    
+    # Build query with eager loading of user relationship
+    from sqlalchemy.orm import joinedload
+    query = db.query(Organization).options(joinedload(Organization.user))
+    
+    # Apply search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (Organization.company_name.ilike(search_term)) |
+            (Organization.email.ilike(search_term))
+        )
+    
+    # Get total count
+    total = query.count()
+    
+    # Apply pagination
+    organizations = query.offset(offset).limit(limit).all()
+    
+    # Fetch subscription data for each organization
+    result = []
+    for org in organizations:
+        # Get active subscription
+        subscription = db.query(func.max).from_statement(
+            db.query(func.max).select_from(func.max)
+        ).first() if False else None  # Placeholder
+        
+        # Get subscription info from subscription table
+        from src.domain.models.subscription import OrganizationSubscription
+        subscription = db.query(OrganizationSubscription).filter(
+            OrganizationSubscription.organization_id == org.id
+        ).first()
+        
+        org_data = {
+            "id": str(org.id),
+            "company_name": org.company_name,
+            "name": org.company_name,
+            "industry": org.industry if org.industry else None,
+            "email": org.user.email if org.user else None,
+            "website": org.website,
+            "created_at": org.created_at.isoformat() if org.created_at else None,
+            "is_verified": org.domain_verified if hasattr(org, 'domain_verified') else False,
+        }
+        
+        # Add subscription info if exists
+        if subscription:
+            org_data.update({
+                "subscription_type": subscription.tier,
+                "subscription_amount": float(subscription.subscription_fee),
+                "subscription_status": subscription.status.lower(),
+                "subscription_start_date": subscription.start_date.isoformat() if subscription.start_date else None,
+                "next_billing_date": subscription.next_billing_date.isoformat() if subscription.next_billing_date else None,
+            })
+        else:
+            org_data.update({
+                "subscription_type": "free",
+                "subscription_amount": 0,
+                "subscription_status": "inactive",
+                "subscription_start_date": None,
+                "next_billing_date": None,
+            })
+        
+        result.append(org_data)
+    
+    return {
+        "organizations": result,
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
+
+
+@router.get("/organizations/{organization_id}")
+def get_organization_details_for_finance(
+    organization_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed organization information for Finance Officers.
+    
+    Includes subscription details, payment history, and program statistics.
+    
+    Requires: Finance Officer or Admin
+    """
+    # Authorization check - Finance Officer only
+    if current_user.role not in [UserRole.FINANCE_OFFICER.value, "finance_officer"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only finance officers can view organization details"
+        )
+    
+    # Get organization
+    from uuid import UUID
+    try:
+        org_uuid = UUID(organization_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid organization ID format"
+        )
+    
+    # Get organization with eager loading
+    from sqlalchemy.orm import joinedload
+    organization = db.query(Organization).options(
+        joinedload(Organization.user)
+    ).filter(Organization.id == org_uuid).first()
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
+    
+    # Get subscription
+    from src.domain.models.subscription import OrganizationSubscription
+    subscription = db.query(OrganizationSubscription).filter(
+        OrganizationSubscription.organization_id == org_uuid
+    ).first()
+    
+    # Get program count
+    from src.domain.models.program import BountyProgram
+    program_count = db.query(func.count(BountyProgram.id)).filter(
+        BountyProgram.organization_id == org_uuid
+    ).scalar() or 0
+    
+    # Get report count
+    from src.domain.models.report import VulnerabilityReport
+    report_count = db.query(func.count(VulnerabilityReport.id)).join(
+        BountyProgram, VulnerabilityReport.program_id == BountyProgram.id
+    ).filter(
+        BountyProgram.organization_id == org_uuid
+    ).scalar() or 0
+    
+    # Get total bounties paid
+    total_bounties = db.query(func.sum(BountyPayment.total_amount)).join(
+        VulnerabilityReport, BountyPayment.report_id == VulnerabilityReport.id
+    ).join(
+        BountyProgram, VulnerabilityReport.program_id == BountyProgram.id
+    ).filter(
+        BountyProgram.organization_id == org_uuid,
+        BountyPayment.status == 'completed'
+    ).scalar() or 0
+    
+    # Build branding object - always return object, never null
+    branding_data = {
+        "logo_url": getattr(organization, 'logo_url', None),
+        "cover_image_url": getattr(organization, 'cover_image_url', None),
+        "brand_color": getattr(organization, 'brand_color', None),
+        "theme_settings": getattr(organization, 'theme_settings', None),
+    }
+    
+    # If all branding fields are None, still return the object structure
+    # This ensures frontend can safely access branding properties
+    
+    # Build subscription object
+    subscription_data = None
+    if subscription:
+        subscription_data = {
+            "tier": subscription.tier,
+            "status": subscription.status.lower(),
+            "subscription_fee": float(subscription.subscription_fee),
+            "start_date": subscription.start_date.isoformat() if subscription.start_date else None,
+            "current_period_start": subscription.current_period_start.isoformat() if hasattr(subscription, 'current_period_start') and subscription.current_period_start else None,
+            "current_period_end": subscription.current_period_end.isoformat() if hasattr(subscription, 'current_period_end') and subscription.current_period_end else None,
+            "next_billing_date": subscription.next_billing_date.isoformat() if subscription.next_billing_date else None,
+            "billing_cycle_months": subscription.billing_cycle_months if hasattr(subscription, 'billing_cycle_months') else 4,
+        }
+    
+    return {
+        "id": str(organization.id),
+        "company_name": organization.company_name,
+        "industry": organization.industry,
+        "email": organization.user.email if organization.user else None,
+        "website": organization.website,
+        "created_at": organization.created_at.isoformat() if organization.created_at else None,
+        "is_verified": getattr(organization, 'domain_verified', False),
+        "program_count": program_count,
+        "report_count": report_count,
+        "total_bounties_paid": float(total_bounties),
+        "branding": branding_data,
+        "subscription": subscription_data
+    }
 
 
 @router.get("/revenue-summary")
@@ -34,11 +240,11 @@ def get_revenue_summary(
     
     Requires: Admin or Finance Officer
     """
-    # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    # Authorization check - Finance Officer only
+    if current_user.role not in [UserRole.FINANCE_OFFICER.value, "finance_officer"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins and finance officers can view financial reports"
+            detail="Only finance officers can view financial reports"
         )
     
     # Get subscription revenue
@@ -107,11 +313,11 @@ def get_commission_report(
     
     Requires: Admin or Finance Officer
     """
-    # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    # Authorization check - Finance Officer only
+    if current_user.role not in [UserRole.FINANCE_OFFICER.value, "finance_officer"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins and finance officers can view commission reports"
+            detail="Only finance officers can view commission reports"
         )
     
     # Query completed payments
@@ -170,11 +376,11 @@ def get_pending_payments(
     
     Requires: Admin or Finance Officer
     """
-    # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    # Authorization check - Finance Officer only
+    if current_user.role not in [UserRole.FINANCE_OFFICER.value, "finance_officer"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins and finance officers can view pending payments"
+            detail="Only finance officers can view pending payments"
         )
     
     # Get pending subscription payments
@@ -237,11 +443,11 @@ def get_overdue_payments(
     
     Requires: Admin or Finance Officer
     """
-    # Authorization check
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF]:
+    # Authorization check - Finance Officer only
+    if current_user.role not in [UserRole.FINANCE_OFFICER.value, "finance_officer"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins and finance officers can view overdue payments"
+            detail="Only finance officers can view overdue payments"
         )
     
     now = datetime.utcnow()

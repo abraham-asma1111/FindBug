@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 import { getDashboardRouteForRole } from '@/lib/portal';
+import { API_URL } from '@/lib/api';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -56,7 +57,10 @@ function LoginPageContent() {
         setShowMFA(true);
         setError('Please enter your 6-digit MFA code');
       } else {
-        const errorMessage = err.response?.data?.detail || 'Login failed. Please try again.';
+        const errorMessage = err.response?.data?.detail
+          || (err.request ? `Cannot reach backend at ${API_URL}. Restart the frontend after env changes and make sure the API server is running there.` : null)
+          || err.message
+          || 'Login failed. Please try again.';
         
         if (errorMessage.includes('MFA') || errorMessage.includes('two-factor')) {
           setShowMFA(true);
@@ -86,7 +90,7 @@ function LoginPageContent() {
           </div>
         </div>
 
-        <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-start justify-center p-8 bg-white min-h-screen pt-24">
+        <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-start justify-center p-8 bg-white dark:bg-[#111111] min-h-screen pt-24">
           <div className="max-w-md w-full py-4">
             <div className="mb-8 text-center">
               <h2 className="text-3xl font-bold text-black mb-2">SIGN IN</h2>
@@ -194,7 +198,7 @@ function LoginPageFallback() {
     <>
       <Header />
       <div className="flex min-h-screen items-center justify-center bg-[#f5f1ec] pt-16">
-        <div className="rounded-3xl border border-[#ddd4cb] bg-white px-6 py-5 text-sm text-[#6d6760] shadow-sm">
+        <div className="rounded-3xl border border-[#ddd4cb] bg-white dark:bg-[#111111] px-6 py-5 text-sm text-[#6d6760] shadow-sm">
           Loading sign-in workspace...
         </div>
       </div>

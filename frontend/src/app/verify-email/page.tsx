@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
 
 function VerifyEmailPageContent() {
   const router = useRouter();
@@ -151,7 +151,7 @@ function VerifyEmailPageFallback() {
     <>
       <Header />
       <div className="flex min-h-screen items-center justify-center bg-[#f5f1ec] pt-16">
-        <div className="rounded-3xl border border-[#ddd4cb] bg-white px-6 py-5 text-sm text-[#6d6760] shadow-sm">
+        <div className="rounded-3xl border border-[#ddd4cb] bg-white dark:bg-[#111111] px-6 py-5 text-sm text-[#6d6760] shadow-sm">
           Loading email verification...
         </div>
       </div>

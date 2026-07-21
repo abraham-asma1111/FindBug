@@ -139,7 +139,17 @@ class BountyService:
         from src.services.notification_service import NotificationService
         notification_service = NotificationService(self.db)
         notification_service.notify_bounty_approved(report=report)
-        
+
+        # Notify all admins that an organization approved a bounty
+        org_name = report.program.organization.company_name if (report.program and report.program.organization) else "Organization"
+        notification_service.notify_admin_bounty_approved(
+            report_title=report.title,
+            report_number=report.report_number,
+            organization_name=org_name,
+            bounty_amount=float(bounty_amount),
+            report_id=report.id,
+        )
+
         # Log audit trail (FREQ-17)
         self.audit_service.log_bounty_approved(
             report_id=report_id,
@@ -264,7 +274,19 @@ class BountyService:
                 from src.services.notification_service import NotificationService
                 notification_service = NotificationService(self.db)
                 notification_service.notify_bounty_paid(report=report)
-                
+
+                # Notify all admins that payment was processed
+                researcher_email = ""
+                if report.researcher and report.researcher.user:
+                    researcher_email = report.researcher.user.email
+                notification_service.notify_admin_payment_processed(
+                    report_title=report.title,
+                    report_number=report.report_number,
+                    researcher_email=researcher_email,
+                    amount=float(report.bounty_amount),
+                    report_id=report.id,
+                )
+
                 # Log audit trail (FREQ-17)
                 self.audit_service.log_bounty_paid(
                     report_id=report_id,
@@ -319,7 +341,19 @@ class BountyService:
         from src.services.notification_service import NotificationService
         notification_service = NotificationService(self.db)
         notification_service.notify_bounty_paid(report=report)
-        
+
+        # Notify all admins that payment was processed
+        researcher_email = ""
+        if report.researcher and report.researcher.user:
+            researcher_email = report.researcher.user.email
+        notification_service.notify_admin_payment_processed(
+            report_title=report.title,
+            report_number=report.report_number,
+            researcher_email=researcher_email,
+            amount=float(report.bounty_amount),
+            report_id=report.id,
+        )
+
         # Log audit trail (FREQ-17)
         self.audit_service.log_bounty_paid(
             report_id=report_id,

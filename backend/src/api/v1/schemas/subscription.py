@@ -36,6 +36,7 @@ class CreateSubscriptionRequest(BaseModel):
     organization_id: UUID
     tier: str = Field(..., description="basic, professional, or enterprise")
     trial_days: int = Field(default=0, ge=0, le=90)
+    pay_from_wallet: bool = Field(default=False, description="Automatically pay from organization wallet")
 
 
 class SubscriptionResponse(BaseModel):
@@ -100,6 +101,11 @@ class MarkPaymentPaidRequest(BaseModel):
 class CancelSubscriptionRequest(BaseModel):
     """Cancel subscription request."""
     reason: Optional[str] = None
+
+
+class ChangeSubscriptionPlanRequest(BaseModel):
+    """Change subscription plan request."""
+    new_tier: str  # 'basic', 'professional', 'enterprise'
 
 
 class SubscriptionRevenueReport(BaseModel):

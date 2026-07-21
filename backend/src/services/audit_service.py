@@ -56,7 +56,7 @@ class AuditService:
             actor_role=actor_role,
             actor_email=actor_email,
             target_id=target_id,
-            metadata=metadata,
+            audit_metadata=metadata,
             ip_address=ip_address,
             user_agent=user_agent,
             severity=severity,

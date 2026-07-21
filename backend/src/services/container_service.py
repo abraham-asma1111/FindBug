@@ -2,193 +2,349 @@
 Container Orchestration Service
 Manages Docker containers for simulation challenges
 """
-import docker
+from __future__ import annotations
+
+import logging
 import secrets
+import socket
+import time
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
+
+import docker
 from sqlalchemy.orm import Session
 
-from src.domain.models.simulation import SimulationInstance, SimulationChallenge
+from src.core.config import settings
+from src.domain.models.simulation import SimulationChallenge, SimulationInstance
+
+logger = logging.getLogger(__name__)
+
+ACADEMY_LAB_IMAGE = "findbug/academy-lab"
+
+# Ports that must never be used for labs (3000 = frontend, 8080 = legacy WebGoat)
+FORBIDDEN_LAB_PORTS = frozenset({3000, 8080})
+
+
+def academy_lab_port() -> int:
+    return int(settings.SIMULATION_LAB_PORT or 5050)
+
+# Per-challenge paths on the branded FindBug Academy lab app
+VULNERABILITY_LAB_PATHS: Dict[str, str] = {
+    "sql_injection": "/challenges/sql-injection",
+    "sqli": "/challenges/sql-injection",
+    "sql injection": "/challenges/sql-injection",
+    "xss": "/challenges/reflected-xss",
+    "reflected_xss": "/challenges/reflected-xss",
+    "cross_site_scripting": "/challenges/reflected-xss",
+    "jwt_attack": "/challenges/jwt-forgery",
+    "jwt": "/challenges/jwt-forgery",
+    "jwt_forgery": "/challenges/jwt-forgery",
+    "ssrf": "/challenges/ssrf-fetch",
+    "ssrf_fetch": "/challenges/ssrf-fetch",
+    "oauth_abuse": "/challenges/oauth-redirect",
+    "oauth": "/challenges/oauth-redirect",
+    "oauth_redirect": "/challenges/oauth-redirect",
+    "race_condition": "/challenges/race-coupon",
+    "race": "/challenges/race-coupon",
+    "race_coupon": "/challenges/race-coupon",
+}
+
+
+def resolve_lab_path(vulnerability_type: Optional[str]) -> str:
+    """Map DB vulnerability_type to academy lab path (handles legacy aliases)."""
+    key = (vulnerability_type or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if key in VULNERABILITY_LAB_PATHS:
+        return VULNERABILITY_LAB_PATHS[key]
+    return VULNERABILITY_LAB_PATHS.get(vulnerability_type or "", "/")
+
+# Legacy seed images still map to the same branded lab (not third-party UIs)
+LEGACY_LAB_IMAGES = frozenset(
+    {
+        ACADEMY_LAB_IMAGE,
+        "bkimminich/juice-shop",
+        "webgoat/webgoat-8.0",
+    }
+)
+
+IMAGE_CONTAINER_PORTS: Dict[str, int] = {
+    ACADEMY_LAB_IMAGE: academy_lab_port(),
+    "bkimminich/juice-shop": academy_lab_port(),
+    "webgoat/webgoat-8.0": academy_lab_port(),
+}
+
+
+def academy_lab_base_url() -> str:
+    host = settings.SIMULATION_LAB_HOST or "127.0.0.1"
+    return f"http://{host}:{academy_lab_port()}"
+
+
+def challenge_lab_url(challenge: SimulationChallenge) -> str:
+    path = resolve_lab_path(challenge.vulnerability_type)
+    return f"{academy_lab_base_url()}{path}"
+
+
+def uses_branded_academy_lab(challenge: SimulationChallenge) -> bool:
+    image_key = (challenge.docker_image or "").split(":")[0]
+    return image_key in LEGACY_LAB_IMAGES
 
 
 class ContainerOrchestrationService:
     """Manages Docker container lifecycle for simulation challenges"""
-    
+
     def __init__(self):
-        self.docker_client = docker.from_env()
+        self.docker_client = None
+        self.docker_available = False
         self.active_instances: Dict[str, dict] = {}
-    
+        self._last_error: Optional[str] = None
+        try:
+            self.docker_client = docker.from_env()
+            self.docker_client.ping()
+            self.docker_available = True
+        except Exception as exc:
+            self.docker_client = None
+            self.docker_available = False
+            self._last_error = str(exc)
+
+    def container_port_for(self, challenge: SimulationChallenge) -> int:
+        image = (challenge.docker_image or "").split(":")[0]
+        if uses_branded_academy_lab(challenge):
+            return academy_lab_port()
+        port = int(challenge.exposed_port) if challenge.exposed_port else None
+        if port in FORBIDDEN_LAB_PORTS:
+            return academy_lab_port()
+        if port:
+            return port
+        return IMAGE_CONTAINER_PORTS.get(image, academy_lab_port())
+
+    def _lab_base_url(self, host_port: int) -> str:
+        host = settings.SIMULATION_LAB_HOST or "127.0.0.1"
+        return f"http://{host}:{host_port}"
+
+    def _wait_for_port(self, host: str, port: int, timeout: int) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                with socket.create_connection((host, port), timeout=2):
+                    return True
+            except OSError:
+                time.sleep(1)
+        return False
+
+    def _resolve_host_port(self, container, container_port: int) -> int:
+        container.reload()
+        ports = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
+        binding = ports.get(f"{container_port}/tcp")
+        if binding and binding[0].get("HostPort"):
+            return int(binding[0]["HostPort"])
+        raise RuntimeError(
+            f"Docker did not publish port {container_port}/tcp. "
+            f"Published ports: {list(ports.keys())}"
+        )
+
+    def _port_is_open(self, host: str, port: int) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                return True
+        except OSError:
+            return False
+
+    def try_shared_lab(
+        self, challenge: SimulationChallenge
+    ) -> Optional[Tuple[str, str]]:
+        """Use shared FindBug Academy lab (docker compose) when port 5050 is up."""
+        if not settings.SIMULATION_USE_SHARED_LABS:
+            return None
+        if not uses_branded_academy_lab(challenge):
+            return None
+        host = settings.SIMULATION_LAB_HOST or "127.0.0.1"
+        if self._port_is_open(host, academy_lab_port()):
+            return challenge_lab_url(challenge), "academy_lab"
+        return None
+
+    def resolve_embed_url(
+        self, challenge: SimulationChallenge, instance: Optional[SimulationInstance] = None
+    ) -> Optional[str]:
+        """Stable lab URL for iframes — prefer shared stack on 5050."""
+        shared = self.try_shared_lab(challenge)
+        if shared:
+            return shared[0]
+        if instance and instance.unique_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(instance.unique_url)
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or academy_lab_port()
+            if self._port_is_open(host, port):
+                return instance.unique_url
+        return None
+
     async def start_challenge_instance(
         self,
         db: Session,
-        user_id: str,
-        challenge_id: str,
-        challenge: SimulationChallenge
+        user_id,
+        challenge_id,
+        challenge: SimulationChallenge,
     ) -> dict:
-        """
-        Spin up a Docker container for a challenge
-        Returns instance info with unique URL
-        """
-        # Generate unique instance ID
         instance_id = secrets.token_urlsafe(8)
-        
-        # Get available port
-        unique_port = self._get_available_port()
-        
-        # Start Docker container
+
+        shared = self.try_shared_lab(challenge)
+        if shared:
+            url, mode = shared
+            return self._persist_instance(
+                db,
+                user_id,
+                challenge_id,
+                instance_id,
+                url,
+                None,
+                mode,
+                host_port=academy_lab_port(),
+            )
+
+        if getattr(settings, "SIMULATION_FORCE_SHARED_LAB", True):
+            raise RuntimeError(
+                f"Academy lab is not running on port {academy_lab_port()}. "
+                "From the project root run: "
+                "docker compose -f simulation/docker-compose.yml up -d"
+            )
+
+        if not self.docker_available or not self.docker_client:
+            raise RuntimeError(
+                f"Docker is not available ({self._last_error or 'daemon not running'}). "
+                "Start Docker, then run: docker compose -f simulation/docker-compose.yml up -d "
+                f"(FindBug Academy lab on port {academy_lab_port()}, not 3000)"
+            )
+
+        container_port = self.container_port_for(challenge)
+        host = settings.SIMULATION_LAB_HOST or "127.0.0.1"
+
         try:
+            cid = str(challenge_id).replace("-", "")[:8]
+            name = f"sim-{cid}-{instance_id}".lower().replace("_", "-")[:63]
             container = self.docker_client.containers.run(
                 image=challenge.docker_image,
                 detach=True,
-                name=f"sim-{challenge_id[:8]}-{instance_id}",
-                ports={f'{challenge.exposed_port}/tcp': unique_port},
+                name=name,
+                ports={f"{container_port}/tcp": None},
                 environment=challenge.environment_variables or {},
                 labels={
-                    'type': 'simulation',
-                    'user_id': str(user_id),
-                    'challenge_id': str(challenge_id),
-                    'instance_id': instance_id,
-                    'created_at': datetime.utcnow().isoformat()
+                    "type": "simulation",
+                    "user_id": str(user_id),
+                    "challenge_id": str(challenge_id),
+                    "instance_id": instance_id,
                 },
-                # Resource limits
-                mem_limit=challenge.container_memory_limit,
+                mem_limit=challenge.container_memory_limit or "512m",
                 cpu_period=100000,
-                cpu_quota=int(float(challenge.container_cpu_limit) * 100000),
-                # Network isolation
-                network_mode='bridge',
-                # Auto-remove when stopped
-                auto_remove=False
+                cpu_quota=int(float(challenge.container_cpu_limit or "0.5") * 100000),
+                remove=False,
             )
-            
-            # Generate unique URL
-            # Option 1: Port-based URL
-            unique_url = f"http://localhost:{unique_port}"
-            # Option 2: Subdomain-based (requires reverse proxy setup)
-            # unique_url = f"https://sim-{instance_id}.yourdomain.com"
-            
-            # Calculate expiration (2 hours from now)
-            expires_at = datetime.utcnow() + timedelta(hours=2)
-            
-            # Save instance to database
-            db_instance = SimulationInstance(
-                instance_id=instance_id,
-                user_id=user_id,
-                challenge_id=challenge_id,
-                container_id=container.id,
-                unique_url=unique_url,
-                port=unique_port,
-                status="running",
-                started_at=datetime.utcnow(),
-                expires_at=expires_at
+            host_port = self._resolve_host_port(container, container_port)
+            timeout = settings.SIMULATION_CONTAINER_START_TIMEOUT
+            if not self._wait_for_port(host, host_port, timeout):
+                container.stop(timeout=5)
+                container.remove(force=True)
+                raise RuntimeError(
+                    f"Lab container started but port {host_port} did not become reachable "
+                    f"within {timeout}s. Try: docker pull {challenge.docker_image}"
+                )
+
+            if uses_branded_academy_lab(challenge):
+                path = resolve_lab_path(challenge.vulnerability_type)
+                unique_url = f"{self._lab_base_url(host_port)}{path}"
+            else:
+                unique_url = self._lab_base_url(host_port)
+
+            return self._persist_instance(
+                db,
+                user_id,
+                challenge_id,
+                instance_id,
+                unique_url,
+                container.id,
+                "docker",
+                host_port=host_port,
             )
-            db.add(db_instance)
-            db.commit()
-            
-            # Store in memory for quick access
-            self.active_instances[instance_id] = {
-                'container_id': container.id,
-                'user_id': str(user_id),
-                'challenge_id': str(challenge_id),
-                'url': unique_url,
-                'port': unique_port,
-                'started_at': datetime.utcnow(),
-                'expires_at': expires_at
-            }
-            
-            return {
-                'instance_id': instance_id,
-                'url': unique_url,
-                'port': unique_port,
-                'expires_at': expires_at.isoformat(),
-                'status': 'running'
-            }
-            
+
         except docker.errors.ImageNotFound:
-            raise Exception(f"Docker image '{challenge.docker_image}' not found")
+            shared = self.try_shared_lab(challenge)
+            if shared:
+                url, mode = shared
+                return self._persist_instance(
+                    db, user_id, challenge_id, instance_id, url, None, mode
+                )
+            raise RuntimeError(
+                f"Docker image not found: {challenge.docker_image}. "
+                f"Run: docker pull {challenge.docker_image}"
+            )
         except docker.errors.APIError as e:
-            raise Exception(f"Docker API error: {str(e)}")
-    
-    async def stop_challenge_instance(
+            shared = self.try_shared_lab(challenge)
+            if shared:
+                url, mode = shared
+                return self._persist_instance(
+                    db, user_id, challenge_id, instance_id, url, None, mode
+                )
+            raise RuntimeError(f"Docker error: {e}") from e
+
+    def _persist_instance(
         self,
         db: Session,
-        instance_id: str
+        user_id,
+        challenge_id,
+        instance_id: str,
+        unique_url: str,
+        container_id: Optional[str],
+        mode: str,
+        host_port: Optional[int] = None,
     ) -> dict:
-        """Stop and remove a challenge container"""
-        # Get instance from database
+        expires_at = datetime.utcnow() + timedelta(hours=2)
+        db_instance = SimulationInstance(
+            instance_id=instance_id,
+            user_id=user_id,
+            challenge_id=challenge_id,
+            container_id=container_id,
+            unique_url=unique_url,
+            port=host_port,
+            status="running",
+            started_at=datetime.utcnow(),
+            expires_at=expires_at,
+        )
+        db.add(db_instance)
+        db.commit()
+        return {
+            "instance_id": instance_id,
+            "url": unique_url,
+            "port": host_port,
+            "expires_at": expires_at.isoformat(),
+            "status": "running",
+            "mode": mode,
+            "reachable": True,
+        }
+
+    async def stop_challenge_instance(self, db: Session, instance_id: str) -> dict:
         db_instance = db.query(SimulationInstance).filter(
             SimulationInstance.instance_id == instance_id
         ).first()
-        
+
         if not db_instance:
             raise Exception("Instance not found")
-        
-        try:
-            # Stop and remove container
-            container = self.docker_client.containers.get(db_instance.container_id)
-            container.stop(timeout=10)
-            container.remove()
-            
-            # Update database
-            db_instance.status = "stopped"
-            db_instance.stopped_at = datetime.utcnow()
-            db.commit()
-            
-            # Remove from memory
-            if instance_id in self.active_instances:
-                del self.active_instances[instance_id]
-            
-            return {
-                'instance_id': instance_id,
-                'status': 'stopped',
-                'message': 'Instance stopped successfully'
-            }
-            
-        except docker.errors.NotFound:
-            # Container already removed
-            db_instance.status = "stopped"
-            db_instance.stopped_at = datetime.utcnow()
-            db.commit()
-            return {
-                'instance_id': instance_id,
-                'status': 'stopped',
-                'message': 'Instance already stopped'
-            }
-    
-    async def get_user_active_instance(
-        self,
-        db: Session,
-        user_id: str,
-        challenge_id: str
-    ) -> Optional[SimulationInstance]:
-        """Check if user already has an active instance for this challenge"""
-        return db.query(SimulationInstance).filter(
-            SimulationInstance.user_id == user_id,
-            SimulationInstance.challenge_id == challenge_id,
-            SimulationInstance.status == "running",
-            SimulationInstance.expires_at > datetime.utcnow()
-        ).first()
-    
-    async def cleanup_expired_instances(self, db: Session):
-        """Background task to cleanup expired containers"""
-        now = datetime.utcnow()
-        
-        # Get expired instances
-        expired_instances = db.query(SimulationInstance).filter(
-            SimulationInstance.status == "running",
-            SimulationInstance.expires_at < now
-        ).all()
-        
-        for instance in expired_instances:
+
+        if db_instance.container_id and self.docker_available and self.docker_client:
             try:
-                await self.stop_challenge_instance(db, instance.instance_id)
-            except Exception as e:
-                print(f"Error cleaning up instance {instance.instance_id}: {e}")
-    
-    def _get_available_port(self) -> int:
-        """Get an available port for the container"""
-        import socket
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(('', 0))
-            s.listen(1)
-            port = s.getsockname()[1]
-        return port
+                container = self.docker_client.containers.get(db_instance.container_id)
+                container.stop(timeout=10)
+                container.remove(force=True)
+            except docker.errors.NotFound:
+                pass
+
+        db_instance.status = "stopped"
+        db_instance.stopped_at = datetime.utcnow()
+        db.commit()
+
+        if instance_id in self.active_instances:
+            del self.active_instances[instance_id]
+
+        return {
+            "instance_id": instance_id,
+            "status": "stopped",
+            "message": "Instance stopped successfully",
+        }

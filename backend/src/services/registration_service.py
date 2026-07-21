@@ -84,6 +84,9 @@ class RegistrationService:
         # Check if there's already a pending registration
         existing_pending = self.pending_repo.get_by_email(email)
         if existing_pending and not existing_pending.is_expired:
+            # Generate new OTP
+            otp = EmailService.generate_otp()
+            
             # Update existing pending registration
             pending_registration = existing_pending
             pending_registration.password_hash = PasswordSecurity.hash_password(password)
@@ -93,29 +96,39 @@ class RegistrationService:
             pending_registration.expires_at = datetime.utcnow() + timedelta(hours=24)
             pending_registration.is_verified = False
             pending_registration.verified_at = None
+            pending_registration.verification_token = EmailService.generate_verification_token()
+            pending_registration.verification_otp = otp
+            pending_registration.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+            self.db.commit()
+            self.db.refresh(pending_registration)
         else:
             # Delete expired pending registration if exists
             if existing_pending:
                 self.pending_repo.delete(existing_pending.id)
             
+            # Generate OTP
+            otp = EmailService.generate_otp()
+            
             # Create new pending registration
-            pending_registration = PendingRegistration(
-                email=email.lower(),
-                password_hash=PasswordSecurity.hash_password(password),
-                registration_type=RegistrationType.RESEARCHER,
-                first_name=InputSanitization.sanitize_html(first_name.strip()),
-                last_name=InputSanitization.sanitize_html(last_name.strip()),
-                verification_token=EmailService.generate_verification_token(),
-                ip_address=ip_address,
-                user_agent=user_agent
-            )
-            pending_registration = self.pending_repo.create(pending_registration)
+            pending_data = {
+                "email": email.lower(),
+                "password_hash": PasswordSecurity.hash_password(password),
+                "registration_type": RegistrationType.RESEARCHER.value,
+                "first_name": InputSanitization.sanitize_html(first_name.strip()),
+                "last_name": InputSanitization.sanitize_html(last_name.strip()),
+                "verification_token": EmailService.generate_verification_token(),
+                "verification_otp": otp,
+                "otp_expires_at": datetime.utcnow() + timedelta(minutes=10),
+                "ip_address": ip_address,
+                "user_agent": user_agent
+            }
+            pending_registration = self.pending_repo.create(pending_data)
         
-        # Send verification email with link (no OTP)
-        email_sent = EmailService.send_email_verification_link(
+        # Send verification email with OTP
+        email_sent = EmailService.send_registration_otp_email(
             email=email,
-            token=pending_registration.verification_token,
-            user_type="researcher"
+            otp=otp,
+            first_name=first_name
         )
         
         if not email_sent:
@@ -125,17 +138,22 @@ class RegistrationService:
         SecurityAudit.log_security_event(
             "REGISTRATION_INITIATED",
             None,
-            {"email": email, "role": "researcher", "method": "email_link"},
+            {"email": email, "role": "researcher", "method": "otp"},
             request
         )
         
         return {
             "success": True,
-            "message": "Registration initiated. Please check your email and click the verification link.",
+            "message": "Registration initiated. Please check your email for the verification code.",
             "email": email,
-            "verification_method": "email_link",
-            "expires_in_hours": 24
+            "verification_method": "otp",
+            "expires_in_minutes": 10
         }
+    
+    # Alias for backward compatibility
+    def initiate_researcher_registration(self, email: str, password: str, first_name: str, last_name: str, request: any = None) -> Dict[str, any]:
+        """Alias for register_researcher"""
+        return self.register_researcher(email, password, first_name, last_name, request)
     
     def initiate_organization_registration(
         self,
@@ -182,6 +200,9 @@ class RegistrationService:
         # Check if there's already a pending registration
         existing_pending = self.pending_repo.get_by_email(email)
         if existing_pending and not existing_pending.is_expired:
+            # Generate new OTP
+            otp = EmailService.generate_otp()
+            
             # Update existing pending registration
             pending_registration = existing_pending
             pending_registration.password_hash = PasswordSecurity.hash_password(password)
@@ -194,32 +215,42 @@ class RegistrationService:
             pending_registration.expires_at = datetime.utcnow() + timedelta(hours=24)
             pending_registration.is_verified = False
             pending_registration.verified_at = None
+            pending_registration.verification_token = EmailService.generate_verification_token()
+            pending_registration.verification_otp = otp
+            pending_registration.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+            self.db.commit()
+            self.db.refresh(pending_registration)
         else:
             # Delete expired pending registration if exists
             if existing_pending:
                 self.pending_repo.delete(existing_pending.id)
             
+            # Generate OTP
+            otp = EmailService.generate_otp()
+            
             # Create new pending registration
-            pending_registration = PendingRegistration(
-                email=email.lower(),
-                password_hash=PasswordSecurity.hash_password(password),
-                registration_type=RegistrationType.ORGANIZATION,
-                first_name=InputSanitization.sanitize_html(first_name.strip()),
-                last_name=InputSanitization.sanitize_html(last_name.strip()),
-                company_name=InputSanitization.sanitize_html(company_name.strip()),
-                phone_number=phone_number.strip(),
-                country=country.strip() if country else None,
-                verification_token=EmailService.generate_verification_token(),
-                ip_address=ip_address,
-                user_agent=user_agent
-            )
-            pending_registration = self.pending_repo.create(pending_registration)
+            pending_data = {
+                "email": email.lower(),
+                "password_hash": PasswordSecurity.hash_password(password),
+                "registration_type": RegistrationType.ORGANIZATION.value,
+                "first_name": InputSanitization.sanitize_html(first_name.strip()),
+                "last_name": InputSanitization.sanitize_html(last_name.strip()),
+                "company_name": InputSanitization.sanitize_html(company_name.strip()),
+                "phone_number": phone_number.strip(),
+                "country": country.strip() if country else None,
+                "verification_token": EmailService.generate_verification_token(),
+                "verification_otp": otp,
+                "otp_expires_at": datetime.utcnow() + timedelta(minutes=10),
+                "ip_address": ip_address,
+                "user_agent": user_agent
+            }
+            pending_registration = self.pending_repo.create(pending_data)
         
-        # Send verification email with link (no OTP)
-        email_sent = EmailService.send_email_verification_link(
+        # Send verification email with OTP
+        email_sent = EmailService.send_registration_otp_email(
             email=email,
-            token=pending_registration.verification_token,
-            user_type="organization"
+            otp=otp,
+            first_name=first_name
         )
         
         if not email_sent:
@@ -235,8 +266,10 @@ class RegistrationService:
         
         return {
             "success": True,
-            "message": "Registration successful! Please check your email and click the verification link to activate your account.",
-            "email": email
+            "message": "Registration initiated. Please check your email for the verification code.",
+            "email": email,
+            "verification_method": "otp",
+            "expires_in_minutes": 10
         }
     
     def verify_registration_otp(
@@ -344,20 +377,43 @@ class RegistrationService:
         request: any = None
     ) -> Dict[str, any]:
         """
-        Create user account from pending registration data
+        Create user account from pending registration data.
+
+        Idempotent: if the user already exists (e.g. a previous attempt
+        succeeded but the notification step crashed before the pending
+        record was deleted), we skip creation and return success.
         """
-        # Create user
+        # ── Idempotency guard ────────────────────────────────────────────────
+        # A previous verify attempt may have committed the user but then
+        # crashed in the notification step, leaving the pending record alive.
+        existing_user = self.user_repo.get_by_email(pending.email)
+        if existing_user:
+            logger.info(
+                f"User {pending.email} already exists — skipping creation "
+                "(idempotent OTP retry)"
+            )
+            return {
+                "success": True,
+                "message": "Registration completed successfully. You can now log in.",
+                "user_id": str(existing_user.id),
+                "email": existing_user.email,
+                "role": existing_user.role,
+                "is_verified": existing_user.is_verified
+            }
+
+        # ── Create user ──────────────────────────────────────────────────────
         user = User(
             id=uuid.uuid4(),
             email=pending.email,
             password_hash=pending.password_hash,
-            role=UserRole.RESEARCHER if pending.registration_type == RegistrationType.RESEARCHER else UserRole.ORGANIZATION,
-            is_verified=True,  # Already verified via OTP
-            is_active=True
+            role=UserRole.RESEARCHER.value if pending.registration_type == RegistrationType.RESEARCHER else UserRole.ORGANIZATION.value,
+            is_verified=True,
+            is_active=True,
+            email_verified_at=datetime.utcnow()
         )
         user = self.user_repo.create(user)
-        
-        # Create profile based on type
+
+        # ── Create profile ───────────────────────────────────────────────────
         if pending.registration_type == RegistrationType.RESEARCHER:
             # Auto-generate username from email
             username = pending.email.split('@')[0]
@@ -366,12 +422,12 @@ class RegistrationService:
                 username = username + str(uuid.uuid4())[:4]
             if len(username) > 50:
                 username = username[:50]
-            
+
             # Ensure unique username
             existing_researcher = self.researcher_repo.get_by_username(username)
             if existing_researcher:
                 username = username[:45] + str(uuid.uuid4())[:5]
-            
+
             researcher = Researcher(
                 id=uuid.uuid4(),
                 user_id=user.id,
@@ -379,39 +435,63 @@ class RegistrationService:
                 first_name=pending.first_name,
                 last_name=pending.last_name,
                 reputation_score=0,
-                total_bounties_earned=0.0,
+                total_earnings=0.0,
                 kyc_status="not_started"
             )
             self.researcher_repo.create(researcher)
-            
+
         else:  # Organization
             organization = Organization(
                 id=uuid.uuid4(),
                 user_id=user.id,
                 company_name=pending.company_name,
-                first_name=pending.first_name,
-                last_name=pending.last_name,
                 phone_number=pending.phone_number,
-                country=pending.country,
                 subscription_type="basic",
-                is_verified=False  # Organizations need additional verification
+                verification_status="pending"
             )
             self.organization_repo.create(organization)
-        
-        # Log security event
+
+        # ── Audit ────────────────────────────────────────────────────────────
         SecurityAudit.log_security_event(
             "REGISTRATION_COMPLETED",
             user.id,
-            {"email": user.email, "role": user.role.value, "method": "otp_verification"},
+            {"email": user.email, "role": user.role, "method": "otp_verification"},
             request
         )
-        
+
+        # ── Admin notification (non-critical, best-effort) ───────────────────
+        # NOTE: notify_admin_user_registered inserts into the notifications
+        # table.  If the DB enum 'notificationtype' is missing 'user_registered'
+        # (migration gap) the INSERT will fail and dirty the current session.
+        # We MUST call db.rollback() in the except branch to restore the
+        # session to a clean state so that the caller can still delete the
+        # pending registration record without hitting
+        # "This Session's transaction has been rolled back".
+        try:
+            from src.services.notification_service import NotificationService
+            notification_svc = NotificationService(self.db)
+            notification_svc.notify_admin_user_registered(
+                user_email=user.email,
+                user_role=user.role,
+                user_id=user.id
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to send admin notification for new user registration: {str(e)}"
+            )
+            # ⚠️  CRITICAL: roll back the failed notification transaction so
+            # the session is clean for the pending-record deletion below.
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+
         return {
             "success": True,
             "message": "Registration completed successfully. You can now log in.",
             "user_id": str(user.id),
             "email": user.email,
-            "role": user.role.value,
+            "role": user.role,
             "is_verified": user.is_verified
         }
     

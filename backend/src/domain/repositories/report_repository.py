@@ -3,7 +3,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, desc
 
 from src.domain.models.report import (
@@ -28,8 +28,15 @@ class ReportRepository:
         return report
     
     def get_by_id(self, report_id: UUID) -> Optional[VulnerabilityReport]:
-        """Get report by ID."""
-        return self.db.query(VulnerabilityReport).filter(
+        """Get report by ID with relationships loaded."""
+        from src.domain.models.researcher import Researcher
+        from src.domain.models.user import User
+        
+        return self.db.query(VulnerabilityReport).options(
+            joinedload(VulnerabilityReport.program),
+            joinedload(VulnerabilityReport.researcher).joinedload(Researcher.user),
+            joinedload(VulnerabilityReport.attachments)
+        ).filter(
             VulnerabilityReport.id == report_id
         ).first()
     
@@ -65,7 +72,8 @@ class ReportRepository:
     ) -> List[VulnerabilityReport]:
         """Get all reports by a researcher."""
         query = self.db.query(VulnerabilityReport).filter(
-            VulnerabilityReport.researcher_id == researcher_id
+            VulnerabilityReport.researcher_id == researcher_id,
+            VulnerabilityReport.deleted_at.is_(None)  # Exclude deleted reports
         )
         
         if status:
@@ -99,7 +107,13 @@ class ReportRepository:
         description: str,
         limit: int = 10
     ) -> List[VulnerabilityReport]:
-        """Search for similar reports (duplicate detection)."""
+        """
+        Search for similar reports (duplicate detection).
+        
+        Note: This method returns all similar reports within the program.
+        The caller (TriageService.find_similar_reports) is responsible for
+        filtering out same-researcher reports to identify true duplicates.
+        """
         # Simple text similarity search
         # In production, use full-text search or ML-based similarity
         search_term = f"%{title}%"

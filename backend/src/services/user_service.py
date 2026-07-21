@@ -41,7 +41,7 @@ class UserService:
         }
 
         # Attach role-specific data
-        if user.role == "researcher":
+        if user.role.lower() == "researcher":
             researcher = self.researcher_repo.get_by_user_id(user_id)
             if researcher:
                 profile["researcher"] = {
@@ -53,14 +53,16 @@ class UserService:
                     "rank": getattr(researcher, "rank", 0),
                     "total_earnings": float(getattr(researcher, "total_earnings", 0)),
                 }
-        elif user.role == "organization":
+        elif user.role.lower() == "organization":
             org = self.org_repo.get_by_user_id(user_id)
             if org:
                 profile["organization"] = {
+                    "id": str(org.id),  # Include organization ID for subscription management
                     "company_name": getattr(org, "company_name", None),
                     "industry": getattr(org, "industry", None),
                     "website": getattr(org, "website", None),
                     "subscription_type": getattr(org, "subscription_type", None),
+                    "verification_status": getattr(org, "verification_status", "pending"),
                 }
 
         logger.info("Profile fetched", extra={"user_id": user_id})
@@ -86,6 +88,40 @@ class UserService:
             "id": str(user.id),
             "full_name": getattr(user, "full_name", None),
             "role": user.role,
+        }
+
+    def search_users(self, query: str, limit: int = 10, exclude_user_id: Optional[str] = None) -> dict:
+        """Search for users by email or name."""
+        from src.domain.models.user import User
+        
+        # Build search query
+        search_filter = User.email.ilike(f"%{query}%")
+        if hasattr(User, 'full_name'):
+            search_filter = search_filter | User.full_name.ilike(f"%{query}%")
+        
+        query_builder = self.db.query(User).filter(search_filter)
+        
+        # Exclude current user
+        if exclude_user_id:
+            from uuid import UUID
+            query_builder = query_builder.filter(User.id != UUID(exclude_user_id))
+        
+        # Limit results
+        users = query_builder.limit(limit).all()
+        
+        results = []
+        for user in users:
+            results.append({
+                "id": str(user.id),
+                "email": user.email,
+                "full_name": getattr(user, "full_name", None),
+                "role": user.role,
+            })
+        
+        return {
+            "users": results,
+            "total": len(results),
+            "query": query
         }
 
     def update_profile(self, user_id: str, data: dict, requesting_user_id: str) -> dict:

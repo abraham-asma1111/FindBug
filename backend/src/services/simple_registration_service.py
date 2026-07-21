@@ -74,7 +74,7 @@ class SimpleRegistrationService:
             id=uuid.uuid4(),
             email=email.lower(),
             password_hash=PasswordSecurity.hash_password(password),
-            role=UserRole.RESEARCHER,
+            role=UserRole.RESEARCHER.value,
             is_verified=False,  # Email not verified yet
             is_active=False     # Account inactive until email verified
         )
@@ -100,7 +100,7 @@ class SimpleRegistrationService:
             first_name=InputSanitization.sanitize_html(first_name.strip()),
             last_name=InputSanitization.sanitize_html(last_name.strip()),
             reputation_score=0,
-            total_bounties_earned=0.0,
+            total_earnings=0.0,
             kyc_status="not_started"
         )
         self.researcher_repo.create(researcher)
@@ -175,7 +175,7 @@ class SimpleRegistrationService:
             id=uuid.uuid4(),
             email=email.lower(),
             password_hash=PasswordSecurity.hash_password(password),
-            role=UserRole.ORGANIZATION,
+            role=UserRole.ORGANIZATION.value,
             is_verified=False,  # Email not verified yet
             is_active=False     # Account inactive until email verified
         )

@@ -3,6 +3,7 @@ PTaaS Retest Service - FREQ-37
 Free retesting of fixed vulnerabilities
 """
 from typing import List, Dict, Optional, Any
+from uuid import UUID
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from src.domain.models.ptaas_retest import (
@@ -22,7 +23,7 @@ class PTaaSRetestService:
     # Retest Policy Management
     def create_retest_policy(
         self,
-        engagement_id: int,
+        engagement_id: UUID,
         policy_data: Dict[str, Any]
     ) -> PTaaSRetestPolicy:
         """
@@ -56,7 +57,7 @@ class PTaaSRetestService:
         
         return policy
     
-    def get_retest_policy(self, engagement_id: int) -> Optional[PTaaSRetestPolicy]:
+    def get_retest_policy(self, engagement_id: UUID) -> Optional[PTaaSRetestPolicy]:
         """Get retest policy for engagement"""
         return self.db.query(PTaaSRetestPolicy).filter(
             PTaaSRetestPolicy.engagement_id == engagement_id
@@ -80,8 +81,8 @@ class PTaaSRetestService:
     # Retest Request Management
     def request_retest(
         self,
-        finding_id: int,
-        requested_by: int,
+        finding_id: UUID,
+        requested_by: UUID,
         request_data: Dict[str, Any]
     ) -> PTaaSRetestRequest:
         """
@@ -152,13 +153,15 @@ class PTaaSRetestService:
         
         # Audit log
         self.audit_service.log_action(
-            user_id=requested_by,
-            action="REQUEST_PTAAS_RETEST",
-            resource_type="PTaaSRetestRequest",
-            resource_id=retest_request.id,
-            details={
-                "finding_id": finding_id,
-                "engagement_id": finding.engagement_id,
+            action_type="REQUEST_PTAAS_RETEST",
+            action_category="ptaas",
+            target_type="PTaaSRetestRequest",
+            description=f"Retest requested for finding {finding_id}",
+            actor_id=requested_by,
+            target_id=retest_request.id,
+            metadata={
+                "finding_id": str(finding_id),
+                "engagement_id": str(finding.engagement_id),
                 "is_free": retest_request.is_free_retest
             }
         )
@@ -167,7 +170,7 @@ class PTaaSRetestService:
     
     def check_retest_eligibility(
         self,
-        finding_id: int,
+        finding_id: UUID,
         policy: PTaaSRetestPolicy
     ) -> Dict[str, Any]:
         """
@@ -193,7 +196,7 @@ class PTaaSRetestService:
             PTaaSEngagement.id == finding.engagement_id
         ).first()
         
-        if engagement:
+        if engagement and engagement.end_date:
             months_since_end = (datetime.utcnow() - engagement.end_date).days / 30
             if months_since_end > policy.retest_period_months:
                 return {
@@ -221,8 +224,8 @@ class PTaaSRetestService:
     
     def approve_retest(
         self,
-        retest_id: int,
-        approved_by: int
+        retest_id: UUID,
+        approved_by: UUID
     ) -> PTaaSRetestRequest:
         """Approve retest request"""
         retest = self.db.query(PTaaSRetestRequest).filter(
@@ -251,20 +254,22 @@ class PTaaSRetestService:
         
         # Audit log
         self.audit_service.log_action(
-            user_id=approved_by,
-            action="APPROVE_PTAAS_RETEST",
-            resource_type="PTaaSRetestRequest",
-            resource_id=retest_id,
-            details={"finding_id": retest.finding_id}
+            action_type="APPROVE_PTAAS_RETEST",
+            action_category="ptaas",
+            target_type="PTaaSRetestRequest",
+            description=f"Retest approved for request {retest_id}",
+            actor_id=approved_by,
+            target_id=retest_id,
+            metadata={"finding_id": str(retest.finding_id)}
         )
         
         return retest
     
     def assign_retest(
         self,
-        retest_id: int,
-        assigned_to: int,
-        assigned_by: int
+        retest_id: UUID,
+        assigned_to: UUID,
+        assigned_by: UUID
     ) -> PTaaSRetestRequest:
         """Assign retest to researcher"""
         retest = self.db.query(PTaaSRetestRequest).filter(
@@ -295,13 +300,15 @@ class PTaaSRetestService:
         
         # Audit log
         self.audit_service.log_action(
-            user_id=assigned_by,
-            action="ASSIGN_PTAAS_RETEST",
-            resource_type="PTaaSRetestRequest",
-            resource_id=retest_id,
-            details={
-                "finding_id": retest.finding_id,
-                "assigned_to": assigned_to
+            action_type="ASSIGN_PTAAS_RETEST",
+            action_category="ptaas",
+            target_type="PTaaSRetestRequest",
+            description=f"Retest assigned to user {assigned_to}",
+            actor_id=assigned_by,
+            target_id=retest_id,
+            metadata={
+                "finding_id": str(retest.finding_id),
+                "assigned_to": str(assigned_to)
             }
         )
         
@@ -309,8 +316,8 @@ class PTaaSRetestService:
     
     def complete_retest(
         self,
-        retest_id: int,
-        completed_by: int,
+        retest_id: UUID,
+        completed_by: UUID,
         result_data: Dict[str, Any]
     ) -> PTaaSRetestRequest:
         """
@@ -351,31 +358,33 @@ class PTaaSRetestService:
         
         # Audit log
         self.audit_service.log_action(
-            user_id=completed_by,
-            action="COMPLETE_PTAAS_RETEST",
-            resource_type="PTaaSRetestRequest",
-            resource_id=retest_id,
-            details={
-                "finding_id": retest.finding_id,
+            action_type="COMPLETE_PTAAS_RETEST",
+            action_category="ptaas",
+            target_type="PTaaSRetestRequest",
+            description=f"Retest completed with result: {retest.retest_result}",
+            actor_id=completed_by,
+            target_id=retest_id,
+            metadata={
+                "finding_id": str(retest.finding_id),
                 "result": retest.retest_result
             }
         )
         
         return retest
     
-    def get_retest_request(self, retest_id: int) -> Optional[PTaaSRetestRequest]:
+    def get_retest_request(self, retest_id: UUID) -> Optional[PTaaSRetestRequest]:
         """Get retest request by ID"""
         return self.db.query(PTaaSRetestRequest).filter(
             PTaaSRetestRequest.id == retest_id
         ).first()
     
-    def get_finding_retests(self, finding_id: int) -> List[PTaaSRetestRequest]:
+    def get_finding_retests(self, finding_id: UUID) -> List[PTaaSRetestRequest]:
         """Get all retest requests for a finding"""
         return self.db.query(PTaaSRetestRequest).filter(
             PTaaSRetestRequest.finding_id == finding_id
         ).order_by(PTaaSRetestRequest.requested_at.desc()).all()
     
-    def get_engagement_retests(self, engagement_id: int) -> List[PTaaSRetestRequest]:
+    def get_engagement_retests(self, engagement_id: UUID) -> List[PTaaSRetestRequest]:
         """Get all retest requests for an engagement"""
         return self.db.query(PTaaSRetestRequest).filter(
             PTaaSRetestRequest.engagement_id == engagement_id
@@ -387,7 +396,7 @@ class PTaaSRetestService:
             PTaaSRetestRequest.status.in_(['PENDING', 'APPROVED'])
         ).order_by(PTaaSRetestRequest.requested_at).limit(limit).all()
     
-    def get_retest_statistics(self, engagement_id: int) -> Dict[str, Any]:
+    def get_retest_statistics(self, engagement_id: UUID) -> Dict[str, Any]:
         """Get retest statistics for engagement - FREQ-37"""
         retests = self.get_engagement_retests(engagement_id)
         
@@ -413,10 +422,10 @@ class PTaaSRetestService:
     # Helper methods
     def _create_history_record(
         self,
-        retest_request_id: int,
-        finding_id: int,
+        retest_request_id: UUID,
+        finding_id: UUID,
         activity_type: str,
-        activity_by: int,
+        activity_by: UUID,
         previous_status: Optional[str],
         new_status: Optional[str],
         notes: Optional[str]

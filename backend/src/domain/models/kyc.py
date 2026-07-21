@@ -1,7 +1,7 @@
 """KYC Verification Model — FREQ-01"""
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from src.core.database import Base
@@ -14,11 +14,29 @@ class KYCVerification(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="pending", index=True)
+    
+    # Persona Integration Fields
+    persona_inquiry_id = Column(String(100), nullable=True, unique=True, index=True)
+    persona_template_id = Column(String(100), nullable=True)
+    persona_status = Column(String(50), nullable=True)  # created, pending, completed, failed
+    persona_verified_at = Column(DateTime, nullable=True)
+    
+    # Email Verification Fields (Step 2 after Persona)
+    email_address = Column(String(255), nullable=True, index=True)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verification_code = Column(String(255), nullable=True)
+    email_verification_code_expires = Column(DateTime, nullable=True)
+    email_verification_attempts = Column(Integer, default=0, nullable=False)
+    email_verified_at = Column(DateTime, nullable=True)
+    
+    # Legacy/Manual Upload Fields (kept for backward compatibility)
     document_type = Column(String(50), nullable=True)
     document_number = Column(String(100), nullable=True)
     document_front = Column(String(500), nullable=True)
     document_back = Column(String(500), nullable=True)
     selfie_photo = Column(String(500), nullable=True)
+    
+    # Verification Fields
     verified_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     verified_at = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)

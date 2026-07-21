@@ -12,12 +12,249 @@ from src.domain.models.simulation import (
     SimulationProgress,
     SimulationReport,
     SimulationSolution,
-    SimulationLeaderboard
+    SimulationLeaderboard,
+)
+from src.services.simulation_helpers import (
+    hint_cost_for_index,
+    hints_as_list,
+    rank_title_from_xp,
 )
 
 
 class SimulationService:
     """Handles simulation platform business logic"""
+
+    async def submit_practice_report(
+        self,
+        db: Session,
+        user_id,
+        challenge_id,
+        report_data: dict,
+    ) -> Dict:
+        """Submit report for triage; store automated feedback preview."""
+        challenge = db.query(SimulationChallenge).filter(
+            SimulationChallenge.id == challenge_id
+        ).first()
+        if not challenge:
+            raise ValueError("Challenge not found")
+
+        pending = db.query(SimulationReport).filter(
+            SimulationReport.user_id == user_id,
+            SimulationReport.challenge_id == challenge_id,
+            SimulationReport.status == "submitted",
+        ).first()
+        if pending:
+            raise ValueError("You already have a pending report for this challenge.")
+
+        description = (
+            report_data.get("description")
+            or report_data.get("steps_to_reproduce")
+            or report_data.get("title", "")
+        )
+        report = SimulationReport(
+            user_id=user_id,
+            challenge_id=challenge_id,
+            title=report_data.get("title", f"Report for {challenge.name}"),
+            description=description,
+            steps_to_reproduce=report_data.get("steps_to_reproduce", ""),
+            impact_assessment=report_data.get("impact", report_data.get("impact_assessment", "")),
+            suggested_severity=report_data.get("severity", "low"),
+            proof_of_concept=report_data.get("poc", report_data.get("proof_of_concept", "")),
+            remediation=report_data.get("remediation", ""),
+            status="submitted",
+            submitted_at=datetime.utcnow(),
+        )
+
+        validation = self._validate_report(report, challenge)
+        report.feedback = validation["feedback"]
+        report.score = validation["validation_score"]
+        report.is_correct = validation["is_correct"]
+
+        db.add(report)
+
+        prog = db.query(SimulationProgress).filter(
+            SimulationProgress.user_id == user_id,
+            SimulationProgress.challenge_id == challenge_id,
+        ).first()
+        if not prog:
+            prog = SimulationProgress(
+                user_id=user_id,
+                challenge_id=challenge_id,
+                status="in_progress",
+            )
+            db.add(prog)
+        prog.attempts = (prog.attempts or 0) + 1
+        challenge.total_attempts = (challenge.total_attempts or 0) + 1
+
+        if validation["is_correct"]:
+            prog.status = "completed"
+            prog.completed_at = datetime.utcnow()
+            report.status = "validated"
+            report.validated_at = datetime.utcnow()
+            report.points_awarded = validation["points_awarded"]
+            challenge.total_completions = (challenge.total_completions or 0) + 1
+            await self._update_leaderboard(db, user_id, validation["points_awarded"])
+
+        db.commit()
+        db.refresh(report)
+
+        if validation["is_correct"]:
+            message = (
+                f"Congratulations — you solved the lab! "
+                f"+{validation['points_awarded']} XP awarded. "
+                f"Your report scored {validation['validation_score']}% on automated checks."
+            )
+        else:
+            message = (
+                "Report submitted for review. "
+                f"Automated score: {validation['validation_score']}% — "
+                "add more detail (vulnerability type, PoC, steps) to reach 70% and earn XP."
+            )
+
+        return {
+            "report_id": str(report.id),
+            "status": report.status,
+            "automated_score": report.score,
+            "automated_feedback": report.feedback,
+            "likely_correct": validation["is_correct"],
+            "xp_awarded": validation["points_awarded"] if validation["is_correct"] else 0,
+            "message": message,
+        }
+
+    def unlock_hint(
+        self,
+        db: Session,
+        user_id,
+        challenge_id,
+        hint_index: int,
+    ) -> Dict:
+        challenge = db.query(SimulationChallenge).filter(
+            SimulationChallenge.id == challenge_id
+        ).first()
+        if not challenge:
+            raise ValueError("Challenge not found")
+
+        hint_list = hints_as_list(challenge)
+        if hint_index < 0 or hint_index >= len(hint_list):
+            raise ValueError("Invalid hint index")
+
+        prog = db.query(SimulationProgress).filter(
+            SimulationProgress.user_id == user_id,
+            SimulationProgress.challenge_id == challenge_id,
+        ).first()
+        if not prog:
+            prog = SimulationProgress(
+                user_id=user_id,
+                challenge_id=challenge_id,
+                status="in_progress",
+                hints_unlocked=[],
+            )
+            db.add(prog)
+
+        unlocked = list(prog.hints_unlocked or [])
+        if hint_index in unlocked:
+            cost = hint_cost_for_index(challenge, hint_index)
+            lb = db.query(SimulationLeaderboard).filter(
+                SimulationLeaderboard.user_id == user_id
+            ).first()
+            return {
+                "hint_index": hint_index,
+                "hint": hint_list[hint_index],
+                "tier": "free" if cost == 0 else "paid",
+                "xp_cost": 0,
+                "xp_balance": (lb.total_points or 0) if lb else 0,
+                "already_unlocked": True,
+            }
+
+        cost = hint_cost_for_index(challenge, hint_index)
+        tier = "free" if cost == 0 else "paid"
+        lb = db.query(SimulationLeaderboard).filter(
+            SimulationLeaderboard.user_id == user_id
+        ).first()
+        if cost > 0:
+            if not lb:
+                lb = SimulationLeaderboard(user_id=user_id, total_points=0)
+                db.add(lb)
+            balance = lb.total_points or 0
+            if balance < cost:
+                raise ValueError(
+                    f"This paid hint costs {cost} XP. You have {balance} XP available "
+                    f"(earn XP by validating reports)."
+                )
+            lb.total_points = balance - cost
+
+        unlocked.append(hint_index)
+        prog.hints_unlocked = unlocked
+        prog.hints_used = len(unlocked)
+        db.commit()
+        db.refresh(prog)
+        if lb:
+            db.refresh(lb)
+
+        xp_balance = (lb.total_points or 0) if lb else 0
+
+        return {
+            "hint_index": hint_index,
+            "hint": hint_list[hint_index],
+            "tier": tier,
+            "xp_cost": cost,
+            "xp_balance": xp_balance,
+            "already_unlocked": False,
+        }
+
+    def apply_admin_review(
+        self,
+        db: Session,
+        report: SimulationReport,
+        is_valid: bool,
+        score: int,
+        xp: int,
+        feedback: str,
+    ) -> None:
+        report.status = "validated" if is_valid else "invalid"
+        report.is_correct = is_valid
+        report.score = score
+        report.feedback = feedback
+        report.points_awarded = xp if is_valid else 0
+        report.validated_at = datetime.utcnow()
+
+        prog = db.query(SimulationProgress).filter(
+            SimulationProgress.user_id == report.user_id,
+            SimulationProgress.challenge_id == report.challenge_id,
+        ).first()
+
+        if is_valid and prog:
+            prog.status = "completed"
+            prog.completed_at = datetime.utcnow()
+            if report.challenge:
+                report.challenge.total_completions = (report.challenge.total_completions or 0) + 1
+
+        lb = db.query(SimulationLeaderboard).filter(
+            SimulationLeaderboard.user_id == report.user_id
+        ).first()
+        if not lb:
+            lb = SimulationLeaderboard(user_id=report.user_id)
+            db.add(lb)
+
+        if is_valid:
+            lb.challenges_completed = (lb.challenges_completed or 0) + 1
+            lb.current_streak = (lb.current_streak or 0) + 1
+            lb.total_points = (lb.total_points or 0) + xp
+        else:
+            lb.current_streak = 0
+
+        lb.rank_title = rank_title_from_xp(lb.total_points or 0)
+        lb.last_updated = datetime.utcnow()
+
+        all_entries = (
+            db.query(SimulationLeaderboard)
+            .order_by(SimulationLeaderboard.total_points.desc())
+            .all()
+        )
+        for rank, entry in enumerate(all_entries, start=1):
+            entry.rank = rank
+
+        db.commit()
     
     async def get_challenges(
         self,
@@ -112,7 +349,8 @@ class SimulationService:
         
         report.is_correct = validation_result['is_correct']
         report.feedback = validation_result['feedback']
-        report.points_awarded = validation_result['points_awarded']
+        report.score = validation_result["validation_score"]
+        report.points_awarded = validation_result["points_awarded"]
         report.status = "validated"
         report.validated_at = datetime.utcnow()
         
@@ -211,16 +449,16 @@ class SimulationService:
             if keywords_found >= len(challenge.validation_keywords) * 0.5:
                 points += 10
         
-        # Determine if correct (70% threshold)
-        is_correct = points >= (challenge.points * 0.7)
-        points_awarded = challenge.points if is_correct else 0
-        
+        validation_score = min(100, points)
+        is_correct = validation_score >= 70
+
         feedback = "\n".join(feedback_items)
-        
+
         return {
-            'is_correct': is_correct,
-            'points_awarded': points_awarded,
-            'feedback': feedback
+            "is_correct": is_correct,
+            "validation_score": validation_score,
+            "points_awarded": challenge.points if is_correct else 0,
+            "feedback": feedback,
         }
     
     async def _update_leaderboard(
@@ -238,8 +476,9 @@ class SimulationService:
             leaderboard = SimulationLeaderboard(user_id=user_id)
             db.add(leaderboard)
         
-        leaderboard.total_points += points
-        leaderboard.challenges_completed += 1
+        leaderboard.total_points = (leaderboard.total_points or 0) + points
+        leaderboard.challenges_completed = (leaderboard.challenges_completed or 0) + 1
+        leaderboard.rank_title = rank_title_from_xp(leaderboard.total_points)
         leaderboard.last_updated = datetime.utcnow()
         
         # Recalculate ranks (simple approach)

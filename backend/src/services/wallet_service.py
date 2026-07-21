@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from src.domain.models.bounty_payment import Wallet, WalletTransaction
+from src.services.audit_service import AuditService
 
 
 class WalletService:
@@ -23,6 +24,7 @@ class WalletService:
     
     def __init__(self, db: Session):
         self.db = db
+        self.audit_service = AuditService(db)
     
     def get_or_create_wallet(
         self,
@@ -114,6 +116,26 @@ class WalletService:
         self.db.commit()
         self.db.refresh(wallet)
         
+        try:
+            self.audit_service.log_action(
+                action_type="wallet_reserve_funds",
+                action_category="bounty",
+                target_type="wallet",
+                description=transaction.description,
+                actor_id=owner_id,
+                actor_role=owner_type,
+                target_id=wallet.wallet_id,
+                metadata={
+                    "amount": float(amount),
+                    "currency": wallet.currency,
+                    "reference_type": reference_type,
+                    "saga_id": saga_id
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
+        
         return {
             "success": True,
             "wallet_id": str(wallet.wallet_id),
@@ -147,6 +169,25 @@ class WalletService:
         """
         wallet = self.get_or_create_wallet(owner_id, owner_type)
         
+        # Idempotency check: prevent double crediting for the same reference
+        if reference_type and reference_id:
+            existing_tx = self.db.query(WalletTransaction).filter(
+                WalletTransaction.wallet_id == wallet.wallet_id,
+                WalletTransaction.reference_type == reference_type,
+                WalletTransaction.reference_id == reference_id,
+                WalletTransaction.transaction_type == "credit"
+            ).first()
+            
+            if existing_tx:
+                return {
+                    "success": True,
+                    "wallet_id": str(wallet.wallet_id),
+                    "transaction_id": str(existing_tx.transaction_id),
+                    "amount": float(amount),
+                    "available_balance": float(wallet.available_balance),
+                    "note": "Idempotent: Transaction already exists"
+                }
+                
         balance_before = wallet.balance
         wallet.balance += amount
         wallet.available_balance = wallet.balance - wallet.reserved_balance
@@ -167,6 +208,26 @@ class WalletService:
         self.db.add(transaction)
         self.db.commit()
         self.db.refresh(wallet)
+        
+        try:
+            self.audit_service.log_action(
+                action_type="wallet_credit",
+                action_category="bounty",
+                target_type="wallet",
+                description=transaction.description,
+                actor_id=owner_id,
+                actor_role=owner_type,
+                target_id=wallet.wallet_id,
+                metadata={
+                    "amount": float(amount),
+                    "currency": wallet.currency,
+                    "reference_type": reference_type,
+                    "saga_id": saga_id
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return {
             "success": True,
@@ -238,6 +299,27 @@ class WalletService:
         self.db.add(transaction)
         self.db.commit()
         self.db.refresh(wallet)
+        
+        try:
+            self.audit_service.log_action(
+                action_type="wallet_debit",
+                action_category="bounty",
+                target_type="wallet",
+                description=transaction.description,
+                actor_id=owner_id,
+                actor_role=owner_type,
+                target_id=wallet.wallet_id,
+                metadata={
+                    "amount": float(amount),
+                    "currency": wallet.currency,
+                    "reference_type": reference_type,
+                    "from_reserved": from_reserved,
+                    "saga_id": saga_id
+                },
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return {
             "success": True,
@@ -392,13 +474,81 @@ class WalletService:
         return [
             {
                 "transaction_id": str(tx.transaction_id),
-                "type": tx.transaction_type,
+                "transaction_type": tx.transaction_type,
                 "amount": float(tx.amount),
                 "balance_before": float(tx.balance_before),
                 "balance_after": float(tx.balance_after),
                 "description": tx.description,
-                "created_at": tx.created_at,
-                "compensated": tx.compensated
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+                "reference_type": tx.reference_type,
+                "reference_id": str(tx.reference_id) if tx.reference_id else None,
+                "saga_id": tx.saga_id,
+                "compensated": tx.compensated,
+                "status": "completed"
             }
             for tx in transactions
         ]
+    
+    def deduct_from_wallet(
+        self,
+        organization_id: UUID,
+        amount: Decimal,
+        description: str,
+        reference_type: str = "subscription_payment",
+        reference_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Deduct amount from organization wallet for subscription payment.
+        
+        Args:
+            organization_id: Organization ID
+            amount: Amount to deduct
+            description: Transaction description
+            reference_type: Type of reference
+            reference_id: Reference ID
+            
+        Returns:
+            Transaction result
+        """
+        wallet = self.get_or_create_wallet(organization_id, "organization")
+        
+        # Check available balance
+        if wallet.available_balance < amount:
+            raise ValueError(
+                f"Insufficient wallet balance: available={wallet.available_balance}, required={amount}"
+            )
+        
+        # Deduct from wallet
+        balance_before = wallet.balance
+        wallet.balance -= amount
+        wallet.available_balance = wallet.balance - wallet.reserved_balance
+        
+        # Record transaction
+        transaction = WalletTransaction(
+            wallet_id=wallet.wallet_id,
+            transaction_type="debit",
+            amount=amount,
+            balance_before=balance_before,
+            balance_after=wallet.balance,
+            reference_type=reference_type,
+            reference_id=UUID(reference_id) if reference_id else None,
+            saga_id=str(uuid4()),
+            description=description
+        )
+        
+        self.db.add(transaction)
+        self.db.commit()
+        self.db.refresh(wallet)
+        
+        return {
+            "success": True,
+            "wallet_id": str(wallet.wallet_id),
+            "transaction_id": str(transaction.transaction_id),
+            "debited_amount": float(amount),
+            "new_balance": float(wallet.balance),
+            "available_balance": float(wallet.available_balance)
+        }
+    
+    def get_organization_wallet(self, organization_id: UUID) -> Wallet:
+        """Get organization wallet."""
+        return self.get_or_create_wallet(organization_id, "organization")

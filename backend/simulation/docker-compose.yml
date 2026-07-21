@@ -1,0 +1,14 @@
+# Same stack when running from backend/ directory:
+#   docker compose -f simulation/docker-compose.yml build
+#   docker compose -f simulation/docker-compose.yml up -d
+
+services:
+  academy-lab:
+    build:
+      context: ../simulation/lab-app
+      dockerfile: Dockerfile
+    image: findbug/academy-lab:latest
+    container_name: findbug-academy-lab
+    ports:
+      - "5050:5050"
+    restart: unless-stopped

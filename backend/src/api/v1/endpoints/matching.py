@@ -214,7 +214,7 @@ def get_my_invitations(
     
     Researcher views their invitations.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view invitations"
@@ -260,7 +260,7 @@ def respond_to_invitation(
     
     Researcher accepts or declines invitation.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can respond to invitations"
@@ -301,7 +301,7 @@ def get_program_recommendations(
     
     Researcher gets recommended programs based on skills.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can get recommendations"
@@ -327,6 +327,103 @@ def get_program_recommendations(
             for p in programs
         ]
     }
+
+
+@router.get("/organization/researchers")
+def list_researchers_for_organization(
+    search: Optional[str] = None,
+    min_reputation: Optional[int] = None,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List researchers for assignment, ordered by reputation (highest first).
+
+    Each item includes ``reputation_rank`` (1 = highest reputation on the platform).
+    """
+    if not (current_user.is_organization() or current_user.is_admin()):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organizations and admins can list researchers",
+        )
+
+    from sqlalchemy import func
+    from sqlalchemy.orm import joinedload
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.user import User as UserModel
+    from src.domain.models.matching import ResearcherProfile
+
+    query = (
+        db.query(Researcher)
+        .options(joinedload(Researcher.user))
+        .join(UserModel, Researcher.user_id == UserModel.id)
+        .outerjoin(ResearcherProfile, Researcher.id == ResearcherProfile.researcher_id)
+        .filter(Researcher.is_active == True)
+    )
+
+    if search:
+        search_term = f"%{search.lower()}%"
+        query = query.filter(
+            func.lower(UserModel.email).like(search_term)
+            | func.lower(Researcher.first_name).like(search_term)
+            | func.lower(Researcher.last_name).like(search_term)
+            | func.lower(Researcher.username).like(search_term)
+        )
+
+    if min_reputation is not None:
+        query = query.filter(Researcher.reputation_score >= min_reputation)
+
+    researchers = (
+        query.order_by(Researcher.reputation_score.desc().nullslast(), Researcher.total_reports.desc())
+        .limit(limit)
+        .all()
+    )
+
+    result = []
+    for rank, researcher in enumerate(researchers, start=1):
+        profile = researcher.profile if hasattr(researcher, "profile") and researcher.profile else None
+        skills: list = []
+        specializations: list = []
+        experience_years = 0
+        if profile:
+            if getattr(profile, "skills", None):
+                skills = profile.skills if isinstance(profile.skills, list) else []
+            if getattr(profile, "specializations", None):
+                specializations = (
+                    profile.specializations if isinstance(profile.specializations, list) else []
+                )
+            experience_years = getattr(profile, "experience_years", 0) or 0
+        elif researcher.skills:
+            skills = [s.strip() for s in researcher.skills.split(",") if s.strip()]
+
+        full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip()
+        if not full_name and researcher.user:
+            full_name = researcher.user.email.split("@")[0]
+
+        result.append(
+            {
+                "id": str(researcher.id),
+                "reputation_rank": rank,
+                "user": {
+                    "id": str(researcher.user.id),
+                    "email": researcher.user.email,
+                    "full_name": full_name,
+                    "username": researcher.username or researcher.user.email.split("@")[0],
+                },
+                "reputation_score": float(researcher.reputation_score or 0),
+                "total_reports": researcher.total_reports or 0,
+                "verified_reports": researcher.verified_reports or 0,
+                "profile": {
+                    "experience_years": experience_years,
+                    "skills": skills,
+                    "specializations": specializations,
+                    "bio": researcher.bio,
+                },
+            }
+        )
+
+    return result
 
 
 @router.post("/feedback")
@@ -476,9 +573,10 @@ def get_ptaas_engagement_candidates(
     # Format response
     candidates = []
     for researcher, match_details in matches:
+        full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip() or researcher.user.email.split('@')[0]
         candidates.append({
             'researcher_id': str(researcher.id),
-            'researcher_name': f"{researcher.user.first_name} {researcher.user.last_name}",
+            'researcher_name': full_name,
             'reputation_score': researcher.reputation_score,
             'match_score': match_details['overall_score'],
             'skill_score': match_details['skill_score'],
@@ -508,7 +606,7 @@ def get_researcher_ptaas_recommendations(
     
     Returns engagements that match researcher's skills and experience.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can access recommendations"
@@ -575,9 +673,11 @@ def get_researcher_ptaas_match_score(
         compliance_requirements=None
     )
     
+    full_name = f"{researcher.first_name or ''} {researcher.last_name or ''}".strip() or researcher.user.email.split('@')[0]
+    
     return {
         "researcher_id": str(researcher_id),
-        "researcher_name": f"{researcher.user.first_name} {researcher.user.last_name}",
+        "researcher_name": full_name,
         "methodology": methodology,
         "match_details": match_details
     }
@@ -891,7 +991,7 @@ def get_pending_assignments(
                 "engagement_id": a.engagement_id,
                 "engagement_type": a.engagement_type,
                 "researcher_id": str(a.researcher_id),
-                "researcher_name": f"{a.researcher.user.first_name} {a.researcher.user.last_name}",
+                "researcher_name": f"{a.researcher.first_name or ''} {a.researcher.last_name or ''}".strip() or a.researcher.user.email.split('@')[0],
                 "match_score": float(a.match_score),
                 "match_details": a.match_details,
                 "proposed_at": a.proposed_at.isoformat(),
@@ -972,13 +1072,15 @@ def get_assignment_details(
             detail="Assignment not found"
         )
     
+    full_name = f"{assignment.researcher.first_name or ''} {assignment.researcher.last_name or ''}".strip() or assignment.researcher.user.email.split('@')[0]
+    
     return {
         "assignment": {
             "id": str(assignment.id),
             "engagement_id": assignment.engagement_id,
             "engagement_type": assignment.engagement_type,
             "researcher_id": str(assignment.researcher_id),
-            "researcher_name": f"{assignment.researcher.user.first_name} {assignment.researcher.user.last_name}",
+            "researcher_name": full_name,
             "organization_id": str(assignment.organization_id),
             "match_score": float(assignment.match_score),
             "match_details": assignment.match_details,
@@ -1271,3 +1373,6 @@ def get_matching_dashboard(
             'total_assignments_this_month': last_month['overview']['total_assignments']
         }
     }
+
+
+# Organization researcher listing: see list_researchers_for_organization above

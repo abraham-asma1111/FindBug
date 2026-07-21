@@ -25,6 +25,7 @@ from src.domain.repositories.user_repository import UserRepository
 from src.domain.repositories.researcher_repository import ResearcherRepository
 from src.domain.repositories.organization_repository import OrganizationRepository
 from src.core.logging import get_logger
+from src.services.audit_service import AuditService
 
 logger = get_logger(__name__)
 
@@ -53,6 +54,7 @@ class AuthService:
         self.researcher_repo = researcher_repo
         self.organization_repo = organization_repo
         self.db = db
+        self.audit_service = AuditService(db)
     
     # ═══════════════════════════════════════════════════════════════════════
     # SECURITY LOGGING HELPERS
@@ -236,7 +238,7 @@ class AuthService:
             id=uuid.uuid4(),
             email=email.lower(),
             password_hash=PasswordSecurity.hash_password(password),
-            role=UserRole.RESEARCHER,
+            role=UserRole.RESEARCHER.value,
             is_verified=False,
             is_active=True,
             email_verification_token=token_hash,
@@ -270,6 +272,16 @@ class AuthService:
             severity="low",
             ip_address=ip_address
         )
+        
+        # Audit log: user created (for activity log)
+        try:
+            self.audit_service.log_user_created(
+                user_id=user.id,
+                user_email=email,
+                user_role="researcher"
+            )
+        except Exception:
+            pass
         
         logger.info("Researcher registered successfully", extra={
             "user_id": str(user.id),
@@ -340,7 +352,7 @@ class AuthService:
             id=uuid.uuid4(),
             email=email.lower(),
             password_hash=PasswordSecurity.hash_password(password),
-            role=UserRole.ORGANIZATION,
+            role=UserRole.ORGANIZATION.value,
             is_verified=False,
             is_active=True,
             email_verification_token=token_hash,
@@ -370,6 +382,16 @@ class AuthService:
             severity="low",
             ip_address=ip_address
         )
+        
+        # Audit log: organization user created
+        try:
+            self.audit_service.log_user_created(
+                user_id=user.id,
+                user_email=email,
+                user_role="organization"
+            )
+        except Exception:
+            pass
         
         logger.info("Organization registered successfully", extra={
             "user_id": str(user.id),
@@ -464,7 +486,7 @@ class AuthService:
             )
             
             # Lock account if max attempts reached
-            if user.failed_login_attempts >= AuthenticationSecurity.MAX_LOGIN_ATTEMPTS:
+            if user.failed_login_attempts and user.failed_login_attempts >= AuthenticationSecurity.MAX_LOGIN_ATTEMPTS:
                 locked_until = datetime.utcnow() + timedelta(
                     minutes=AuthenticationSecurity.LOCKOUT_DURATION_MINUTES
                 )
@@ -496,7 +518,7 @@ class AuthService:
                 )
             
             # Log brute force attempt if multiple failures
-            if user.failed_login_attempts >= 3:
+            if user.failed_login_attempts and user.failed_login_attempts >= 3:
                 self._log_security_event(
                     event_type="brute_force",
                     user_id=user.id,
@@ -530,7 +552,7 @@ class AuthService:
                     "token_type": "bearer",
                     "user_id": str(user.id),
                     "email": user.email,
-                    "role": user.role.value,
+                    "role": user.role if isinstance(user.role, str) else user.role.value,
                     "mfa_required": True,
                     "mfa_enabled": True
                 }
@@ -568,7 +590,7 @@ class AuthService:
                 raise ValueError("Invalid MFA code")
         
         # Reset failed login attempts
-        if user.failed_login_attempts > 0:
+        if user.failed_login_attempts and user.failed_login_attempts > 0:
             user = self.user_repo.reset_failed_login(user)
         
         # Update last login
@@ -578,7 +600,7 @@ class AuthService:
         token_data = {
             "sub": user.email,
             "user_id": str(user.id),
-            "role": user.role.value
+            "role": user.role if isinstance(user.role, str) else user.role.value
         }
         access_token = TokenSecurity.create_access_token(token_data)
         
@@ -606,7 +628,7 @@ class AuthService:
             SecurityAudit.log_security_event(
                 "LOGIN_SUCCESS",
                 str(user.id),
-                {"email": user.email, "role": user.role.value, "mfa_used": user.mfa_enabled},
+                {"email": user.email, "role": user.role if isinstance(user.role, str) else user.role.value, "mfa_used": user.mfa_enabled},
                 request
             )
         
@@ -622,7 +644,7 @@ class AuthService:
             "token_type": "bearer",
             "user_id": str(user.id),
             "email": user.email,
-            "role": user.role.value,
+            "role": user.role if isinstance(user.role, str) else user.role.value,
             "mfa_required": False,
             "mfa_enabled": user.mfa_enabled
         }
@@ -905,7 +927,7 @@ class AuthService:
         token_data = {
             "sub": user.email,
             "user_id": str(user.id),
-            "role": user.role.value
+            "role": user.role if isinstance(user.role, str) else user.role.value
         }
         access_token = TokenSecurity.create_access_token(token_data)
         

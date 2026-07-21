@@ -61,6 +61,12 @@ class ProgramScope(Base):
     
     # Relationships
     program = relationship("BountyProgram", back_populates="scopes")
+    verifications = relationship(
+        "ScopeVerification",
+        back_populates="scope",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
 
 
 class RewardTier(Base):

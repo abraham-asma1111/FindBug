@@ -3,11 +3,15 @@ Bug Bounty Platform - Main Application
 FastAPI Backend Server
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
-from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration
-from src.api.v1.endpoints import simulation_gateway
+from src.api.v1.endpoints import auth, profile, domain, sso, programs, reports, triage, bounty, reputation, notifications, dashboard, analytics, admin, matching, ptaas, code_review, integration, live_events, ai_red_teaming, messages, subscription, financial, users, vrt, kyc, security, webhooks, email_templates, data_exports, compliance, payments, files, wallet, recommendations, email_preferences, payment_methods, duplicate_detection, registration, finance_reports, finance_settings, persona_kyc, sms_verification, bounty_payments, organization_branding, financial_analytics, organization_verification
+from src.api.v1.endpoints import simulation_gateway, admin_settings, system_health, scope_verification
+from src.core.database import get_database_status
 
 # Version and metadata
 VERSION = "1.0.0"
@@ -21,6 +25,34 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Add validation exception handler for debugging
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Return JSON 500 so CORS headers still apply (avoids opaque browser CORS errors)."""
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": str(exc) or "Internal server error"},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors for debugging"""
+    print(f"❌ VALIDATION ERROR on {request.method} {request.url.path}")
+    print(f"Errors: {exc.errors()}")
+    print(f"Body: {exc.body}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body}
+    )
 
 # CORS Configuration
 app.add_middleware(
@@ -64,26 +96,43 @@ app.include_router(simulation_gateway.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(vrt.router, prefix="/api/v1")
 app.include_router(kyc.router, prefix="/api/v1")
+app.include_router(persona_kyc.router, prefix="/api/v1")
+app.include_router(sms_verification.router, prefix="/api/v1")
 app.include_router(security.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 app.include_router(email_templates.router, prefix="/api/v1")
 app.include_router(data_exports.router, prefix="/api/v1")
 app.include_router(compliance.router, prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")
+app.include_router(financial_analytics.router, prefix="/api/v1")
+app.include_router(finance_reports.router, prefix="/api/v1")
+app.include_router(finance_settings.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(wallet.router, prefix="/api/v1")
 app.include_router(recommendations.router, prefix="/api/v1")
 app.include_router(email_preferences.router, prefix="/api/v1")
 app.include_router(payment_methods.router, prefix="/api/v1")
 app.include_router(duplicate_detection.router, prefix="/api/v1")
-
+app.include_router(bounty_payments.router, prefix="/api/v1")
+app.include_router(organization_branding.router, prefix="/api/v1")
+app.include_router(organization_verification.router, prefix="/api/v1")
+app.include_router(admin_settings.router, prefix="/api/v1")
+app.include_router(system_health.router, prefix="/api/v1")
+app.include_router(scope_verification.router, prefix="/api/v1")
 
 # Health Check Endpoint
 @app.get("/health", tags=["Health"])
-async def health_check():
+async def health_check(response: Response):
     """Health check endpoint"""
+    database_status = get_database_status()
+    overall_status = "healthy" if database_status == "healthy" else "degraded"
+
+    if database_status != "healthy":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
     return {
-        "status": "healthy",
+        "status": overall_status,
+        "database": database_status,
         "app": APP_NAME,
         "version": VERSION,
         "environment": "development"
@@ -109,6 +158,12 @@ async def startup_event():
     print(f"🚀 {APP_NAME} v{VERSION} starting...")
     print(f"📚 API Documentation: http://localhost:8001/docs")
     print(f"❤️  Health Check: http://localhost:8001/health")
+    # Start daily reverification scheduler
+    try:
+        from src.tasks.verification_tasks import start_reverification_scheduler
+        start_reverification_scheduler()
+    except Exception as exc:
+        print(f"⚠️  Reverification scheduler could not start: {exc}")
 
 
 # Shutdown Event

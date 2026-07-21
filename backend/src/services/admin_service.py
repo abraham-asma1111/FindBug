@@ -51,9 +51,9 @@ class AdminService:
         
         self.notification_service.create_notification(
             user_id=user.id,
-            notification_type=NotificationType.SYSTEM,
+            notification_type=NotificationType.ACCOUNT_VERIFIED,
             title="Welcome to FindBug Platform!",
-            message=f"Welcome {staff.first_name}! Your staff account has been created. You now have access to admin features.",
+            message=f"Welcome {staff.full_name}! Your staff account has been created. You now have access to platform features.",
             priority=NotificationPriority.HIGH,
             action_url="/admin/dashboard",
             action_text="Go to Dashboard",
@@ -121,10 +121,7 @@ class AdminService:
         
         if search:
             query = query.filter(
-                or_(
-                    User.email.ilike(f"%{search}%"),
-                    User.full_name.ilike(f"%{search}%")
-                )
+                User.email.ilike(f"%{search}%")
             )
         
         return query.order_by(User.created_at.desc()).limit(limit).offset(offset).all()
@@ -139,14 +136,14 @@ class AdminService:
         details = {
             "id": str(user.id),
             "email": user.email,
-            "full_name": user.full_name,
+            "full_name": getattr(user, "full_name", None),
             "role": user.role,
             "is_active": user.is_active,
-            "email_verified": user.email_verified,
-            "mfa_enabled": user.mfa_enabled,
+            "email_verified": bool(getattr(user, "email_verified_at", None)),
+            "mfa_enabled": getattr(user, "mfa_enabled", False),
             "created_at": user.created_at,
-            "last_login": user.last_login,
-            "login_count": user.login_count
+            "last_login": getattr(user, "last_login_at", None),
+            "login_count": 0,
         }
         
         # Add role-specific details
@@ -181,6 +178,7 @@ class AdminService:
     
     def update_user_status(
         self,
+        admin_id: UUID,
         user_id: UUID,
         is_active: bool,
         reason: Optional[str] = None
@@ -197,6 +195,7 @@ class AdminService:
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="user_status_change",
             target_type="user",
             target_id=user_id,
@@ -210,6 +209,7 @@ class AdminService:
     
     def update_user_role(
         self,
+        admin_id: UUID,
         user_id: UUID,
         new_role: str
     ) -> User:
@@ -230,6 +230,7 @@ class AdminService:
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="user_role_change",
             target_type="user",
             target_id=user_id,
@@ -241,7 +242,7 @@ class AdminService:
         
         return user
     
-    def delete_user(self, user_id: UUID) -> bool:
+    def delete_user(self, admin_id: UUID, user_id: UUID) -> bool:
         """Soft delete user - FREQ-14."""
         user = self.db.query(User).filter(User.id == user_id).first()
         
@@ -255,6 +256,7 @@ class AdminService:
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="user_deleted",
             target_type="user",
             target_id=user_id,
@@ -283,6 +285,7 @@ class AdminService:
     
     def update_program_status(
         self,
+        admin_id: UUID,
         program_id: UUID,
         new_status: str,
         reason: Optional[str] = None
@@ -295,17 +298,22 @@ class AdminService:
         if not program:
             raise ValueError("Program not found")
         
-        valid_statuses = ["draft", "public", "private", "paused", "archived"]
+        valid_statuses = ["draft", "pending_review", "public", "private", "paused", "archived"]
         if new_status not in valid_statuses:
             raise ValueError(f"Invalid status: {new_status}")
         
         old_status = program.status
         program.status = new_status
+        if new_status == "public":
+            program.visibility = "public"
+        elif new_status in ("draft", "private", "pending_review", "archived"):
+            program.visibility = "private"
         self.db.commit()
         self.db.refresh(program)
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="program_status_change",
             target_type="program",
             target_id=program_id,
@@ -318,7 +326,71 @@ class AdminService:
         
         return program
     
-    def delete_program(self, program_id: UUID) -> bool:
+    def approve_program(self, admin_id: UUID, program_id: UUID) -> BountyProgram:
+        """Approve a program that is in pending_review status - FREQ-14."""
+        program = self.db.query(BountyProgram).filter(
+            BountyProgram.id == program_id
+        ).first()
+        
+        if not program:
+            raise ValueError("Program not found")
+            
+        if program.status != "pending_review":
+            raise ValueError(f"Program cannot be approved because it is in status: {program.status}")
+            
+        old_status = program.status
+        program.status = "public"
+        program.visibility = "public"
+        self.db.commit()
+        self.db.refresh(program)
+        
+        # Log action
+        self._log_admin_action(
+            admin_id=admin_id,
+            action="program_approved",
+            target_type="program",
+            target_id=program_id,
+            details={
+                "old_status": old_status,
+                "new_status": "public"
+            }
+        )
+        
+        return program
+        
+    def reject_program(self, admin_id: UUID, program_id: UUID, reason: str) -> BountyProgram:
+        """Reject a program that is in pending_review status - FREQ-14."""
+        program = self.db.query(BountyProgram).filter(
+            BountyProgram.id == program_id
+        ).first()
+        
+        if not program:
+            raise ValueError("Program not found")
+            
+        if program.status != "pending_review":
+            raise ValueError(f"Program cannot be rejected because it is in status: {program.status}")
+            
+        old_status = program.status
+        program.status = "draft"
+        self.db.commit()
+        self.db.refresh(program)
+        
+        # Log action
+        self._log_admin_action(
+            admin_id=admin_id,
+            action="program_rejected",
+            target_type="program",
+            target_id=program_id,
+            details={
+                "old_status": old_status,
+                "new_status": "draft",
+                "reason": reason
+            }
+        )
+        
+        return program
+    
+    def delete_program(self, admin_id: UUID, program_id: UUID) -> bool:
         """Soft delete program - FREQ-14."""
         program = self.db.query(BountyProgram).filter(
             BountyProgram.id == program_id
@@ -332,6 +404,7 @@ class AdminService:
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="program_deleted",
             target_type="program",
             target_id=program_id,
@@ -350,32 +423,215 @@ class AdminService:
         limit: int = 100,
         offset: int = 0
     ) -> List[Dict]:
-        """Get platform audit log - FREQ-14, FREQ-17."""
-        # Query status history for audit trail
-        query = self.db.query(ReportStatusHistory)
+        """Get unified platform activity log - FREQ-14, FREQ-17.
         
-        if start_date:
-            query = query.filter(ReportStatusHistory.changed_at >= start_date)
+        Sources:
+          - AuditLog: triage, bounty, report, ptaas, program, user, admin, config actions
+          - LoginHistory: authentication events (success/failure)
+          - SecurityEvent: security incidents not covered by AuditLog
         
-        if end_date:
-            query = query.filter(ReportStatusHistory.changed_at <= end_date)
+        Filter categories (action_type param):
+          all | report | bounty | user | program | admin | config |
+          security | ptaas | auth
+        """
+        from src.domain.models.security_log import SecurityEvent, LoginHistory
+        from src.domain.models.audit_log import AuditLog
+        from datetime import datetime as _dt
+
+        events = []
+        # fetch more than needed per source so merge+sort+paginate works correctly
+        max_fetch = (offset + limit) * 2
+
+        # ── 1. AuditLog (primary source – covers most platform operations) ────
+        AUDIT_CATEGORIES = {
+            "report", "bounty", "user", "program", "admin", "config", "ptaas"
+        }
+        # Decide whether to include AuditLog at all for this filter
+        include_audit = (
+            not action_type
+            or action_type == "all"
+            or action_type in AUDIT_CATEGORIES
+        )
+        if include_audit:
+            q = self.db.query(AuditLog)
+            if action_type and action_type not in ("all",):
+                q = q.filter(AuditLog.action_category == action_type)
+            if start_date:
+                q = q.filter(AuditLog.created_at >= start_date)
+            if end_date:
+                q = q.filter(AuditLog.created_at <= end_date)
+            for a in q.order_by(AuditLog.created_at.desc()).limit(max_fetch).all():
+                events.append({
+                    "id": str(a.id),
+                    "event_type": a.action_type,
+                    "category": a.action_category,
+                    "description": a.description,
+                    "user_id": str(a.actor_id) if a.actor_id else None,
+                    "user_email": a.actor_email,
+                    "actor_role": a.actor_role,
+                    "target_type": a.target_type,
+                    "target_id": str(a.target_id) if a.target_id else None,
+                    "timestamp": a.created_at,
+                    "severity": a.severity or "info",
+                    "details": a.audit_metadata or {},
+                    "ip_address": a.ip_address,
+                })
+
+        # ── 2. LoginHistory (authentication events) ───────────────────────────
+        include_auth = (
+            not action_type
+            or action_type in ("all", "auth", "security")
+        )
+        if include_auth:
+            q_l = self.db.query(LoginHistory)
+            if start_date:
+                q_l = q_l.filter(LoginHistory.created_at >= start_date)
+            if end_date:
+                q_l = q_l.filter(LoginHistory.created_at <= end_date)
+            for l in q_l.order_by(LoginHistory.created_at.desc()).limit(max_fetch).all():
+                events.append({
+                    "id": str(l.id),
+                    "event_type": "login_success" if l.is_successful else "login_failed",
+                    "category": "auth",
+                    "description": "Successful login" if l.is_successful else f"Failed login: {l.failure_reason or 'unknown reason'}",
+                    "user_id": str(l.user_id),
+                    "user_email": None,      # enriched below
+                    "actor_role": None,
+                    "timestamp": l.created_at,
+                    "severity": "info" if l.is_successful else "medium",
+                    "details": {
+                        "ip_address": l.ip_address,
+                        "is_successful": l.is_successful,
+                        "failure_reason": l.failure_reason,
+                        "mfa_used": l.mfa_used,
+                    },
+                    "ip_address": l.ip_address,
+                })
+
+        # ── 3. SecurityEvent (security incidents: brute_force, lockout, etc.) ─
+        # Only include if NOT filtering for a non-security AuditLog category
+        include_security = (
+            not action_type
+            or action_type in ("all", "security", "auth")
+        )
+        if include_security:
+            q_s = self.db.query(SecurityEvent)
+            # Exclude admin_ events that come from _log_admin_action (already
+            # captured as AuditLog admin category in new code)
+            q_s = q_s.filter(~SecurityEvent.event_type.like("admin_%"))
+            if start_date:
+                q_s = q_s.filter(SecurityEvent.created_at >= start_date)
+            if end_date:
+                q_s = q_s.filter(SecurityEvent.created_at <= end_date)
+            for s in q_s.order_by(SecurityEvent.created_at.desc()).limit(max_fetch).all():
+                events.append({
+                    "id": str(s.id),
+                    "event_type": s.event_type,
+                    "category": "security",
+                    "description": s.description,
+                    "user_id": str(s.user_id) if s.user_id else None,
+                    "user_email": None,      # enriched below
+                    "actor_role": None,
+                    "timestamp": s.created_at,
+                    "severity": s.severity,
+                    "details": {"is_blocked": s.is_blocked},
+                    "ip_address": s.ip_address,
+                })
+
+        # ── Sort by timestamp desc ─────────────────────────────────────────────
+        def _ts(e):
+            t = e["timestamp"]
+            if t is None:
+                return _dt.min
+            return t.replace(tzinfo=None) if t.tzinfo else t
+
+        events.sort(key=_ts, reverse=True)
+
+        # ── Enrich missing user_email from DB ─────────────────────────────────
+        needs_email = [e for e in events if e.get("user_id") and not e.get("user_email")]
+        if needs_email:
+            uids = list({e["user_id"] for e in needs_email})
+            rows = self.db.query(User.id, User.email, User.role).filter(User.id.in_(uids)).all()
+            uid_map = {str(r[0]): {"email": r[1], "role": str(r[2])} for r in rows}
+            for e in events:
+                if e.get("user_id") and not e.get("user_email"):
+                    info = uid_map.get(e["user_id"], {})
+                    e["user_email"] = info.get("email", "Unknown User")
+                    if not e.get("actor_role"):
+                        e["actor_role"] = info.get("role")
+        for e in events:
+            if not e.get("user_email"):
+                e["user_email"] = "System"
+
+        # ── Enrich with contextual information (organization names, usernames) ─
+        from src.domain.models.organization import Organization
+        from src.domain.models.program import BountyProgram
+        import re
         
-        history = query.order_by(
-            ReportStatusHistory.changed_at.desc()
-        ).limit(limit).offset(offset).all()
-        
-        return [
-            {
-                "id": str(h.id),
-                "report_id": str(h.report_id),
-                "from_status": h.from_status,
-                "to_status": h.to_status,
-                "changed_by": str(h.changed_by),
-                "changed_at": h.changed_at,
-                "change_reason": h.change_reason
-            }
-            for h in history
-        ]
+        for e in events:
+            metadata = e.get("details", {})
+            category = e.get("category")
+            actor_id = e.get("user_id")  # This is the actor_id from audit log
+            actor_role = e.get("actor_role")  # Use the role from audit log, not user's actual role
+            description = e.get("description", "")
+            
+            # For program-related events, show the organization name
+            # Use actor_role to determine if this was an organization action
+            if category == "program" and actor_role == "organization":
+                # Try to get from actor if they have an organization profile
+                if actor_id:
+                    user = self.db.query(User).filter(User.id == actor_id).first()
+                    if user and user.organization:
+                        e["organization_name"] = user.organization.company_name
+                        e["display_name"] = user.organization.company_name
+                
+                # Fallback: Extract program name from description and look up organization
+                if not e.get("display_name"):
+                    # Try to extract program name from description
+                    # Patterns: "Program published: NAME" or "Published new Bug Bounty Program: NAME"
+                    match = re.search(r'(?:Program published:|Bug Bounty Program:)\s*(.+?)(?:\s*$|\.)', description)
+                    if match:
+                        program_name = match.group(1).strip()
+                        # Look up program by name to get organization
+                        program = self.db.query(BountyProgram).filter(
+                            BountyProgram.name == program_name
+                        ).first()
+                        if program and program.organization_id:
+                            org = self.db.query(Organization).filter(
+                                Organization.id == program.organization_id
+                            ).first()
+                            if org:
+                                e["organization_name"] = org.company_name
+                                e["display_name"] = org.company_name
+            
+            # For user-related events (KYC, etc.), show the researcher username
+            # Use actor_role to determine if this was a researcher action
+            elif category == "user" and actor_role == "researcher":
+                # Try to get from actor if they have a researcher profile
+                if actor_id:
+                    user = self.db.query(User).filter(User.id == actor_id).first()
+                    if user and user.researcher:
+                        # Check if researcher has username
+                        if user.researcher.username:
+                            e["display_name"] = user.researcher.username
+                            e["target_username"] = user.researcher.username
+                        elif user.researcher.first_name or user.researcher.last_name:
+                            # Fallback to full name
+                            name_parts = [user.researcher.first_name, user.researcher.last_name]
+                            full_name = " ".join([n for n in name_parts if n])
+                            e["display_name"] = full_name
+                        else:
+                            # Fallback to email
+                            e["display_name"] = user.email
+                        e["target_email"] = user.email
+                    else:
+                        # No researcher profile, use email
+                        e["display_name"] = user.email if user else "Unknown"
+
+        # ── Paginate ──────────────────────────────────────────────────────────
+        return events[offset: offset + limit]
+
+
     
     def get_platform_statistics(self) -> Dict:
         """Get platform-wide statistics - FREQ-14."""
@@ -405,11 +661,12 @@ class AdminService:
             ).group_by(VulnerabilityReport.status).all()
         )
         
-        # Bounty statistics
+        # Bounty statistics — use BountyPayment table (same source as finance officer portal)
+        from src.domain.models.bounty_payment import BountyPayment
         total_bounties = self.db.query(
-            func.sum(VulnerabilityReport.bounty_amount)
+            func.sum(BountyPayment.researcher_amount)
         ).filter(
-            VulnerabilityReport.bounty_amount.isnot(None)
+            BountyPayment.status.in_(["completed", "approved"])
         ).scalar() or 0
         
         # Recent activity (last 30 days)
@@ -472,13 +729,14 @@ class AdminService:
             "acknowledgment_deadline_hours": 24
         }
     
-    def update_platform_config(self, config: Dict) -> Dict:
+    def update_platform_config(self, admin_id: UUID, config: Dict) -> Dict:
         """Update platform configuration - FREQ-14."""
         # Placeholder for platform configuration update
         # In production, this would write to a config table
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="config_updated",
             target_type="platform",
             target_id=None,
@@ -491,15 +749,35 @@ class AdminService:
     
     def _log_admin_action(
         self,
+        admin_id: UUID,
         action: str,
         target_type: str,
         target_id: Optional[UUID],
         details: Dict
     ):
         """Log admin action for audit trail - FREQ-17."""
-        # Placeholder for admin action logging
-        # In production, this would write to an admin_actions table
-        pass
+        import json
+        
+        description = f"Admin {action} on {target_type}"
+        if target_id:
+            description += f" ({target_id})"
+            
+        def _serialize(obj):
+            if hasattr(obj, 'value'): return str(obj.value)
+            return str(obj)
+            
+        description += f" - Details: {json.dumps(details, default=_serialize)}"
+        
+        event = SecurityEvent(
+            user_id=admin_id,
+            event_type=f"admin_{action}",
+            severity="medium",
+            description=description[:1000], # Prevent overflow
+            is_blocked=False
+        )
+        
+        self.db.add(event)
+        self.db.commit()
 
 
     # Reports Management - FREQ-19 (Admin oversight)
@@ -602,11 +880,12 @@ class AdminService:
     
     def create_staff_member(
         self,
+        admin_id: UUID,
         email: str,
         full_name: str,
         department: str,
         role: str = "triage_specialist"
-    ) -> Staff:
+    ) -> tuple[Staff, str]:
         """Create new staff member - FREQ-01, FREQ-14."""
         role_map = {
             "triage_specialist": UserRole.TRIAGE_SPECIALIST,
@@ -627,13 +906,14 @@ class AdminService:
         
         temp_password = secrets.token_urlsafe(16)
         
+        from datetime import datetime
         user = User(
             email=email,
-            full_name=full_name,
             password_hash=get_password_hash(temp_password),
             role=user_role,
             is_active=True,
-            email_verified=True
+            is_verified=True,
+            email_verified_at=datetime.utcnow()
         )
         
         self.db.add(user)
@@ -652,6 +932,7 @@ class AdminService:
         
         # Log action
         self._log_admin_action(
+            admin_id=admin_id,
             action="staff_created",
             target_type="staff",
             target_id=staff.id,
@@ -662,10 +943,19 @@ class AdminService:
             }
         )
         
-        # Send welcome email to new staff member
+        # Send in-app notification
         self.send_welcome_email(staff.id)
         
-        return staff
+        # Send actual email with credentials via SMTP
+        from src.core.email_service import EmailService
+        EmailService.send_staff_welcome_email(
+            email=email,
+            full_name=full_name,
+            role=role,
+            temp_password=temp_password
+        )
+        
+        return staff, temp_password
     
     def get_staff_statistics(self) -> Dict:
         """Get staff statistics - FREQ-14."""
@@ -683,14 +973,9 @@ class AdminService:
             User.last_login >= thirty_days_ago
         ).count()
         
-        # Triage performance
-        avg_triage_time = self.db.query(
-            func.avg(Staff.avg_triage_time_hours)
-        ).scalar() or 0
-        
-        total_triaged = self.db.query(
-            func.sum(Staff.reports_triaged)
-        ).scalar() or 0
+        # Triage performance (columns not yet migrated — safe defaults)
+        avg_triage_time = 0
+        total_triaged   = 0
         
         return {
             "total_staff": total_staff,
@@ -709,14 +994,40 @@ class AdminService:
         limit: int = 50,
         offset: int = 0
     ) -> List[Researcher]:
-        """Get all researchers - FREQ-14."""
+        """
+        Get all researchers - FREQ-14.
+        
+        Returns researchers who are:
+        - (email_verified AND persona_verified) OR (reputation_score > 0)
+        """
+        from src.domain.models.kyc import KYCVerification
+        
+        # Join User and KYC tables
         query = self.db.query(Researcher).join(User)
+        query = query.outerjoin(
+            KYCVerification,
+            KYCVerification.user_id == User.id
+        )
+        
+        # Filter: (email_verified AND persona_verified) OR (reputation_score > 0)
+        query = query.filter(
+            or_(
+                # Fully verified: email AND persona
+                (
+                    User.email_verified_at.isnot(None) &
+                    KYCVerification.persona_verified_at.isnot(None)
+                ),
+                # OR has reputation
+                Researcher.reputation_score > 0
+            )
+        )
         
         if search:
             query = query.filter(
                 or_(
                     User.email.ilike(f"%{search}%"),
-                    User.full_name.ilike(f"%{search}%")
+                    User.full_name.ilike(f"%{search}%"),
+                    Researcher.username.ilike(f"%{search}%")
                 )
             )
         
@@ -783,7 +1094,7 @@ class AdminService:
         query = self.db.query(Organization)
         
         if verified_only:
-            query = query.filter(Organization.is_verified == True)
+            query = query.filter(Organization.verification_status == "active")
         
         return query.order_by(Organization.created_at.desc()).limit(limit).offset(offset).all()
     
@@ -800,7 +1111,8 @@ class AdminService:
         if not org:
             raise ValueError("Organization not found")
         
-        org.is_verified = is_verified
+        org.verification_status = "active" if is_verified else "pending"
+        org.domain_verified = bool(is_verified)
         self.db.commit()
         self.db.refresh(org)
         
@@ -818,7 +1130,7 @@ class AdminService:
         """Get organization statistics - FREQ-14."""
         total_orgs = self.db.query(Organization).count()
         verified_orgs = self.db.query(Organization).filter(
-            Organization.is_verified == True
+            Organization.verification_status == "active"
         ).count()
         
         # Organizations with active programs

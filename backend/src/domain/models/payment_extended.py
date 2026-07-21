@@ -110,6 +110,38 @@ class PaymentGateway(Base):
     updated_at = Column(DateTime, onupdate=datetime.utcnow)
 
 
+class PaymentMethod(Base):
+    """
+    Payment Method — User's saved payment methods
+    Stores user payment method details for payouts.
+    """
+    __tablename__ = "payment_methods"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+                     nullable=False, index=True)
+
+    method_type = Column(String(50), nullable=False)
+    # telebirr | cbe_birr | bank_transfer
+
+    account_number = Column(String(100), nullable=True)
+    account_name = Column(String(200), nullable=True)
+    bank_name = Column(String(100), nullable=True)
+    phone_number = Column(String(20), nullable=True)
+
+    is_default = Column(Boolean, nullable=False, default=False)
+    is_verified = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_payment_methods_user_id", "user_id"),
+    )
+
+    user = relationship("User", back_populates="payment_methods")
+
+
 class PaymentHistory(Base):
     """
     Payment History — ERD: payment_history

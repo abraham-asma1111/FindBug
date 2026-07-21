@@ -8,12 +8,14 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.api.v1.middlewares.auth import get_current_user
 from src.domain.models.user import User
+from src.domain.models.notification import Notification
 from src.services.notification_service import NotificationService
+from src.api.v1.schemas.notification import NotificationListResponse
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
-@router.get("", status_code=status.HTTP_200_OK)
+@router.get("", response_model=NotificationListResponse, status_code=status.HTTP_200_OK)
 def get_notifications(
     unread_only: bool = Query(False, description="Show only unread notifications"),
     limit: int = Query(50, ge=1, le=100),
@@ -37,6 +39,12 @@ def get_notifications(
     
     unread_count = service.get_unread_count(current_user.id)
     
+    # Calculate actual total (considering unread_only filter)
+    total_query = db.query(Notification).filter(Notification.user_id == current_user.id)
+    if unread_only:
+        total_query = total_query.filter(Notification.is_read == False)
+    total = total_query.count()
+    
     return {
         "notifications": [
             {
@@ -55,7 +63,7 @@ def get_notifications(
             }
             for n in notifications
         ],
-        "total": len(notifications),
+        "total": total,
         "unread_count": unread_count,
         "limit": limit,
         "offset": offset

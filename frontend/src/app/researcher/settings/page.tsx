@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import SectionCard from '@/components/dashboard/SectionCard';
 import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatCurrency, getPortalNavItems } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 
@@ -108,6 +108,9 @@ export default function ResearcherSettingsPage() {
           title="Settings"
           subtitle="Maintain your researcher profile, public identity, and baseline account configuration."
           navItems={getPortalNavItems(user.role)}
+          headerAlign="center"
+          eyebrowText="Researcher Portal"
+          eyebrowClassName="text-xl tracking-[0.18em]"
         >
           <div className="grid gap-4 md:grid-cols-3">
             <StatCard label="Email" value={user.email} helper={user.emailVerified ? 'Verified account' : 'Email not verified'} />
@@ -139,7 +142,7 @@ export default function ResearcherSettingsPage() {
               ) : null}
 
               <div className="space-y-2">
-                <label htmlFor="fullName" className="block text-sm font-medium text-[#4f4943]">
+                <label htmlFor="fullName" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                   Full Name
                 </label>
                 <input
@@ -148,12 +151,12 @@ export default function ResearcherSettingsPage() {
                   type="text"
                   value={form.fullName}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                 />
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="bio" className="block text-sm font-medium text-[#4f4943]">
+                <label htmlFor="bio" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                   Bio
                 </label>
                 <textarea
@@ -162,14 +165,14 @@ export default function ResearcherSettingsPage() {
                   rows={5}
                   value={form.bio}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                   placeholder="Share the domains and testing areas you are strongest in."
                 />
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label htmlFor="website" className="block text-sm font-medium text-[#4f4943]">
+                  <label htmlFor="website" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                     Website
                   </label>
                   <input
@@ -178,12 +181,12 @@ export default function ResearcherSettingsPage() {
                     type="url"
                     value={form.website}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="github" className="block text-sm font-medium text-[#4f4943]">
+                  <label htmlFor="github" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                     GitHub
                   </label>
                   <input
@@ -192,13 +195,13 @@ export default function ResearcherSettingsPage() {
                     type="text"
                     value={form.github}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                    className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="twitter" className="block text-sm font-medium text-[#4f4943]">
+                <label htmlFor="twitter" className="block text-sm font-medium text-[#4f4943] dark:text-gray-300">
                   X / Twitter
                 </label>
                 <input
@@ -207,7 +210,7 @@ export default function ResearcherSettingsPage() {
                   type="text"
                   value={form.twitter}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
+                  className="w-full rounded-2xl border border-[#d5ccc3] bg-white dark:bg-[#111111] px-4 py-3 text-[#2d2a26] focus:outline-none focus:ring-2 focus:ring-[#f9c6c2]"
                 />
               </div>
 
@@ -226,15 +229,15 @@ export default function ResearcherSettingsPage() {
             description="Quick status checks for visibility and security posture."
           >
             <div className="space-y-4 text-sm text-[#6d6760]">
-              <div className="rounded-2xl bg-[#faf6f1] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">Verification</p>
-                <p className="mt-2 font-semibold text-[#2d2a26]">
+              <div className="rounded-2xl bg-[#faf6f1] p-4 dark:bg-gray-800">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">Verification</p>
+                <p className="mt-2 font-semibold text-[#2d2a26] dark:text-gray-100">
                   {user.emailVerified ? 'Verified and active' : 'Verification pending'}
                 </p>
               </div>
-              <div className="rounded-2xl bg-[#faf6f1] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177]">Security</p>
-                <p className="mt-2 font-semibold text-[#2d2a26]">
+              <div className="rounded-2xl bg-[#faf6f1] p-4 dark:bg-gray-800">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b8177] dark:text-gray-400">Security</p>
+                <p className="mt-2 font-semibold text-[#2d2a26] dark:text-gray-100">
                   {user.mfaEnabled ? 'MFA enabled' : 'MFA not enabled yet'}
                 </p>
               </div>

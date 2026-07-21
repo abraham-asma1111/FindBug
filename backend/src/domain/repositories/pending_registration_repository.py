@@ -16,6 +16,21 @@ class PendingRegistrationRepository(BaseRepository[PendingRegistration]):
     def __init__(self, db: Session):
         super().__init__(db, PendingRegistration)
     
+    def create(self, data):
+        """
+        Create a new pending registration.
+        Accepts either a dict or a PendingRegistration object.
+        """
+        if isinstance(data, PendingRegistration):
+            # If it's already an object, add it directly
+            self.db.add(data)
+            self.db.commit()
+            self.db.refresh(data)
+            return data
+        else:
+            # If it's a dict, use parent's create method
+            return super().create(data)
+    
     def get_by_email(self, email: str) -> Optional[PendingRegistration]:
         """Get pending registration by email"""
         return self.db.query(PendingRegistration).filter(

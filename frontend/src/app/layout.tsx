@@ -1,9 +1,14 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+// import { Inter } from 'next/font/google'
 import './globals.css'
 import Providers from '@/components/providers'
 
-const inter = Inter({ subsets: ['latin'] })
+// Use system fonts instead of Google Fonts to avoid network issues
+// const inter = Inter({ 
+//   subsets: ['latin'],
+//   display: 'swap',
+//   variable: '--font-inter',
+// })
 
 export const metadata: Metadata = {
   title: 'FindBug - Bug Bounty Platform',
@@ -16,8 +21,34 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  // Check if we're on a finance or triage portal page
+                  const path = window.location.pathname;
+                  const isForceDark = path.startsWith('/finance') || path.startsWith('/triage') || path.startsWith('/admin');
+                  
+                  if (isForceDark) {
+                    // Force dark mode for finance, triage, and platform wallet portals
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    // For other pages, check localStorage
+                    const theme = localStorage.getItem('theme');
+                    if (theme === 'dark') {
+                      document.documentElement.classList.add('dark');
+                    }
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className="font-sans antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

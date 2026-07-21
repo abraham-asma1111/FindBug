@@ -1,6 +1,8 @@
 """
 Researcher Repository - Data access layer for Researcher model
 """
+import uuid
+
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -15,7 +17,13 @@ class ResearcherRepository:
     
     def get_by_id(self, researcher_id: str) -> Optional[Researcher]:
         """Get researcher by ID"""
+        if isinstance(researcher_id, str):
+            researcher_id = uuid.UUID(researcher_id)
         return self.db.query(Researcher).filter(Researcher.id == researcher_id).first()
+
+    def get(self, researcher_id: str) -> Optional[Researcher]:
+        """Backward-compatible alias for fetching a researcher by ID."""
+        return self.get_by_id(researcher_id)
     
     def get_by_user_id(self, user_id: str) -> Optional[Researcher]:
         """Get researcher by user ID"""

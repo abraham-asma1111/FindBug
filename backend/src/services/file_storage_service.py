@@ -69,7 +69,21 @@ class FileStorageService:
                     ContentType=file.content_type
                 )
             except Exception:
-                pass  # Fallback to database storage
+                pass  # Fallback to local storage
+        
+        # Fallback to local storage if S3 is not available
+        if not self.s3_client:
+            import os
+            local_storage_path = getattr(settings, 'LOCAL_STORAGE_PATH', 'uploads') if settings else 'uploads'
+            
+            # Create directory if it doesn't exist
+            full_dir_path = os.path.join(local_storage_path, str(user_id))
+            os.makedirs(full_dir_path, exist_ok=True)
+            
+            # Save file locally
+            local_file_path = os.path.join(local_storage_path, storage_key)
+            with open(local_file_path, 'wb') as f:
+                f.write(content)
         
         # Return file metadata
         return {
@@ -123,3 +137,52 @@ class FileStorageService:
             return True
         except Exception:
             return False
+    
+    def save_file(
+        self,
+        file: UploadFile,
+        report_id: UUID,
+        subfolder: str = "reports"
+    ) -> Dict[str, Any]:
+        """Save uploaded file to local storage"""
+        import os
+        from datetime import datetime
+        
+        # Generate unique filename
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        file_id = str(uuid4())
+        file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
+        unique_filename = f"{report_id}_{timestamp}_{file_id}.{file_extension}"
+        
+        # Create storage path
+        storage_dir = f"data/uploads/{subfolder}/{report_id}"
+        os.makedirs(storage_dir, exist_ok=True)
+        
+        # Full file path
+        file_path = os.path.join(storage_dir, unique_filename)
+        
+        # Read and save file content as binary
+        file.file.seek(0)
+        content = file.file.read()
+        
+        with open(file_path, 'wb') as f:
+            f.write(content)
+        
+        # Return metadata
+        return {
+            "filename": unique_filename,
+            "original_filename": file.filename,
+            "file_type": file.content_type or 'application/octet-stream',
+            "file_size": len(content),
+            "storage_path": f"{subfolder}/{report_id}/{unique_filename}",
+            "uploaded_at": datetime.utcnow()
+        }
+    
+    def get_file_path(self, storage_path: str) -> str:
+        """Get full file path from storage path"""
+        return f"data/uploads/{storage_path}"
+    
+    def scan_file_for_viruses(self, file_path: str) -> tuple:
+        """Scan file for viruses - stub implementation"""
+        # In production, integrate with ClamAV or similar
+        return (True, "Clean")

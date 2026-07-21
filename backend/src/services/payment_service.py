@@ -13,6 +13,7 @@ from src.domain.models.payment_extended import PayoutRequest, Transaction, Payme
 from src.domain.models.kyc import KYCVerification
 from src.domain.models.researcher import Researcher
 from src.domain.models.organization import Organization
+from src.domain.models.ptaas import PTaaSFinding
 from src.domain.models.report import VulnerabilityReport
 from src.core.exceptions import NotFoundException, ForbiddenException, ConflictException
 from src.core.logging import get_logger
@@ -37,8 +38,11 @@ class PaymentService:
     def __init__(self, db: Session):
         self.db = db
         
-        # Platform commission rate (BR-06: 30%)
-        self.commission_rate = Decimal("0.30")
+        # Platform commission rates
+        # Organization pays 30% commission on top of bounty
+        self.org_commission_rate = Decimal("0.30")
+        # Researcher pays 15% commission from their bounty
+        self.researcher_commission_rate = Decimal("0.15")
         
         # Payout deadline (BR-08: 30 days)
         self.payout_deadline_days = 30
@@ -53,15 +57,22 @@ class PaymentService:
     def create_bounty_payment(
         self,
         report_id: UUID,
-        researcher_amount: Decimal,
+        bounty_amount: Decimal,
         approved_by: UUID
     ) -> BountyPayment:
         """
-        Create bounty payment with 30% commission (BR-06).
+        Create bounty payment with dual commission structure:
+        - Organization pays 30% commission on top of bounty
+        - Researcher pays 15% commission from their bounty
+        
+        Example: $1,000 bounty
+        - Organization pays: $1,000 + $300 (30%) = $1,300 total
+        - Researcher gets: $1,000 - $150 (15%) = $850 in wallet
+        - Platform revenue: $300 + $150 = $450 (34.6% of org payment)
         
         Args:
             report_id: Report ID
-            researcher_amount: Amount for researcher
+            bounty_amount: Base bounty amount (what researcher earns before commission)
             approved_by: User ID who approved
             
         Returns:
@@ -75,9 +86,17 @@ class PaymentService:
         if not report:
             raise NotFoundException("Report not found")
         
-        # Calculate commission (BR-06: 30%)
-        commission_amount = researcher_amount * self.commission_rate
-        total_amount = researcher_amount + commission_amount
+        # Calculate commissions (BR-06: Dual commission structure)
+        # Organization pays 30% commission on top of bounty
+        org_commission = bounty_amount * self.org_commission_rate
+        # Researcher pays 15% commission from their bounty
+        researcher_commission = bounty_amount * self.researcher_commission_rate
+        # Total platform revenue (30% from org + 15% from researcher)
+        total_commission = org_commission + researcher_commission
+        # Amount researcher receives in wallet (bounty - researcher commission)
+        researcher_net_amount = bounty_amount - researcher_commission
+        # Total amount organization pays (bounty + org commission)
+        total_org_payment = bounty_amount + org_commission
         
         # Generate transaction ID
         transaction_id = f"BP-{uuid.uuid4().hex[:12].upper()}"
@@ -88,13 +107,14 @@ class PaymentService:
             report_id=report_id,
             researcher_id=report.researcher_id,
             organization_id=report.program.organization_id,
-            researcher_amount=researcher_amount,
-            commission_amount=commission_amount,
-            total_amount=total_amount,
-            status="approved",
-            approved_by=approved_by,
-            approved_at=datetime.utcnow(),
-            payout_deadline=datetime.utcnow() + timedelta(days=self.payout_deadline_days)
+            researcher_amount=researcher_net_amount,  # What researcher gets in wallet
+            commission_amount=total_commission,  # Total platform revenue
+            total_amount=total_org_payment,  # What organization pays
+            status="pending",  # Start as pending, not approved
+            approved_by=None,
+            approved_at=None,
+            payout_deadline=None,  # Set when approved
+            kyc_verified=False
         )
         
         self.db.add(payment)
@@ -104,30 +124,330 @@ class PaymentService:
         # Create payment history
         self._add_payment_history(
             payment_id=payment.payment_id,
-            previous_status="pending",
-            new_status="approved",
+            previous_status="none",
+            new_status="pending",
             changed_by=approved_by,
-            notes="Bounty payment approved"
-        )
-        
-        # Create transaction record
-        self._create_transaction(
-            user_id=report.researcher.user_id,
-            type="bounty_payment",
-            amount=researcher_amount,
-            status="pending",
-            reference_id=payment.payment_id,
-            reference_type="bounty_payment"
+            notes="Bounty payment created"
         )
         
         logger.info("Bounty payment created", extra={
             "payment_id": str(payment.payment_id),
-            "researcher_amount": float(researcher_amount),
-            "commission": float(commission_amount),
-            "total": float(total_amount)
+            "researcher_amount": float(researcher_net_amount),
+            "commission": float(total_commission),
+            "total": float(total_org_payment)
         })
         
         return payment
+
+    def create_ptaas_bounty_payment(
+        self,
+        finding_id: UUID,
+        bounty_amount: Decimal,
+        approved_by: UUID,
+        *,
+        commit: bool = True,
+    ) -> BountyPayment:
+        """Create bounty payment record for a validated PTaaS finding."""
+        finding = self.db.query(PTaaSFinding).filter(PTaaSFinding.id == finding_id).first()
+        if not finding:
+            raise NotFoundException("PTaaS finding not found")
+        if not finding.discovered_by:
+            raise ValueError("Finding has no assigned researcher")
+
+        researcher = self.db.query(Researcher).filter(
+            Researcher.user_id == finding.discovered_by
+        ).first()
+        if not researcher:
+            raise NotFoundException("Researcher not found for finding submitter")
+
+        engagement = finding.engagement
+        if not engagement:
+            from src.domain.models.ptaas import PTaaSEngagement
+            engagement = self.db.query(PTaaSEngagement).filter(
+                PTaaSEngagement.id == finding.engagement_id
+            ).first()
+        if not engagement:
+            raise NotFoundException("PTaaS engagement not found")
+
+        org_commission = bounty_amount * self.org_commission_rate
+        researcher_commission = bounty_amount * self.researcher_commission_rate
+        total_commission = org_commission + researcher_commission
+        researcher_net_amount = bounty_amount - researcher_commission
+        total_org_payment = bounty_amount + org_commission
+
+        transaction_id = f"PTAAS-BP-{uuid.uuid4().hex[:12].upper()}"
+
+        payment = BountyPayment(
+            transaction_id=transaction_id,
+            report_id=None,
+            ptaas_finding_id=finding_id,
+            payment_source="ptaas",
+            researcher_id=researcher.id,
+            organization_id=engagement.organization_id,
+            researcher_amount=researcher_net_amount,
+            commission_amount=total_commission,
+            total_amount=total_org_payment,
+            status="pending",
+            approved_by=None,
+            approved_at=None,
+            payout_deadline=None,
+            kyc_verified=False,
+        )
+
+        self.db.add(payment)
+        if commit:
+            self.db.commit()
+            self.db.refresh(payment)
+            self._add_payment_history(
+                payment_id=payment.payment_id,
+                previous_status="none",
+                new_status="pending",
+                changed_by=approved_by,
+                notes="PTaaS bounty payment created",
+            )
+        else:
+            self.db.flush()
+
+        return payment
+    
+    def approve_bounty_payment(
+        self,
+        payment_id: UUID,
+        approved_by: UUID
+    ) -> BountyPayment:
+        """
+        Approve bounty payment and credit researcher wallet.
+        
+        This is the Finance Officer's main action:
+        1. Verify KYC
+        2. Approve payment
+        3. Credit researcher wallet
+        4. Set payout deadline
+        
+        Args:
+            payment_id: Payment ID
+            approved_by: Finance Officer user ID
+            
+        Returns:
+            Updated BountyPayment
+        """
+        payment = self.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == payment_id
+        ).first()
+        
+        if not payment:
+            raise NotFoundException("Payment not found")
+        
+        if payment.status != "pending":
+            raise ValueError(f"Cannot approve payment with status: {payment.status}")
+        
+        # Check KYC verification (BR-08)
+        if not self._is_kyc_verified(payment.researcher_id):
+            raise ForbiddenException("KYC verification required before payment approval")
+        
+        # Update payment status
+        old_status = payment.status
+        payment.status = "approved"
+        payment.approved_by = approved_by
+        payment.approved_at = datetime.utcnow()
+        payment.payout_deadline = datetime.utcnow() + timedelta(days=self.payout_deadline_days)
+        payment.kyc_verified = True
+        payment.kyc_verified_at = datetime.utcnow()
+        
+        self.db.commit()
+        self.db.refresh(payment)
+        
+        # Add history
+        self._add_payment_history(
+            payment_id=payment_id,
+            previous_status=old_status,
+            new_status="approved",
+            changed_by=approved_by,
+            notes="Payment approved by Finance Officer"
+        )
+        
+        # Credit researcher wallet
+        from src.services.wallet_service import WalletService
+        wallet_service = WalletService(self.db)
+        
+        try:
+            # Get researcher to access user_id
+            researcher = self.db.query(Researcher).filter(
+                Researcher.id == payment.researcher_id
+            ).first()
+            
+            if not researcher:
+                raise NotFoundException("Researcher not found")
+            
+            # Credit researcher wallet (using user_id, not researcher_id)
+            wallet_service.credit_wallet(
+                owner_id=researcher.user_id,
+                owner_type="researcher",
+                amount=payment.researcher_amount,
+                saga_id=payment.transaction_id,
+                reference_type="bounty_payment",
+                reference_id=payment.payment_id
+            )
+            
+            # Credit platform wallet with commission
+            # Use a fixed platform owner_id (we'll use UUID with all zeros for platform)
+            from uuid import UUID as UUID_TYPE
+            platform_owner_id = UUID_TYPE('00000000-0000-0000-0000-000000000000')
+            
+            wallet_service.credit_wallet(
+                owner_id=platform_owner_id,
+                owner_type="platform",
+                amount=payment.commission_amount,
+                saga_id=payment.transaction_id,
+                reference_type="commission",
+                reference_id=payment.payment_id
+            )
+            
+            # Create transaction record for researcher
+            self._create_transaction(
+                user_id=payment.researcher.user_id,
+                type="bounty_payment",
+                amount=payment.researcher_amount,
+                status="completed",
+                reference_id=payment.payment_id,
+                reference_type="bounty_payment"
+            )
+            
+            # Create transaction record for platform commission
+            self._create_transaction(
+                user_id=platform_owner_id,
+                type="commission",
+                amount=payment.commission_amount,
+                status="completed",
+                reference_id=payment.payment_id,
+                reference_type="bounty_payment"
+            )
+            
+            logger.info("Bounty payment approved, researcher and platform wallets credited", extra={
+                "payment_id": str(payment_id),
+                "researcher_id": str(payment.researcher_id),
+                "researcher_amount": float(payment.researcher_amount),
+                "commission_amount": float(payment.commission_amount)
+            })
+            
+        except Exception as e:
+            # Rollback payment approval if wallet credit fails
+            payment.status = old_status
+            payment.approved_by = None
+            payment.approved_at = None
+            payment.payout_deadline = None
+            payment.kyc_verified = False
+            payment.kyc_verified_at = None
+            self.db.commit()
+            
+            logger.error("Failed to credit wallet, payment approval rolled back", extra={
+                "payment_id": str(payment_id),
+                "error": str(e)
+            })
+            
+            raise ValueError(f"Failed to credit researcher wallet: {str(e)}")
+        
+        return payment
+    
+    def reject_bounty_payment(
+        self,
+        payment_id: UUID,
+        rejected_by: UUID,
+        reason: str
+    ) -> BountyPayment:
+        """
+        Reject bounty payment.
+        
+        Args:
+            payment_id: Payment ID
+            rejected_by: Finance Officer user ID
+            reason: Rejection reason
+            
+        Returns:
+            Updated BountyPayment
+        """
+        payment = self.db.query(BountyPayment).filter(
+            BountyPayment.payment_id == payment_id
+        ).first()
+        
+        if not payment:
+            raise NotFoundException("Payment not found")
+        
+        if payment.status != "pending":
+            raise ValueError(f"Cannot reject payment with status: {payment.status}")
+        
+        old_status = payment.status
+        payment.status = "rejected"
+        payment.approved_by = rejected_by
+        payment.approved_at = datetime.utcnow()
+        payment.failure_reason = reason
+        
+        self.db.commit()
+        self.db.refresh(payment)
+        
+        # Add history
+        self._add_payment_history(
+            payment_id=payment_id,
+            previous_status=old_status,
+            new_status="rejected",
+            changed_by=rejected_by,
+            notes=f"Payment rejected: {reason}"
+        )
+        
+        logger.info("Bounty payment rejected", extra={
+            "payment_id": str(payment_id),
+            "reason": reason
+        })
+        
+        return payment
+    
+    def list_bounty_payments(
+        self,
+        status: Optional[str] = None,
+        researcher_id: Optional[UUID] = None,
+        organization_id: Optional[UUID] = None,
+        program_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 20
+    ) -> tuple[list[BountyPayment], int]:
+        """
+        List bounty payments with filters.
+        
+        Args:
+            status: Filter by status
+            researcher_id: Filter by researcher
+            organization_id: Filter by organization
+            program_id: Filter by program
+            skip: Pagination offset
+            limit: Maximum results
+            
+        Returns:
+            Tuple of (payments list, total count)
+        """
+        from src.domain.models.report import VulnerabilityReport
+        
+        query = self.db.query(BountyPayment)
+        
+        if status:
+            query = query.filter(BountyPayment.status == status)
+        
+        if researcher_id:
+            query = query.filter(BountyPayment.researcher_id == researcher_id)
+        
+        if organization_id:
+            query = query.filter(BountyPayment.organization_id == organization_id)
+        
+        if program_id:
+            # Join with VulnerabilityReport to filter by program_id
+            query = query.join(
+                VulnerabilityReport,
+                BountyPayment.report_id == VulnerabilityReport.id
+            ).filter(VulnerabilityReport.program_id == program_id)
+        
+        total = query.count()
+        payments = query.order_by(BountyPayment.created_at.desc()).offset(skip).limit(limit).all()
+        
+        return payments, total
     
     def process_bounty_payment(
         self,
@@ -329,7 +649,8 @@ class PaymentService:
         approved_by: UUID
     ) -> PayoutRequest:
         """
-        Approve payout request.
+        Approve payout request and complete the payout.
+        This debits the researcher's wallet and marks the payout as completed.
         
         Args:
             payout_id: Payout request ID
@@ -348,19 +669,63 @@ class PaymentService:
         if payout.status != "pending":
             raise ValueError(f"Cannot approve payout with status: {payout.status}")
         
-        payout.status = "approved"
-        payout.processed_by = approved_by
-        payout.processed_at = datetime.utcnow()
+        # Get researcher to access user_id
+        researcher = self.db.query(Researcher).filter(
+            Researcher.id == payout.researcher_id
+        ).first()
         
-        self.db.commit()
-        self.db.refresh(payout)
+        if not researcher:
+            raise NotFoundException("Researcher not found")
         
-        logger.info("Payout request approved", extra={
-            "payout_id": str(payout_id),
-            "approved_by": str(approved_by)
-        })
+        # Debit wallet
+        from src.services.wallet_service import WalletService
+        wallet_service = WalletService(self.db)
         
-        return payout
+        try:
+            # Debit the researcher's wallet (from available balance, not reserved)
+            wallet_service.debit_wallet(
+                owner_id=researcher.user_id,
+                owner_type="researcher",
+                amount=payout.amount,
+                saga_id=str(payout.id),
+                from_reserved=False,  # Debit from available balance
+                reference_type="payout_request",
+                reference_id=payout.id
+            )
+            
+            # Mark payout as completed
+            payout.status = "completed"
+            payout.processed_by = approved_by
+            payout.processed_at = datetime.utcnow()
+            
+            self.db.commit()
+            self.db.refresh(payout)
+            
+            # Create transaction record
+            self._create_transaction(
+                user_id=researcher.user_id,
+                type="payout",
+                amount=payout.amount,
+                status="completed",
+                reference_id=payout.id,
+                reference_type="payout_request"
+            )
+            
+            logger.info("Payout request approved and completed", extra={
+                "payout_id": str(payout_id),
+                "approved_by": str(approved_by),
+                "amount": float(payout.amount)
+            })
+            
+            return payout
+            
+        except Exception as e:
+            self.db.rollback()
+            logger.error("Failed to process payout approval", extra={
+                "payout_id": str(payout_id),
+                "error": str(e)
+            })
+            raise ValueError(f"Failed to process payout: {str(e)}")
     
     def process_payout_request(
         self,
@@ -734,3 +1099,195 @@ class PaymentService:
         query = query.order_by(Transaction.created_at.desc())
         
         return query.offset(skip).limit(limit).all()
+
+    def get_user_payment_methods(self, user_id: str) -> List:
+        """
+        Get user's payment methods.
+        Requires KYC verification.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            List of payment methods
+            
+        Raises:
+            HTTPException: If user is not KYC verified
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        from src.services.kyc_service import KYCService
+        from src.domain.models.user import User
+        from fastapi import HTTPException, status
+        
+        # Check if user is admin/super_admin to bypass KYC
+        user = self.db.query(User).filter(User.id == UUID(user_id)).first()
+        is_admin = user and user.role.lower() in ["admin", "super_admin"]
+        
+        if not is_admin:
+            # Check KYC verification
+            kyc_service = KYCService(self.db)
+            kyc_status = kyc_service.get_kyc_status(user_id)
+            
+            if kyc_status["status"] != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="KYC verification required to access payment methods"
+                )
+        
+        return self.db.query(PaymentMethod).filter(
+            PaymentMethod.user_id == UUID(user_id)
+        ).order_by(PaymentMethod.created_at.desc()).all()
+
+    def add_payment_method(self, user_id: str, method_data: dict):
+        """
+        Add new payment method for user.
+        Requires KYC verification.
+        
+        Args:
+            user_id: User ID
+            method_data: Payment method data
+            
+        Returns:
+            Created payment method
+            
+        Raises:
+            HTTPException: If user is not KYC verified
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        from src.services.kyc_service import KYCService
+        from src.domain.models.user import User
+        from fastapi import HTTPException, status
+        
+        # Check if user is admin/super_admin to bypass KYC
+        user = self.db.query(User).filter(User.id == UUID(user_id)).first()
+        is_admin = user and user.role.lower() in ["admin", "super_admin"]
+        
+        if not is_admin:
+            # Check KYC verification
+            kyc_service = KYCService(self.db)
+            kyc_status = kyc_service.get_kyc_status(user_id)
+            
+            if kyc_status["status"] != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="KYC verification required to add payment methods"
+                )
+        
+        # If this is set as default, unset other defaults
+        if method_data.get("is_default", False):
+            self.db.query(PaymentMethod).filter(
+                PaymentMethod.user_id == UUID(user_id),
+                PaymentMethod.is_default == True
+            ).update({"is_default": False})
+        
+        payment_method = PaymentMethod(
+            user_id=UUID(user_id),
+            method_type=method_data["method_type"],
+            account_number=method_data.get("account_number"),
+            account_name=method_data.get("account_name"),
+            bank_name=method_data.get("bank_name"),
+            phone_number=method_data.get("phone_number"),
+            is_default=method_data.get("is_default", False),
+            is_verified=False  # New methods need verification
+        )
+        
+        self.db.add(payment_method)
+        self.db.commit()
+        self.db.refresh(payment_method)
+        
+        return payment_method
+
+    def update_payment_method(self, method_id: str, method_data: dict):
+        """
+        Update payment method.
+        
+        Args:
+            method_id: Payment method ID
+            method_data: Updated data
+            
+        Returns:
+            Updated payment method or None if not found
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        
+        payment_method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == UUID(method_id)
+        ).first()
+        
+        if not payment_method:
+            return None
+        
+        # If setting as default, unset other defaults for this user
+        if method_data.get("is_default", False):
+            self.db.query(PaymentMethod).filter(
+                PaymentMethod.user_id == payment_method.user_id,
+                PaymentMethod.id != UUID(method_id),
+                PaymentMethod.is_default == True
+            ).update({"is_default": False})
+        
+        # Update fields
+        for field, value in method_data.items():
+            if hasattr(payment_method, field):
+                setattr(payment_method, field, value)
+        
+        self.db.commit()
+        self.db.refresh(payment_method)
+        
+        return payment_method
+
+    def delete_payment_method(self, method_id: str) -> bool:
+        """
+        Delete payment method.
+        
+        Args:
+            method_id: Payment method ID
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        
+        payment_method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == UUID(method_id)
+        ).first()
+        
+        if not payment_method:
+            return False
+        
+        self.db.delete(payment_method)
+        self.db.commit()
+        
+        return True
+
+    def set_default_payment_method(self, method_id: str, user_id: str) -> bool:
+        """
+        Set default payment method for user.
+        
+        Args:
+            method_id: Payment method ID
+            user_id: User ID
+            
+        Returns:
+            True if updated, False if not found
+        """
+        from src.domain.models.payment_extended import PaymentMethod
+        
+        # First, unset all defaults for this user
+        self.db.query(PaymentMethod).filter(
+            PaymentMethod.user_id == UUID(user_id),
+            PaymentMethod.is_default == True
+        ).update({"is_default": False})
+        
+        # Set the specified method as default
+        payment_method = self.db.query(PaymentMethod).filter(
+            PaymentMethod.id == UUID(method_id),
+            PaymentMethod.user_id == UUID(user_id)
+        ).first()
+        
+        if not payment_method:
+            return False
+        
+        payment_method.is_default = True
+        self.db.commit()
+        
+        return True

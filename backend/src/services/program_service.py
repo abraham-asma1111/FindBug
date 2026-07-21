@@ -8,11 +8,18 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from src.domain.models.program import (
-    BountyProgram, ProgramScope, RewardTier, ProgramInvitation
+    BountyProgram,
+    ProgramScope,
+    RewardTier,
+    ProgramInvitation,
+    ProgramParticipation,
 )
+from src.domain.models.user import User
 from src.domain.repositories.program_repository import ProgramRepository
 from src.domain.repositories.organization_repository import OrganizationRepository
 from src.domain.repositories.researcher_repository import ResearcherRepository
+from src.services.audit_service import AuditService
+from src.core.role_access import UserRole, role_of
 
 
 class ProgramService:
@@ -23,7 +30,54 @@ class ProgramService:
         self.program_repo = ProgramRepository(db)
         self.org_repo = OrganizationRepository(db)
         self.researcher_repo = ResearcherRepository(db)
-    
+        self.audit_service = AuditService(db)
+
+    def can_user_access_program(self, program: BountyProgram, user: User) -> bool:
+        """
+        Whether a user may view program details (scopes, rewards, overview).
+
+        - Public programs: visibility=public OR status=public (joinable listings)
+        - Private programs: org owner, staff roles, accepted invite, or active participation
+        """
+        r = role_of(user)
+        if r in (
+            UserRole.ADMIN,
+            UserRole.SUPER_ADMIN,
+            UserRole.STAFF,
+            UserRole.TRIAGE_SPECIALIST,
+            UserRole.FINANCE_OFFICER,
+        ):
+            return True
+
+        if user.is_organization() and user.organization:
+            if program.organization_id == user.organization.id:
+                return True
+
+        if program.visibility == "public" or program.status == "public":
+            return True
+
+        if not user.is_researcher():
+            return False
+
+        researcher = user.researcher
+        if not researcher:
+            researcher = self.researcher_repo.get_by_user_id(str(user.id))
+        if not researcher:
+            return False
+
+        invitation = self.program_repo.check_existing_invitation(
+            program.id, researcher.id
+        )
+        if invitation and invitation.status == "accepted":
+            return True
+
+        participation = self.db.query(ProgramParticipation).filter(
+            ProgramParticipation.program_id == program.id,
+            ProgramParticipation.researcher_id == researcher.id,
+            ProgramParticipation.status == "active",
+        ).first()
+        return participation is not None
+
     def create_program(
         self,
         organization_id: UUID,
@@ -40,11 +94,18 @@ class ProgramService:
         """Create a new bounty program."""
         
         # Verify organization exists
-        org = self.org_repo.get_organization_by_id(organization_id)
+        org = self.org_repo.get_by_id(organization_id)
         if not org:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Organization not found"
+            )
+            
+        # Verify organization is active (identity verified by admin)
+        if org.verification_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your organization account must be verified and activated by an administrator before you can create programs."
             )
         
         # Validate program type
@@ -77,7 +138,20 @@ class ProgramService:
             response_sla_hours=response_sla_hours
         )
         
-        return self.program_repo.create_program(program)
+        program = self.program_repo.create_program(program)
+        
+        # Audit log: program created
+        try:
+            self.audit_service.log_program_created(
+                program_id=program.id,
+                program_name=name,
+                organization_id=organization_id,
+                organization_email=org.user.email if hasattr(org, 'user') and org.user else str(organization_id)
+            )
+        except Exception:
+            pass  # Don't fail if audit logging fails
+        
+        return program
     
     def get_program(self, program_id: UUID) -> BountyProgram:
         """Get program by ID."""
@@ -182,18 +256,21 @@ class ProgramService:
     ):
         """Join a public program."""
         from src.domain.models.program import ProgramParticipation
-        from datetime import datetime
         
         # Check if program exists and is public
-        program = self.program_repo.get_by_id(program_id)
-        if not program:
-            raise ValueError("Program not found")
+        program = self.get_program(program_id)
         
         if program.status != "public":
-            raise ValueError("Can only join public programs. Private programs require invitation.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Can only join public programs. Private programs require invitation."
+            )
         
         if program.deleted_at:
-            raise ValueError("Cannot join archived program")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot join archived program"
+            )
         
         # Check if already joined
         existing = self.db.query(ProgramParticipation).filter(
@@ -203,7 +280,10 @@ class ProgramService:
         ).first()
         
         if existing:
-            raise ValueError("Already joined this program")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Already joined this program"
+            )
         
         # Create participation
         participation = ProgramParticipation(
@@ -216,6 +296,22 @@ class ProgramService:
         self.db.add(participation)
         self.db.commit()
         self.db.refresh(participation)
+        
+        # Audit log: researcher joined program
+        try:
+            self.audit_service.log_action(
+                action_type="researcher_joined_program",
+                action_category="program",
+                target_type="program",
+                description=f"Researcher joined program: {program.name}",
+                actor_id=researcher_id,
+                actor_role="researcher",
+                target_id=program_id,
+                metadata={"program_name": program.name},
+                severity="info"
+            )
+        except Exception:
+            pass
         
         return participation
     
@@ -233,7 +329,7 @@ class ProgramService:
         
         result = []
         for participation in participations:
-            program = self.program_repo.get_by_id(participation.program_id)
+            program = self.program_repo.get_program_by_id(participation.program_id)
             if program:
                 result.append({
                     "program": program,
@@ -293,12 +389,31 @@ class ProgramService:
                 detail="Bounty program must have reward tiers before publishing"
             )
         
-        # Update status and visibility
-        program.status = "public"
-        program.visibility = "public"
+        # Move to pending_review — goes to Admin queue, NOT directly public.
+        # Admin manually verifies the program scopes match the org's submitted domains.
+        program.status = "pending_review"
+        program.visibility = "private"
         program.start_date = datetime.utcnow()
         
-        return self.program_repo.update_program(program)
+        result = self.program_repo.update_program(program)
+        
+        # Audit log: program submitted for review
+        try:
+            self.audit_service.log_action(
+                action_type="program_submitted_for_review",
+                action_category="program",
+                target_type="program",
+                description=f"Program submitted for admin review: {result.name}",
+                actor_id=organization_id,
+                actor_role="organization",
+                target_id=program_id,
+                metadata={"program_name": result.name, "status": "pending_review"},
+                severity="info"
+            )
+        except Exception:
+            pass
+        
+        return result
     
     def add_scope(
         self,

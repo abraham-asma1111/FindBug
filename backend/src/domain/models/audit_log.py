@@ -51,7 +51,7 @@ class AuditLog(Base):
     description = Column(Text, nullable=False)
     
     # Additional metadata (JSON)
-    audit_metadata = Column(JSONB, nullable=True)
+    audit_metadata = Column('metadata', JSONB, nullable=True)
     # Stores: old_value, new_value, reason, ip_address, user_agent, etc.
     
     # Request context

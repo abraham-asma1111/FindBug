@@ -29,17 +29,28 @@ class NotificationCreate(BaseModel):
 class NotificationResponse(BaseModel):
     """Schema for notification response"""
     id: UUID
-    user_id: UUID
     type: str
     title: str
     message: str
     priority: str
     is_read: bool
+    read_at: Optional[datetime] = None
     created_at: datetime
-    metadata: Optional[Dict[str, Any]] = None
+    action_url: Optional[str] = None
+    action_text: Optional[str] = None
+    related_entity_type: Optional[str] = None
+    related_entity_id: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+class NotificationListResponse(BaseModel):
+    """Schema for paginated notification list response"""
+    notifications: List[NotificationResponse]
+    total: int
+    unread_count: int
+    limit: int
+    offset: int
 
 
 class NotificationUpdate(BaseModel):

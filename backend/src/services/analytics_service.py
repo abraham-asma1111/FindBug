@@ -598,27 +598,27 @@ class AnalyticsService:
             VulnerabilityReport.bounty_approved_at >= start_date
         ).scalar() or Decimal('0')
         
-        # Severity distribution
+        # Severity distribution (check both assigned and suggested severity)
         severity_dist = {
             'critical': self.db.query(VulnerabilityReport).filter(
                 VulnerabilityReport.researcher_id == researcher.id,
                 VulnerabilityReport.submitted_at >= start_date,
-                VulnerabilityReport.assigned_severity == 'critical'
+                func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == 'critical'
             ).count(),
             'high': self.db.query(VulnerabilityReport).filter(
                 VulnerabilityReport.researcher_id == researcher.id,
                 VulnerabilityReport.submitted_at >= start_date,
-                VulnerabilityReport.assigned_severity == 'high'
+                func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == 'high'
             ).count(),
             'medium': self.db.query(VulnerabilityReport).filter(
                 VulnerabilityReport.researcher_id == researcher.id,
                 VulnerabilityReport.submitted_at >= start_date,
-                VulnerabilityReport.assigned_severity == 'medium'
+                func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == 'medium'
             ).count(),
             'low': self.db.query(VulnerabilityReport).filter(
                 VulnerabilityReport.researcher_id == researcher.id,
                 VulnerabilityReport.submitted_at >= start_date,
-                VulnerabilityReport.assigned_severity == 'low'
+                func.coalesce(VulnerabilityReport.assigned_severity, VulnerabilityReport.suggested_severity) == 'low'
             ).count()
         }
         
@@ -716,7 +716,7 @@ class AnalyticsService:
         months_data = []
         current_date = start_date
         
-        while current_date < datetime.utcnow():
+        while current_date <= datetime.utcnow():
             month_end = current_date + timedelta(days=30)
             
             reports = self.db.query(VulnerabilityReport).filter(

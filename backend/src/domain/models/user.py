@@ -20,6 +20,10 @@ class UserRole(str, enum.Enum):
     FINANCE_OFFICER = "finance_officer"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
+    
+    # Note: The database enum also has uppercase values for backward compatibility:
+    # 'RESEARCHER', 'ORGANIZATION', 'STAFF', 'ADMIN', 'SUPER_ADMIN'
+    # But we use lowercase values in the application
 
 
 class User(Base):
@@ -37,7 +41,9 @@ class User(Base):
     # Authentication
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(SQLEnum(UserRole), nullable=False)
+    # Using String instead of Enum to handle mixed case values in database
+    # (RESEARCHER vs triage_specialist)
+    role = Column(String(50), nullable=False)
     
     # Account Status
     is_verified = Column(Boolean, default=False)
@@ -88,3 +94,49 @@ class User(Base):
     login_history = relationship("LoginHistory", back_populates="user", cascade="all, delete-orphan")
     data_exports = relationship("DataExport", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="user")
+    payment_methods = relationship("PaymentMethod", back_populates="user", cascade="all, delete-orphan")
+    
+    def __init__(self, **kwargs):
+        """
+        Initialize User model with automatic enum-to-string conversion for role.
+        
+        This prevents the common error: "invalid input value for enum userrole"
+        by ensuring role is ALWAYS stored as a string value, not an enum object.
+        """
+        # Convert role enum to string if needed
+        if 'role' in kwargs:
+            role_value = kwargs['role']
+            if isinstance(role_value, UserRole):
+                kwargs['role'] = role_value.value
+            elif isinstance(role_value, enum.Enum):
+                kwargs['role'] = role_value.value
+        
+        super().__init__(**kwargs)
+    
+    def has_role(self, role_name: str) -> bool:
+        """
+        Check if user has a specific role (case-insensitive).
+        
+        Args:
+            role_name: Role to check (e.g., 'researcher', 'organization', 'admin')
+            
+        Returns:
+            True if user has the role, False otherwise
+        """
+        return self.role.lower() == role_name.lower()
+    
+    def is_researcher(self) -> bool:
+        """Check if user is a researcher."""
+        return self.has_role("researcher")
+    
+    def is_organization(self) -> bool:
+        """Check if user is an organization."""
+        return self.has_role("organization")
+    
+    def is_admin(self) -> bool:
+        """Check if user is an admin."""
+        return self.has_role("admin") or self.has_role("super_admin")
+    
+    def is_staff(self) -> bool:
+        """Check if user is staff (includes triage specialist, finance officer, etc.)."""
+        return self.has_role("staff") or self.has_role("triage_specialist") or self.has_role("finance_officer")

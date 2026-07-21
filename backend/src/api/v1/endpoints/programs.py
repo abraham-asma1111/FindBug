@@ -30,8 +30,15 @@ def create_program(
     """
     Create a new bounty program.
     
-    Only organizations can create programs.
+    Only verified organizations can create programs.
     """
+    # Check organization verification status — must be 'active' (set by Admin)
+    if current_user.organization.verification_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Your organization must be verified and activated by an Administrator before creating programs. Current status: {current_user.organization.verification_status}."
+        )
+    
     try:
         service = ProgramService(db)
         
@@ -39,10 +46,7 @@ def create_program(
             organization_id=str(current_user.organization.id),
             name=program_data.name,
             description=program_data.description,
-            program_type=program_data.program_type,
-            scope=program_data.scope,
-            reward_tiers=program_data.reward_tiers,
-            rules=program_data.rules
+            program_type=program_data.type
         )
         
         return ProgramResponse.from_orm(program)
@@ -53,15 +57,17 @@ def create_program(
         )
 
 
-@router.get("", response_model=List[ProgramListResponse])
+@router.get("")
 def list_programs(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     search: Optional[str] = Query(None, description="Search by program name or description"),
     program_type: Optional[str] = Query(None, description="Filter by type: bounty or vdp"),
-    status: Optional[str] = Query(None, description="Filter by status: draft, public, paused, closed"),
+    program_status: Optional[str] = Query(None, description="Filter by status: draft, public, paused, closed"),
     min_reward: Optional[float] = Query(None, description="Minimum reward amount"),
     max_reward: Optional[float] = Query(None, description="Maximum reward amount"),
+    organization_id: Optional[str] = Query(None, description="Filter by organization ID (for finance officers)"),
+    enrich_stats: bool = Query(False, description="Include detailed statistics (for finance officers)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -70,16 +76,93 @@ def list_programs(
     
     - Organizations see their own programs
     - Researchers see public programs
+    - Finance officers can filter by organization_id and get enriched stats
     - Supports search and filtering
     """
     service = ProgramService(db)
     
-    if current_user.role == "organization":
+    # If organization_id is provided (e.g., by finance officer), get programs for that organization
+    if organization_id:
+        # Allow finance officers and admins to query by organization_id
+        if current_user.role in ['finance_officer', 'admin', 'super_admin']:
+            programs = service.get_organization_programs(
+                organization_id,
+                search=search,
+                program_type=program_type,
+                status=program_status
+            )
+            
+            # If enrich_stats is requested, add statistics
+            if enrich_stats:
+                from sqlalchemy import func, text
+                from src.domain.models.report import VulnerabilityReport
+                from src.domain.models.bounty_payment import BountyPayment
+                from src.domain.models.program import ProgramParticipation, RewardTier
+                
+                enriched_programs = []
+                for program in programs:
+                    # Get statistics
+                    stats_query = text("""
+                        SELECT 
+                            -- Report stats
+                            (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as total_reports,
+                            (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'valid') as valid_reports,
+                            (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'resolved') as resolved_reports,
+                            -- Researcher stats
+                            (SELECT COUNT(DISTINCT researcher_id) FROM program_participations pp WHERE pp.program_id = :program_id) as total_researchers,
+                            (SELECT COUNT(DISTINCT vr.researcher_id) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as researchers_with_reports,
+                            -- Bounty stats
+                            (SELECT COALESCE(SUM(bp.total_amount), 0) FROM bounty_payments bp 
+                             JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                             WHERE vr.program_id = :program_id AND bp.status = 'completed') as total_bounties_paid,
+                            (SELECT COUNT(*) FROM bounty_payments bp 
+                             JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                             WHERE vr.program_id = :program_id AND bp.status IN ('pending', 'approved')) as pending_payments,
+                            -- Reward tiers
+                            (SELECT MIN(min_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as min_bounty,
+                            (SELECT MAX(max_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as max_bounty
+                    """)
+                    
+                    stats = db.execute(stats_query, {"program_id": program.id}).fetchone()
+                    
+                    # Convert program to dict and add stats
+                    program_dict = {
+                        "id": str(program.id),
+                        "name": program.name,
+                        "description": program.description,
+                        "status": program.status,
+                        "type": program.type,
+                        "visibility": program.visibility,
+                        "created_at": program.created_at.isoformat() if program.created_at else None,
+                        "organization_id": str(program.organization_id),
+                        # Statistics
+                        "total_reports": stats.total_reports if stats else 0,
+                        "valid_reports": stats.valid_reports if stats else 0,
+                        "resolved_reports": stats.resolved_reports if stats else 0,
+                        "total_researchers": stats.total_researchers if stats else 0,
+                        "researchers_with_reports": stats.researchers_with_reports if stats else 0,
+                        "total_bounties_paid": float(stats.total_bounties_paid) if stats and stats.total_bounties_paid else 0,
+                        "pending_payments": stats.pending_payments if stats else 0,
+                        "min_bounty": float(stats.min_bounty) if stats and stats.min_bounty else 0,
+                        "max_bounty": float(stats.max_bounty) if stats and stats.max_bounty else 0,
+                    }
+                    enriched_programs.append(program_dict)
+                
+                return enriched_programs
+            
+            return programs
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to query programs by organization_id"
+            )
+    
+    if current_user.is_organization():
         programs = service.get_organization_programs(
             current_user.organization.id,
             search=search,
             program_type=program_type,
-            status=status
+            status=program_status
         )
     else:
         programs = service.search_public_programs(
@@ -96,7 +179,7 @@ def list_programs(
 
 @router.get("/my-programs", response_model=List[ProgramListResponse])
 def get_my_programs(
-    status: str = Query(None, description="Filter by status"),
+    program_status: str = Query(None, description="Filter by status"),
     current_user: User = Depends(require_organization),
     db: Session = Depends(get_db)
 ):
@@ -109,15 +192,60 @@ def get_my_programs(
     
     programs = service.get_organization_programs(
         current_user.organization.id,
-        status=status
+        status=program_status
     )
     
     return programs
 
 
-@router.get("/{program_id}", response_model=ProgramResponse)
+@router.get("/archived", response_model=List[ProgramListResponse])
+def get_archived_programs(
+    current_user: User = Depends(require_organization),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all archived programs for the current organization.
+    
+    Only organizations can access this endpoint.
+    """
+    # Get archived programs (those with deleted_at set)
+    programs = db.query(BountyProgram).filter(
+        BountyProgram.organization_id == current_user.organization.id,
+        BountyProgram.deleted_at.isnot(None)
+    ).order_by(BountyProgram.deleted_at.desc()).all()
+    
+    return programs
+
+
+@router.get("/my-participations", status_code=status.HTTP_200_OK)
+def get_my_participations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get programs the researcher has joined.
+    
+    Only for researchers.
+    """
+    if not current_user.is_researcher():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only researchers can view participations"
+        )
+    
+    service = ProgramService(db)
+    
+    participations = service.get_researcher_participations(
+        researcher_id=current_user.researcher.id
+    )
+    
+    return participations
+
+
+@router.get("/{program_id}")
 def get_program(
     program_id: UUID,
+    enrich_stats: bool = Query(False, description="Include detailed statistics (for finance officers)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -126,28 +254,75 @@ def get_program(
     
     - Public programs: accessible to all
     - Private programs: only accessible to organization owner and invited researchers
+    - Finance officers can request enriched statistics with enrich_stats=true
     """
     service = ProgramService(db)
     program = service.get_program(program_id)
-    
-    # Check access
-    if program.visibility == "private":
-        # Organization owner can access
-        if current_user.role == "organization" and program.organization_id == current_user.organization.id:
-            return program
-        
-        # Invited researchers can access
-        if current_user.role == "researcher":
-            invitation = service.program_repo.check_existing_invitation(
-                program_id, current_user.researcher.id
-            )
-            if invitation and invitation.status == "accepted":
-                return program
-        
+
+    if not service.can_user_access_program(program, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this program"
+            detail="Not authorized to access this program",
         )
+    
+    # If enrich_stats is requested, add statistics
+    if enrich_stats and current_user.role in ['finance_officer', 'admin', 'super_admin']:
+        from sqlalchemy import text
+        
+        # Get statistics
+        stats_query = text("""
+            SELECT 
+                -- Report stats
+                (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as total_reports,
+                (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'valid') as valid_reports,
+                (SELECT COUNT(*) FROM vulnerability_reports vr WHERE vr.program_id = :program_id AND vr.status = 'resolved') as resolved_reports,
+                -- Researcher stats
+                (SELECT COUNT(DISTINCT researcher_id) FROM program_participations pp WHERE pp.program_id = :program_id) as total_researchers,
+                (SELECT COUNT(DISTINCT vr.researcher_id) FROM vulnerability_reports vr WHERE vr.program_id = :program_id) as researchers_with_reports,
+                -- Bounty stats
+                (SELECT COALESCE(SUM(bp.total_amount), 0) FROM bounty_payments bp 
+                 JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                 WHERE vr.program_id = :program_id AND bp.status = 'completed') as total_bounties_paid,
+                (SELECT COUNT(*) FROM bounty_payments bp 
+                 JOIN vulnerability_reports vr ON bp.report_id = vr.id 
+                 WHERE vr.program_id = :program_id AND bp.status IN ('pending', 'approved')) as pending_payments,
+                -- Reward tiers
+                (SELECT MIN(min_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as min_bounty,
+                (SELECT MAX(max_amount) FROM reward_tiers rt WHERE rt.program_id = :program_id) as max_bounty
+        """)
+        
+        stats = db.execute(stats_query, {"program_id": program.id}).fetchone()
+        
+        # Convert program to dict and add stats
+        program_dict = {
+            "id": str(program.id),
+            "name": program.name,
+            "description": program.description,
+            "status": program.status,
+            "type": program.type,
+            "visibility": program.visibility,
+            "created_at": program.created_at.isoformat() if program.created_at else None,
+            "organization_id": str(program.organization_id),
+            # Statistics
+            "total_reports": stats.total_reports if stats else 0,
+            "valid_reports": stats.valid_reports if stats else 0,
+            "resolved_reports": stats.resolved_reports if stats else 0,
+            "total_researchers": stats.total_researchers if stats else 0,
+            "researchers_with_reports": stats.researchers_with_reports if stats else 0,
+            "total_bounties_paid": float(stats.total_bounties_paid) if stats and stats.total_bounties_paid else 0,
+            "pending_payments": stats.pending_payments if stats else 0,
+            "min_bounty": float(stats.min_bounty) if stats and stats.min_bounty else 0,
+            "max_bounty": float(stats.max_bounty) if stats and stats.max_bounty else 0,
+        }
+        
+        # Add organization info if available
+        if program.organization:
+            program_dict["organization"] = {
+                "id": str(program.organization.id),
+                "company_name": program.organization.company_name
+            }
+        
+        return program_dict
     
     return program
 
@@ -193,15 +368,67 @@ def publish_program(
     Publish a program (make it public).
     
     Program must have at least one scope and reward tiers (for bounty programs).
+    Organization must have sufficient wallet balance (≥ critical tier reward).
     Supports both GET and POST methods.
     """
     service = ProgramService(db)
-    
+
+    # Get program to check reward tiers
+    program = service.get_program(program_id)
+
+    # Verify ownership
+    if program.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to publish this program"
+        )
+
+    # For bounty programs: check wallet balance (soft-block only if wallet exists)
+    if program.type == "bounty":
+        tiers = service.program_repo.get_reward_tiers_by_program(program_id)
+        if not tiers:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot publish bounty program without reward tiers"
+            )
+        try:
+            from src.services.wallet_service import WalletService
+            wallet_service = WalletService(db)
+            balance_info = wallet_service.get_balance(
+                owner_id=current_user.id,
+                owner_type="organization"
+            )
+            critical_tier = max(tiers, key=lambda t: t.max_amount)
+            current_balance = balance_info.get("balance", 0)
+            if current_balance < critical_tier.max_amount:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Insufficient wallet balance. You need at least {critical_tier.max_amount} ETB to publish. Current balance: {current_balance} ETB."
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # No wallet yet — allow publish to proceed; admin will review
+
+    # Publish → goes to pending_review for Admin to approve, NOT directly public
     program = service.publish_program(
         program_id,
         current_user.organization.id
     )
-    
+
+    # Notify admins
+    try:
+        from src.services.notification_service import NotificationService
+        notification_service = NotificationService(db)
+        org_name = current_user.organization.company_name if current_user.organization else "An organization"
+        notification_service.notify_admin_program_created(
+            program_name=program.name,
+            organization_name=org_name,
+            program_id=program.id,
+        )
+    except Exception:
+        pass
+
     return program
 
 
@@ -249,16 +476,13 @@ def get_scopes(
     """Get all scopes for a program."""
     service = ProgramService(db)
     
-    # Verify access to program
     program = service.get_program(program_id)
-    
-    if program.visibility == "private":
-        if current_user.role == "organization" and program.organization_id != current_user.organization.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this program"
-            )
-    
+    if not service.can_user_access_program(program, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this program",
+        )
+
     scopes = service.program_repo.get_scopes_by_program(program_id)
     return scopes
 
@@ -304,16 +528,13 @@ def get_reward_tiers(
     """Get all reward tiers for a program."""
     service = ProgramService(db)
     
-    # Verify access to program
     program = service.get_program(program_id)
-    
-    if program.visibility == "private":
-        if current_user.role == "organization" and program.organization_id != current_user.organization.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this program"
-            )
-    
+    if not service.can_user_access_program(program, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this program",
+        )
+
     tiers = service.program_repo.get_reward_tiers_by_program(program_id)
     return tiers
 
@@ -347,7 +568,7 @@ def invite_researcher(
 @router.get("/{program_id}/invitations", response_model=List[InvitationResponse])
 def get_program_invitations(
     program_id: UUID,
-    status: str = Query(None, description="Filter by status"),
+    invitation_status: str = Query(None, description="Filter by status"),
     current_user: User = Depends(require_organization),
     db: Session = Depends(get_db)
 ):
@@ -367,7 +588,7 @@ def get_program_invitations(
         )
     
     invitations = service.program_repo.get_invitations_by_program(
-        program_id, status=status
+        program_id, status=invitation_status
     )
     
     return invitations
@@ -375,7 +596,7 @@ def get_program_invitations(
 
 @router.get("/invitations/my-invitations", response_model=List[InvitationResponse])
 def get_my_invitations(
-    status: str = Query(None, description="Filter by status"),
+    invitation_status: str = Query(None, description="Filter by status"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -384,7 +605,7 @@ def get_my_invitations(
     
     Only researchers can access this endpoint.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can view invitations"
@@ -393,7 +614,7 @@ def get_my_invitations(
     service = ProgramService(db)
     
     invitations = service.program_repo.get_invitations_by_researcher(
-        current_user.researcher.id, status=status
+        current_user.researcher.id, status=invitation_status
     )
     
     return invitations
@@ -411,7 +632,7 @@ def respond_to_invitation(
     
     Only the invited researcher can respond.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can respond to invitations"
@@ -428,8 +649,9 @@ def respond_to_invitation(
     return invitation
 
 
+@router.post("/{program_id}/join", status_code=status.HTTP_200_OK)
+@router.get("/{program_id}/join", status_code=status.HTTP_200_OK)
 @router.post("/programs/{program_id}/join", status_code=status.HTTP_200_OK)
-@router.get("/programs/{program_id}/join", status_code=status.HTTP_200_OK)
 def join_program(
     program_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -441,17 +663,27 @@ def join_program(
     Only researchers can join programs.
     Private programs require invitation acceptance.
     """
-    if current_user.role != "researcher":
+    if not current_user.is_researcher():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only researchers can join programs"
+        )
+    
+    # Get researcher profile
+    from src.domain.models.researcher import Researcher
+    researcher = db.query(Researcher).filter(Researcher.user_id == current_user.id).first()
+    
+    if not researcher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Researcher profile not found. Please complete your researcher profile first."
         )
     
     service = ProgramService(db)
     
     participation = service.join_program(
         program_id=program_id,
-        researcher_id=current_user.researcher.id
+        researcher_id=researcher.id
     )
     
     return {
@@ -459,32 +691,6 @@ def join_program(
         "program_id": str(program_id),
         "joined_at": participation.joined_at
     }
-
-
-@router.get("/programs/my-participations", status_code=status.HTTP_200_OK)
-def get_my_participations(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get programs the researcher has joined.
-    
-    Only for researchers.
-    """
-    if current_user.role != "researcher":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only researchers can view participations"
-        )
-    
-    service = ProgramService(db)
-    
-    participations = service.get_researcher_participations(
-        researcher_id=current_user.researcher.id
-    )
-    
-    return participations
-
 
 
 @router.post("/{program_id}/pause", response_model=ProgramResponse)
@@ -668,22 +874,119 @@ def restore_program(
     return updated_program
 
 
-@router.get("/archived", response_model=List[ProgramListResponse])
-def get_archived_programs(
+@router.delete("/{program_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{program_id}/delete", status_code=status.HTTP_200_OK)
+@router.get("/{program_id}/delete", status_code=status.HTTP_200_OK)
+def delete_program(
+    program_id: UUID,
     current_user: User = Depends(require_organization),
     db: Session = Depends(get_db)
 ):
     """
-    Get all archived programs for the current organization.
+    Permanently delete a program.
     
-    Only organizations can access this endpoint.
+    Only draft programs or archived programs can be permanently deleted.
+    Only the organization that owns the program can delete it.
+    Supports DELETE, POST, and GET methods for compatibility.
     """
     service = ProgramService(db)
     
-    # Get archived programs (those with deleted_at set)
-    programs = db.query(BountyProgram).filter(
-        BountyProgram.organization_id == current_user.organization.id,
-        BountyProgram.deleted_at.isnot(None)
-    ).order_by(BountyProgram.deleted_at.desc()).all()
+    # Get program including archived ones
+    program = service.program_repo.get_program_by_id(program_id)
     
-    return programs
+    if not program:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Program not found"
+        )
+    
+    # Verify ownership
+    if program.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this program"
+        )
+    
+    # Only allow deletion of draft or archived programs
+    if program.status not in ['draft'] and not program.deleted_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only draft or archived programs can be permanently deleted"
+        )
+    
+    # Permanently delete
+    db.delete(program)
+    db.commit()
+    
+    return {"message": "Program deleted successfully"}
+
+
+@router.get("/{program_id}/participants", status_code=status.HTTP_200_OK)
+def get_program_participants(
+    program_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all researchers participating in a program.
+    
+    Returns list of researchers with their participation stats.
+    Accessible by program owners and finance officers.
+    """
+    service = ProgramService(db)
+    
+    # Verify access
+    program = service.get_program(program_id)
+    
+    # Allow access for organization owners and finance officers
+    if current_user.role not in ['finance_officer', 'admin', 'super_admin']:
+        if not (current_user.is_organization() and program.organization_id == current_user.organization.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view program participants"
+            )
+    
+    # Get participants with stats
+    from sqlalchemy import func
+    from src.domain.models.program import ProgramParticipation
+    from src.domain.models.researcher import Researcher
+    from src.domain.models.user import User as UserModel
+    from src.domain.models.report import VulnerabilityReport
+    
+    participants_query = db.query(
+        Researcher,
+        UserModel,
+        ProgramParticipation.joined_at,
+        func.count(VulnerabilityReport.id).label('reports_count')
+    ).join(
+        UserModel, Researcher.user_id == UserModel.id
+    ).join(
+        ProgramParticipation, Researcher.id == ProgramParticipation.researcher_id
+    ).outerjoin(
+        VulnerabilityReport,
+        (VulnerabilityReport.researcher_id == Researcher.id) &
+        (VulnerabilityReport.program_id == program_id)
+    ).filter(
+        ProgramParticipation.program_id == program_id
+    ).group_by(
+        Researcher.id,
+        UserModel.id,
+        ProgramParticipation.joined_at
+    ).all()
+    
+    participants = []
+    for researcher, user, joined_at, reports_count in participants_query:
+        # Use email as username if username doesn't exist
+        username = getattr(user, 'username', None) or user.email.split('@')[0]
+        
+        participants.append({
+            "id": str(researcher.id),
+            "user_id": str(user.id),
+            "username": username,
+            "email": user.email,
+            "joined_at": joined_at.isoformat() if joined_at else None,
+            "reports_count": reports_count or 0,
+            "reputation_score": researcher.reputation_score or 0,
+        })
+    
+    return participants

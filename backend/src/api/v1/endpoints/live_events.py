@@ -48,7 +48,7 @@ def create_event(
     
     Requires organization admin role
     """
-    if not current_user.organization_id:
+    if not current_user.organization:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User must belong to an organization"
@@ -57,7 +57,7 @@ def create_event(
     service = LiveEventService(db)
     
     event = service.create_event(
-        organization_id=current_user.organization_id,
+        organization_id=current_user.organization.id,
         name=data.name,
         description=data.description,
         start_time=data.start_time,
@@ -87,11 +87,11 @@ def list_events(
     """
     service = LiveEventService(db)
     
-    if current_user.organization_id:
+    if current_user.organization:
         # Organization view - their events
         status_enum = EventStatus(status_filter) if status_filter else None
         events = service.list_events(
-            organization_id=current_user.organization_id,
+            organization_id=current_user.organization.id,
             status=status_enum,
             active_only=active_only
         )
@@ -122,8 +122,8 @@ def get_event(
         )
     
     # Check access
-    if current_user.organization_id:
-        if event.organization_id != current_user.organization_id:
+    if current_user.organization:
+        if event.organization_id != current_user.organization.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied"
@@ -153,7 +153,7 @@ def update_event_status(
             detail="Event not found"
         )
     
-    if event.organization_id != current_user.organization_id:
+    if not current_user.organization or event.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -186,7 +186,7 @@ def start_event(
             detail="Event not found"
         )
     
-    if event.organization_id != current_user.organization_id:
+    if not current_user.organization or event.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -218,7 +218,7 @@ def close_event(
             detail="Event not found"
         )
     
-    if event.organization_id != current_user.organization_id:
+    if not current_user.organization or event.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -255,7 +255,7 @@ def invite_researchers(
             detail="Event not found"
         )
     
-    if event.organization_id != current_user.organization_id:
+    if not current_user.organization or event.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -303,7 +303,7 @@ def get_event_dashboard(
             detail="Event not found"
         )
     
-    if event.organization_id != current_user.organization_id:
+    if not current_user.organization or event.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -351,7 +351,7 @@ def get_event_metrics(
             detail="Event not found"
         )
     
-    if event.organization_id != current_user.organization_id:
+    if not current_user.organization or event.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
@@ -549,3 +549,104 @@ def get_my_participation(
         )
     
     return participation
+
+
+# ============================================
+# PRIZE DISTRIBUTION & AUTOMATION
+# ============================================
+
+@router.post("/{event_id}/distribute-prizes", status_code=status.HTTP_200_OK)
+def distribute_prizes(
+    event_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Distribute prizes to top performers
+    
+    Requires organization admin role
+    Only available for closed events
+    """
+    service = LiveEventService(db)
+    event = service.get_event(event_id)
+    
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found"
+        )
+    
+    if not current_user.organization or event.organization_id != current_user.organization.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    try:
+        distributions = service.distribute_prizes(
+            event_id=event_id,
+            approved_by=current_user.id
+        )
+        return {
+            "message": f"Prizes distributed to {len(distributions)} participants",
+            "distributions": distributions
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/automation/start-scheduled", status_code=status.HTTP_200_OK)
+def auto_start_scheduled_events(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Auto-start scheduled events that have reached their start time
+    
+    This endpoint should be called by a cron job or background task
+    Requires admin role
+    """
+    # TODO: Add admin role check
+    service = LiveEventService(db)
+    
+    try:
+        started_count = service.auto_start_scheduled_events()
+        return {
+            "message": f"Auto-started {started_count} events",
+            "count": started_count
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/automation/close-expired", status_code=status.HTTP_200_OK)
+def auto_close_expired_events(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Auto-close active events that have reached their end time
+    
+    This endpoint should be called by a cron job or background task
+    Requires admin role
+    """
+    # TODO: Add admin role check
+    service = LiveEventService(db)
+    
+    try:
+        closed_count = service.auto_close_expired_events()
+        return {
+            "message": f"Auto-closed {closed_count} events",
+            "count": closed_count
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

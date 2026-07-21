@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import SectionCard from '@/components/dashboard/SectionCard';
 import StatCard from '@/components/dashboard/StatCard';
 import PortalShell from '@/components/portal/PortalShell';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatDateTime, getPortalNavItems, getRoleLabel } from '@/lib/portal';
 import { useAuthStore } from '@/store/authStore';
 
@@ -159,7 +159,7 @@ export default function StaffDashboardPage() {
             <div className="space-y-3">
               {data?.oldest_pending?.length ? (
                 data.oldest_pending.map((report) => (
-                  <div key={report.id || report.report_number || report.title} className="rounded-3xl border border-[#e6ddd4] bg-white p-4">
+                  <div key={report.id || report.report_number || report.title} className="rounded-3xl border border-[#e6ddd4] bg-white dark:bg-[#111111] p-4">
                     <p className="text-sm font-semibold text-[#2d2a26]">
                       {report.report_number ? `${report.report_number} · ` : ''}
                       {report.title}

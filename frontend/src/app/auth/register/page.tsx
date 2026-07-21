@@ -19,6 +19,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     country: '',
     organizationName: '',
+    industry: '',
     phoneNumber: '',
     acceptTerms: false,
   });
@@ -50,7 +51,7 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const result = await register({
+      await register({
         email: formData.email,
         password: formData.password,
         first_name: formData.firstName,
@@ -58,11 +59,12 @@ export default function RegisterPage() {
         role,
         country: role === 'organization' ? formData.country : undefined,
         organization_name: role === 'organization' ? formData.organizationName : undefined,
+        industry: role === 'organization' ? formData.industry : undefined,
         phone_number: role === 'organization' ? formData.phoneNumber : undefined,
       });
       
-      // Registration initiated successfully - redirect to email verification page
-      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}&waiting=true`);
+      // Registration initiated successfully - redirect to OTP verification page
+      router.push(`/auth/verify-otp?email=${encodeURIComponent(formData.email)}`);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed. Please try again.');
     } finally {
@@ -484,6 +486,37 @@ export default function RegisterPage() {
                         onChange={handleChange}
                         className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:border-primary text-black"
                       />
+                    </div>
+
+                    <div>
+                      <label htmlFor="industry" className="block text-sm font-medium text-black mb-2">
+                        Industry <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        id="industry"
+                        name="industry"
+                        required={role === 'organization'}
+                        value={formData.industry}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:border-primary text-black"
+                      >
+                        <option value="">Select Industry</option>
+                        <option value="Banking">Banking</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="E-commerce">E-commerce</option>
+                        <option value="Telecommunications">Telecommunications</option>
+                        <option value="Government">Government</option>
+                        <option value="Education">Education</option>
+                        <option value="Insurance">Insurance</option>
+                        <option value="Retail">Retail</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                        <option value="Energy">Energy</option>
+                        <option value="Transportation">Transportation</option>
+                        <option value="Media">Media</option>
+                        <option value="Other">Other</option>
+                      </select>
                     </div>
 
                     <div>

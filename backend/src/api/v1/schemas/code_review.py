@@ -69,8 +69,13 @@ class CreateEngagementRequest(BaseModel):
 
 
 class AssignReviewerRequest(BaseModel):
-    """Request to assign a reviewer"""
+    """Request to assign a single reviewer (legacy)"""
     reviewer_id: UUID
+
+
+class AssignReviewersRequest(BaseModel):
+    """Request to assign one or more reviewers"""
+    reviewer_ids: List[UUID] = Field(..., min_length=1)
 
 
 class AddFindingRequest(BaseModel):
@@ -111,6 +116,7 @@ class CodeReviewEngagementResponse(BaseModel):
     id: UUID
     organization_id: UUID
     reviewer_id: Optional[UUID]
+    assigned_reviewer_ids: Optional[List[str]] = None
     title: str
     repository_url: str
     review_type: ReviewTypeEnum

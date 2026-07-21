@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
+from src.api.v1.schemas.coercion import coerce_optional_float
+
 
 # Report submission schemas
 class ReportCreate(BaseModel):
@@ -41,12 +43,13 @@ class ReportUpdate(BaseModel):
 class TriageUpdate(BaseModel):
     """Schema for triage specialist to update report."""
     status: Optional[str] = Field(None, pattern="^(new|triaged|valid|invalid|duplicate|resolved|closed)$")
-    assigned_severity: Optional[str] = Field(None, pattern="^(critical|high|medium|low)$")
+    assigned_severity: Optional[str] = Field(None, pattern="^(critical|high|medium|low|info)$")
     cvss_score: Optional[Decimal] = Field(None, ge=0.0, le=10.0)
     vrt_category: Optional[str] = Field(None, max_length=100)
     triage_notes: Optional[str] = None
     is_duplicate: Optional[bool] = None
     duplicate_of: Optional[UUID] = None
+    bounty_amount: Optional[Decimal] = Field(None, ge=0)
 
 
 class BountyApproval(BaseModel):
@@ -117,7 +120,7 @@ class ReportResponse(BaseModel):
     # Status
     status: str
     assigned_severity: Optional[str]
-    cvss_score: Optional[Decimal]
+    cvss_score: Optional[float] = None
     vrt_category: Optional[str]
     
     # Triage
@@ -135,7 +138,7 @@ class ReportResponse(BaseModel):
     resolved_at: Optional[datetime]
     
     # Bounty
-    bounty_amount: Optional[Decimal]
+    bounty_amount: Optional[float] = None
     bounty_status: Optional[str]
     
     # Metadata
@@ -143,6 +146,10 @@ class ReportResponse(BaseModel):
     updated_at: datetime
     last_activity_at: datetime
     closed_at: Optional[datetime]
+
+    @validator("cvss_score", "bounty_amount", pre=True)
+    def _coerce_decimal_fields(cls, value):
+        return coerce_optional_float(value)
     
     class Config:
         from_attributes = True

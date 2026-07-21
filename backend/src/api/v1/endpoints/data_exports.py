@@ -92,7 +92,7 @@ async def request_export(
     description="List all data exports for current user"
 )
 async def list_exports(
-    status: Optional[str] = Query(None, description="Filter by status"),
+    export_status: Optional[str] = Query(None, description="Filter by status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -107,7 +107,7 @@ async def list_exports(
     try:
         result = export_service.list_exports(
             user_id=str(current_user.id),
-            status=status,
+            status=export_status,
             skip=skip,
             limit=limit
         )

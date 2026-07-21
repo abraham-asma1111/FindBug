@@ -14,6 +14,7 @@ from src.services.code_review_service import CodeReviewService
 from src.api.v1.schemas.code_review import (
     CreateEngagementRequest,
     AssignReviewerRequest,
+    AssignReviewersRequest,
     AddFindingRequest,
     UpdateFindingStatusRequest,
     CodeReviewEngagementResponse,
@@ -25,9 +26,49 @@ from src.api.v1.schemas.code_review import (
     FindingSeverityEnum,
     FindingStatusEnum
 )
-from src.domain.models.code_review import ReviewStatus, FindingSeverity, FindingStatus
+from src.domain.models.code_review import (
+    CodeReviewFinding,
+    ReviewStatus,
+    ReviewType,
+    FindingSeverity,
+    FindingStatus,
+    IssueType,
+)
 
 router = APIRouter(prefix="/code-review", tags=["code-review"])
+
+
+def _organization_id(user: User) -> UUID:
+    if not user.organization:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Organization profile not found for this account",
+        )
+    return user.organization.id
+
+
+def _researcher_id(user: User) -> UUID:
+    if not user.researcher:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Researcher profile not found for this account",
+        )
+    return user.researcher.id
+
+
+def _assert_engagement_access(engagement, current_user: User) -> None:
+    if current_user.is_organization() and engagement.organization_id != _organization_id(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this engagement",
+        )
+    if current_user.is_researcher() and not CodeReviewService.is_reviewer_assigned(
+        engagement, _researcher_id(current_user)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this engagement",
+        )
 
 
 @router.post("/engagements", response_model=CodeReviewEngagementResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +84,7 @@ def create_engagement(
     - **repository_url**: URL to the code repository
     - **review_type**: Type of review (security, performance, etc.)
     """
-    if current_user.role != "organization":
+    if not current_user.is_organization():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organizations can create code review engagements"
@@ -53,10 +94,10 @@ def create_engagement(
     
     try:
         engagement = service.create_engagement(
-            organization_id=current_user.id,
+            organization_id=_organization_id(current_user),
             title=request.title,
             repository_url=request.repository_url,
-            review_type=request.review_type.value
+            review_type=ReviewType(request.review_type.value),
         )
         return engagement
     except Exception as e:
@@ -67,40 +108,35 @@ def create_engagement(
 
 
 @router.post("/engagements/{engagement_id}/assign", response_model=CodeReviewEngagementResponse)
-def assign_reviewer(
+def assign_reviewers(
     engagement_id: UUID,
-    request: AssignReviewerRequest,
+    request: AssignReviewersRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    Assign a reviewer to an engagement
-    
-    - **reviewer_id**: ID of the researcher to assign
+    Assign one or more reviewers to an engagement.
+
+    - **reviewer_ids**: Researcher IDs to add to the review team (merged with existing).
     """
     service = CodeReviewService(db)
-    
-    # Verify engagement exists and user has permission
+
     engagement = service.get_engagement(engagement_id)
     if not engagement:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Engagement not found"
+            detail="Engagement not found",
         )
-    
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to assign reviewers to this engagement"
-        )
-    
+
+    if current_user.is_organization():
+        _assert_engagement_access(engagement, current_user)
+
     try:
-        engagement = service.assign_reviewer(engagement_id, request.reviewer_id)
-        return engagement
+        return service.assign_reviewers(engagement_id, request.reviewer_ids)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=str(e),
         )
 
 
@@ -120,12 +156,9 @@ def start_review(
             detail="Engagement not found"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to start this review"
-        )
-    
+    if current_user.is_researcher():
+        _assert_engagement_access(engagement, current_user)
+
     try:
         engagement = service.start_review(engagement_id)
         return engagement
@@ -162,21 +195,24 @@ def add_finding(
             detail="Engagement not found"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to add findings to this engagement"
-        )
-    
+    if current_user.is_researcher():
+        _assert_engagement_access(engagement, current_user)
+
     try:
+        if current_user.is_researcher() and engagement.status != ReviewStatus.IN_PROGRESS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Start the review before adding findings.",
+            )
+
         finding = service.add_finding(
             engagement_id=engagement_id,
             title=request.title,
             description=request.description,
-            severity=request.severity.value,
-            issue_type=request.issue_type.value,
+            severity=FindingSeverity(request.severity.value),
+            issue_type=IssueType(request.issue_type.value),
             file_path=request.file_path,
-            line_number=request.line_number
+            line_number=request.line_number,
         )
         return finding
     except ValueError as e:
@@ -193,16 +229,38 @@ def update_finding_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update finding status"""
+    """Update finding status (organization remediation or reviewer triage)."""
     service = CodeReviewService(db)
-    
+
+    finding = db.query(CodeReviewFinding).filter(CodeReviewFinding.id == finding_id).first()
+    if not finding:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Finding not found",
+        )
+
+    engagement = service.get_engagement(finding.engagement_id)
+    if not engagement:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Engagement not found",
+        )
+
+    if current_user.is_organization() or current_user.is_researcher():
+        _assert_engagement_access(engagement, current_user)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this finding",
+        )
+
     try:
-        finding = service.update_finding_status(finding_id, request.status.value)
+        finding = service.update_finding_status(finding_id, FindingStatus(request.status.value))
         return finding
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
         )
 
 
@@ -222,12 +280,9 @@ def submit_report(
             detail="Engagement not found"
         )
     
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to submit this report"
-        )
-    
+    if current_user.is_researcher():
+        _assert_engagement_access(engagement, current_user)
+
     try:
         engagement = service.submit_report(engagement_id)
         return engagement
@@ -254,37 +309,25 @@ def get_engagement(
             detail="Engagement not found"
         )
     
-    # Check permissions
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this engagement"
-        )
-    
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this engagement"
-        )
-    
+    _assert_engagement_access(engagement, current_user)
     return engagement
 
 
 @router.get("/engagements", response_model=EngagementListResponse)
 def list_engagements(
-    status: Optional[ReviewStatusEnum] = None,
+    engagement_status: Optional[ReviewStatusEnum] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """List engagements for current user"""
     service = CodeReviewService(db)
     
-    status_value = ReviewStatus(status.value) if status else None
+    status_value = ReviewStatus(engagement_status.value) if engagement_status else None
     
-    if current_user.role == "organization":
-        engagements = service.get_organization_engagements(current_user.id, status_value)
-    elif current_user.role == "researcher":
-        engagements = service.get_reviewer_engagements(current_user.id, status_value)
+    if current_user.is_organization():
+        engagements = service.get_organization_engagements(_organization_id(current_user), status_value)
+    elif current_user.is_researcher():
+        engagements = service.get_reviewer_engagements(_researcher_id(current_user), status_value)
     else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -315,19 +358,8 @@ def list_findings(
             detail="Engagement not found"
         )
     
-    # Check permissions
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view findings for this engagement"
-        )
-    
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view findings for this engagement"
-        )
-    
+    _assert_engagement_access(engagement, current_user)
+
     severity_value = FindingSeverity(severity.value) if severity else None
     status_value = FindingStatus(finding_status.value) if finding_status else None
     
@@ -355,18 +387,7 @@ def get_engagement_stats(
             detail="Engagement not found"
         )
     
-    # Check permissions
-    if current_user.role == "organization" and engagement.organization_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view stats for this engagement"
-        )
-    
-    if current_user.role == "researcher" and engagement.reviewer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view stats for this engagement"
-        )
-    
+    _assert_engagement_access(engagement, current_user)
+
     stats = service.get_engagement_stats(engagement_id)
     return stats

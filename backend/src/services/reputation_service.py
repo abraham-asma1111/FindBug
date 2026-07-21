@@ -24,8 +24,8 @@ class ReputationService:
         'high': 30,      # High severity
         'medium': 20,    # Medium severity
         'low': 10,       # Low severity
-        'invalid': -20,  # Invalid report penalty
-        'duplicate': -20 # Duplicate report penalty (after 24h)
+        'invalid': 0,    # Invalid report - no penalty
+        'duplicate': 0   # Duplicate report after 24h - no points
     }
     
     def calculate_points_for_report(
@@ -37,30 +37,46 @@ class ReputationService:
         
         Rules:
         - Valid reports: 10-50 points based on severity
-        - Invalid reports: -20 points
-        - Duplicate reports: -20 points (if after 24 hours)
+        - Invalid reports: 0 points (no penalty)
+        - Duplicate reports within 24h: 25% of severity points (they get 50% bounty)
+        - Duplicate reports after 24h: 0 points (no bounty, no reputation)
         """
-        # Invalid reports
+        # Invalid reports - no penalty
         if report.status == 'invalid':
             return self.REPUTATION_POINTS['invalid']
         
         # Duplicate reports
-        if report.is_duplicate:
-            # Check if within 24 hours (gets 50% bounty but no penalty)
+        if report.is_duplicate or report.status == 'duplicate':
+            # Check if this is the ORIGINAL report (submitted first)
             if report.duplicate_of:
                 original = self.db.query(VulnerabilityReport).filter(
                     VulnerabilityReport.id == report.duplicate_of
                 ).first()
                 
                 if original:
-                    time_diff = report.submitted_at - original.submitted_at
-                    within_24_hours = time_diff.total_seconds() <= 86400
-                    
-                    if within_24_hours:
-                        # No penalty for duplicates within 24h
-                        return 0
+                    # If this report was submitted BEFORE the "original", they are actually the original
+                    if report.submitted_at < original.submitted_at:
+                        # They are the original - give full points
+                        if report.assigned_severity:
+                            return self.REPUTATION_POINTS.get(report.assigned_severity, 0)
+                    else:
+                        # They submitted after - check 24h window
+                        time_diff = report.submitted_at - original.submitted_at
+                        within_24_hours = time_diff.total_seconds() <= 86400
+                        
+                        if within_24_hours:
+                            # 25% of severity points for duplicates within 24h
+                            # Use the original report's severity
+                            severity = original.assigned_severity or report.suggested_severity
+                            if severity:
+                                base_points = self.REPUTATION_POINTS.get(severity, 0)
+                                return base_points * 0.25  # 25% of points (12.5 for critical, 7.5 for high, etc.)
+            else:
+                # No duplicate_of link but marked as duplicate - if they have assigned_severity, they are the original
+                if report.assigned_severity:
+                    return self.REPUTATION_POINTS.get(report.assigned_severity, 0)
             
-            # Penalty for duplicates after 24h
+            # No points for duplicates after 24h
             return self.REPUTATION_POINTS['duplicate']
         
         # Valid reports - points based on assigned severity

@@ -2,10 +2,13 @@
 PTaaS Pydantic Schemas
 """
 from pydantic import BaseModel, Field, validator
+
+from src.api.v1.schemas.coercion import coerce_optional_float
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from uuid import UUID
 
 
 class TestingMethodologyEnum(str, Enum):
@@ -46,7 +49,7 @@ class PTaaSEngagementCreate(BaseModel):
     deliverables: Dict[str, Any] = Field(..., description="Reports, documentation, presentations")
     pricing_model: PricingModelEnum
     base_price: Decimal = Field(..., gt=0)
-    platform_commission_rate: Decimal = Field(default=15.00, ge=0, le=100)
+    platform_commission_rate: Decimal = Field(default=30.00, ge=0, le=100)
     team_size: int = Field(default=1, ge=1)
     subscription_interval: Optional[str] = None
     
@@ -69,13 +72,13 @@ class PTaaSEngagementUpdate(BaseModel):
     compliance_notes: Optional[str] = None
     deliverables: Optional[Dict[str, Any]] = None
     status: Optional[EngagementStatusEnum] = None
-    assigned_researchers: Optional[List[int]] = None
+    assigned_researchers: Optional[List[UUID]] = None
     team_size: Optional[int] = None
 
 
 class PTaaSEngagementResponse(BaseModel):
-    id: int
-    organization_id: int
+    id: UUID
+    organization_id: UUID
     name: str
     description: Optional[str]
     status: str
@@ -96,11 +99,11 @@ class PTaaSEngagementResponse(BaseModel):
     subscription_interval: Optional[str]
     subscription_start_date: Optional[datetime]
     subscription_end_date: Optional[datetime]
-    assigned_researchers: Optional[List[int]]
+    assigned_researchers: Optional[List[UUID]]
     team_size: int
     created_at: datetime
     updated_at: Optional[datetime]
-    created_by: Optional[int]
+    created_by: Optional[UUID]
     
     class Config:
         from_attributes = True
@@ -109,7 +112,7 @@ class PTaaSEngagementResponse(BaseModel):
 # Finding Schemas - FREQ-35: Structured Templates
 class PTaaSFindingCreate(BaseModel):
     """Structured finding submission with mandatory fields - FREQ-35"""
-    engagement_id: int
+    engagement_id: UUID
     title: str = Field(..., min_length=3, max_length=255)
     description: str = Field(..., min_length=10)
     severity: str = Field(..., pattern="^(Critical|High|Medium|Low|Info)$")
@@ -194,12 +197,12 @@ class PTaaSFindingUpdate(BaseModel):
 
 
 class PTaaSFindingResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     title: str
     description: str
     severity: str
-    cvss_score: Optional[Decimal]
+    cvss_score: Optional[float] = None
     affected_component: Optional[str]
     
     # Proof of Exploit
@@ -235,7 +238,7 @@ class PTaaSFindingResponse(BaseModel):
     
     # Validation
     validated: Optional[bool]
-    validated_by: Optional[int]
+    validated_by: Optional[UUID]
     validated_at: Optional[datetime]
     retest_required: Optional[bool]
     retest_notes: Optional[str]
@@ -247,11 +250,36 @@ class PTaaSFindingResponse(BaseModel):
     reproduction_steps: Optional[str]
     references: Optional[List[str]]
     status: str
-    discovered_by: Optional[int]
+    bounty_amount: Optional[float] = None
+    bounty_status: Optional[str] = None
+    bounty_approved_at: Optional[datetime] = None
+    discovered_by: Optional[UUID]
     discovered_at: datetime
+    created_at: Optional[datetime] = None  # Alias for discovered_at for frontend compatibility
     
+    @validator("cvss_score", pre=True)
+    def _coerce_cvss_score(cls, value):
+        return coerce_optional_float(value)
+
     class Config:
         from_attributes = True
+        
+    @classmethod
+    def from_orm(cls, obj):
+        """Custom from_orm to map discovered_at to created_at"""
+        data = super().from_orm(obj)
+        if hasattr(obj, 'discovered_at') and obj.discovered_at:
+            data.created_at = obj.discovered_at
+        return data
+
+
+def to_ptaas_finding_response(finding) -> PTaaSFindingResponse:
+    """Serialize ORM finding with numeric coercion (cvss_score as float)."""
+    return PTaaSFindingResponse.from_orm(finding)
+
+
+def to_ptaas_finding_responses(findings) -> List[PTaaSFindingResponse]:
+    return [to_ptaas_finding_response(f) for f in findings]
 
 
 class PTaaSFindingValidation(BaseModel):
@@ -261,9 +289,20 @@ class PTaaSFindingValidation(BaseModel):
     retest_notes: Optional[str] = None
 
 
+class PTaaSRetestRequestCreate(BaseModel):
+    """Schema for requesting a retest"""
+    fix_description: str = Field(..., min_length=10)
+
+
+class PTaaSRetestResultSubmit(BaseModel):
+    """Schema for submitting a retest result"""
+    is_fixed: bool
+    retest_notes: str = Field(..., min_length=10)
+
+
 # Deliverable Schemas
 class PTaaSDeliverableCreate(BaseModel):
-    engagement_id: int
+    engagement_id: UUID
     deliverable_type: str = Field(..., pattern="^(report|documentation|presentation)$")
     title: str = Field(..., min_length=3, max_length=255)
     description: Optional[str] = None
@@ -273,18 +312,18 @@ class PTaaSDeliverableCreate(BaseModel):
 
 
 class PTaaSDeliverableResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     deliverable_type: str
     title: str
     description: Optional[str]
     file_path: Optional[str]
     file_url: Optional[str]
     version: str
-    submitted_by: Optional[int]
+    submitted_by: Optional[UUID]
     submitted_at: datetime
     approved: bool
-    approved_by: Optional[int]
+    approved_by: Optional[UUID]
     approved_at: Optional[datetime]
     
     class Config:
@@ -293,17 +332,17 @@ class PTaaSDeliverableResponse(BaseModel):
 
 # Progress Update Schemas
 class PTaaSProgressUpdateCreate(BaseModel):
-    engagement_id: int
+    engagement_id: UUID
     update_text: str = Field(..., min_length=10)
     progress_percentage: int = Field(default=0, ge=0, le=100)
 
 
 class PTaaSProgressUpdateResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     update_text: str
     progress_percentage: int
-    created_by: Optional[int]
+    created_by: Optional[UUID]
     created_at: datetime
     
     class Config:

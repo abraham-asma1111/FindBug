@@ -4,7 +4,9 @@ Free retesting of fixed vulnerabilities
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+import uuid
 from src.core.database import Base
 
 
@@ -12,12 +14,12 @@ class PTaaSRetestRequest(Base):
     """Retest request for fixed vulnerabilities - FREQ-37"""
     __tablename__ = "ptaas_retest_requests"
 
-    id = Column(Integer, primary_key=True, index=True)
-    finding_id = Column(Integer, ForeignKey("ptaas_findings.id"), nullable=False)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    finding_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_findings.id"), nullable=False)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False)
     
     # Request details
-    requested_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    requested_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     requested_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     status = Column(String(50), default="PENDING")  # PENDING, APPROVED, IN_PROGRESS, COMPLETED, REJECTED, EXPIRED
@@ -28,7 +30,7 @@ class PTaaSRetestRequest(Base):
     fix_evidence = Column(JSON)  # URLs to evidence of fix
     
     # Retest assignment
-    assigned_to = Column(Integer, ForeignKey("users.id"))
+    assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     assigned_at = Column(DateTime)
     
     # Retest results
@@ -59,8 +61,8 @@ class PTaaSRetestPolicy(Base):
     """Retest policy configuration - FREQ-37"""
     __tablename__ = "ptaas_retest_policies"
 
-    id = Column(Integer, primary_key=True, index=True)
-    engagement_id = Column(Integer, ForeignKey("ptaas_engagements.id"), nullable=False, unique=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    engagement_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_engagements.id"), nullable=False, unique=True)
     
     # Policy settings
     retest_period_months = Column(Integer, default=12, nullable=False)
@@ -93,13 +95,13 @@ class PTaaSRetestHistory(Base):
     """Historical record of retest activities - FREQ-37"""
     __tablename__ = "ptaas_retest_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    retest_request_id = Column(Integer, ForeignKey("ptaas_retest_requests.id"), nullable=False)
-    finding_id = Column(Integer, ForeignKey("ptaas_findings.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    retest_request_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_retest_requests.id"), nullable=False)
+    finding_id = Column(UUID(as_uuid=True), ForeignKey("ptaas_findings.id"), nullable=False)
     
     # Activity tracking
     activity_type = Column(String(50), nullable=False)  # REQUESTED, APPROVED, ASSIGNED, STARTED, COMPLETED, REJECTED
-    activity_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    activity_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     activity_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Activity details

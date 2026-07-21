@@ -4,6 +4,16 @@ PTaaS Retest Schemas - FREQ-37
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from uuid import UUID
+from enum import Enum
+
+
+class RetestResult(str, Enum):
+    """Enum for retest results"""
+    FIXED = "FIXED"
+    NOT_FIXED = "NOT_FIXED"
+    PARTIALLY_FIXED = "PARTIALLY_FIXED"
+    NEW_ISSUE = "NEW_ISSUE"
 
 
 # Retest Policy Schemas
@@ -21,8 +31,8 @@ class PTaaSRetestPolicyCreate(BaseModel):
 
 
 class PTaaSRetestPolicyResponse(BaseModel):
-    id: int
-    engagement_id: int
+    id: UUID
+    engagement_id: UUID
     retest_period_months: int
     max_free_retests_per_finding: int
     eligible_severities: Optional[List[str]]
@@ -48,16 +58,16 @@ class PTaaSRetestRequestCreate(BaseModel):
 
 
 class PTaaSRetestRequestResponse(BaseModel):
-    id: int
-    finding_id: int
-    engagement_id: int
-    requested_by: int
+    id: UUID
+    finding_id: UUID
+    engagement_id: UUID
+    requested_by: UUID
     requested_at: datetime
     status: str
     fix_description: str
     fix_implemented_at: Optional[datetime]
     fix_evidence: Optional[List[str]]
-    assigned_to: Optional[int]
+    assigned_to: Optional[UUID]
     assigned_at: Optional[datetime]
     retest_started_at: Optional[datetime]
     retest_completed_at: Optional[datetime]
@@ -77,13 +87,13 @@ class PTaaSRetestRequestResponse(BaseModel):
 
 
 class PTaaSRetestAssignment(BaseModel):
-    assigned_to: int = Field(..., description="User ID to assign retest to")
+    assigned_to: UUID = Field(..., description="User ID to assign retest to")
 
 
 class PTaaSRetestCompletion(BaseModel):
-    retest_result: str = Field(..., pattern="^(FIXED|NOT_FIXED|PARTIALLY_FIXED|NEW_ISSUE)$")
-    retest_notes: str = Field(..., min_length=20)
-    retest_evidence: Optional[List[str]] = Field(None, description="URLs to retest evidence")
+    retest_result: RetestResult = Field(..., description="Result of the retest")
+    retest_notes: str = Field(..., min_length=20, description="Detailed notes about the retest")
+    retest_evidence: Optional[List[str]] = Field(default=None, description="URLs to retest evidence")
 
 
 class PTaaSRetestEligibilityResponse(BaseModel):

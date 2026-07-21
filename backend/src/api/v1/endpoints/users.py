@@ -23,6 +23,18 @@ def get_my_profile(
     return service.get_profile(str(current_user.id))
 
 
+@router.get("/search", summary="Search Users")
+def search_users(
+    q: str = Query(..., min_length=2, description="Search query (email or name)"),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Search for users by email or name to start a conversation."""
+    service = UserService(db)
+    return service.search_users(q, limit, exclude_user_id=str(current_user.id))
+
+
 @router.put("/me", summary="Update Current User Profile")
 def update_my_profile(
     data: dict,
@@ -50,7 +62,7 @@ def get_public_profile(
 @router.get("", summary="List Users (Admin)")
 def list_users(
     role: Optional[str] = Query(None, description="Filter by role"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    user_status: Optional[str] = Query(None, description="Filter by status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -58,7 +70,7 @@ def list_users(
 ):
     """List all users (Admin only)."""
     service = UserService(db)
-    return service.list_users(role=role, status=status, skip=skip, limit=limit)
+    return service.list_users(role=role, status=user_status, skip=skip, limit=limit)
 
 
 @router.post("/{user_id}/deactivate", summary="Deactivate User (Admin)")
