@@ -104,8 +104,8 @@ class OrganizationVerificationService:
                 f"Cannot approve organization with status: {org.verification_status}"
             )
         
-        # Update status
-        org.verification_status = "approved"
+        # Update status to 'active' so the organization can create/publish programs
+        org.verification_status = "active"
         
         self.db.commit()
         self.db.refresh(org)

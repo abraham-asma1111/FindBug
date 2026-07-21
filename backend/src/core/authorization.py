@@ -150,26 +150,11 @@ class ResourceAuthorization:
         - Public programs: anyone can view
         - Private programs: only owner and invited researchers
         """
-        # Public programs are accessible to all
-        if program.visibility == "public":
+        from src.services.program_service import ProgramService
+
+        if ProgramService(db).can_user_access_program(program, user):
             return True
-        
-        # Organization owner can always access
-        if user.role == "organization" and user.organization:
-            if program.organization_id == user.organization.id:
-                return True
-        
-        # Check if researcher is invited
-        if user.role == "researcher" and user.researcher:
-            from src.domain.repositories.program_repository import ProgramRepository
-            repo = ProgramRepository(db)
-            invitation = repo.check_existing_invitation(
-                program.id,
-                user.researcher.id
-            )
-            if invitation and invitation.status == "accepted":
-                return True
-        
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have permission to access this program"

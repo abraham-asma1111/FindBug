@@ -494,7 +494,7 @@ async def submit_simulation_report(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return _sim_service.submit_practice_report(
+        return await _sim_service.submit_practice_report(
             db, current_user.id, challenge_id, report_data
         )
     except ValueError as e:

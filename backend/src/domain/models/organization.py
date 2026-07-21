@@ -41,6 +41,12 @@ class Organization(Base):
     # Bugcrowd 2026 Business Verification
     business_license_url = Column(String(500), nullable=True)
     tax_id = Column(String(100), nullable=True)
+    legal_name = Column(String(300), nullable=True)
+    corporate_email = Column(String(255), nullable=True)
+    phone_number = Column(String(50), nullable=True)
+    owned_domains = Column(Text, nullable=True)    # JSON list of root domains
+    owned_subdomains = Column(Text, nullable=True) # JSON list of subdomains/assets
+    additional_notes = Column(Text, nullable=True) # Free-text explanation from org
     verification_status = Column(String(20), default="pending")
     
     # Bugcrowd 2026 SSO Configuration

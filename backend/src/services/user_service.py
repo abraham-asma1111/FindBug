@@ -62,6 +62,7 @@ class UserService:
                     "industry": getattr(org, "industry", None),
                     "website": getattr(org, "website", None),
                     "subscription_type": getattr(org, "subscription_type", None),
+                    "verification_status": getattr(org, "verification_status", "pending"),
                 }
 
         logger.info("Profile fetched", extra={"user_id": user_id})

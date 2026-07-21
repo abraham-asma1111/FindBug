@@ -66,7 +66,7 @@ def get_recommendations(
             "program_name": program.name,
             "program_type": program.type,
             "budget": float(program.budget) if program.budget else None,
-            "organization_name": program.organization.name if program.organization else None,
+            "organization_name": program.organization.company_name if program.organization else None,
             "match_score": round(match_score, 2),
             "reason": _get_recommendation_reason(researcher, program, match_score)
         })

@@ -31,12 +31,31 @@ def academy_lab_port() -> int:
 # Per-challenge paths on the branded FindBug Academy lab app
 VULNERABILITY_LAB_PATHS: Dict[str, str] = {
     "sql_injection": "/challenges/sql-injection",
+    "sqli": "/challenges/sql-injection",
+    "sql injection": "/challenges/sql-injection",
     "xss": "/challenges/reflected-xss",
+    "reflected_xss": "/challenges/reflected-xss",
+    "cross_site_scripting": "/challenges/reflected-xss",
     "jwt_attack": "/challenges/jwt-forgery",
+    "jwt": "/challenges/jwt-forgery",
+    "jwt_forgery": "/challenges/jwt-forgery",
     "ssrf": "/challenges/ssrf-fetch",
+    "ssrf_fetch": "/challenges/ssrf-fetch",
     "oauth_abuse": "/challenges/oauth-redirect",
+    "oauth": "/challenges/oauth-redirect",
+    "oauth_redirect": "/challenges/oauth-redirect",
     "race_condition": "/challenges/race-coupon",
+    "race": "/challenges/race-coupon",
+    "race_coupon": "/challenges/race-coupon",
 }
+
+
+def resolve_lab_path(vulnerability_type: Optional[str]) -> str:
+    """Map DB vulnerability_type to academy lab path (handles legacy aliases)."""
+    key = (vulnerability_type or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if key in VULNERABILITY_LAB_PATHS:
+        return VULNERABILITY_LAB_PATHS[key]
+    return VULNERABILITY_LAB_PATHS.get(vulnerability_type or "", "/")
 
 # Legacy seed images still map to the same branded lab (not third-party UIs)
 LEGACY_LAB_IMAGES = frozenset(
@@ -60,9 +79,7 @@ def academy_lab_base_url() -> str:
 
 
 def challenge_lab_url(challenge: SimulationChallenge) -> str:
-    path = VULNERABILITY_LAB_PATHS.get(
-        challenge.vulnerability_type or "", "/"
-    )
+    path = resolve_lab_path(challenge.vulnerability_type)
     return f"{academy_lab_base_url()}{path}"
 
 
@@ -232,9 +249,7 @@ class ContainerOrchestrationService:
                 )
 
             if uses_branded_academy_lab(challenge):
-                path = VULNERABILITY_LAB_PATHS.get(
-                    challenge.vulnerability_type or "", "/"
-                )
+                path = resolve_lab_path(challenge.vulnerability_type)
                 unique_url = f"{self._lab_base_url(host_port)}{path}"
             else:
                 unique_url = self._lab_base_url(host_port)

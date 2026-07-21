@@ -304,6 +304,10 @@ class AdminService:
         
         old_status = program.status
         program.status = new_status
+        if new_status == "public":
+            program.visibility = "public"
+        elif new_status in ("draft", "private", "pending_review", "archived"):
+            program.visibility = "private"
         self.db.commit()
         self.db.refresh(program)
         

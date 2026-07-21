@@ -47,9 +47,9 @@ def merged_user_status(vulnerability_type: str, challenges: list, prog_map: dict
 
 
 def challenge_lab_path(vulnerability_type: Optional[str]) -> str:
-    from src.services.container_service import VULNERABILITY_LAB_PATHS
+    from src.services.container_service import resolve_lab_path
 
-    return VULNERABILITY_LAB_PATHS.get(vulnerability_type or "", "/")
+    return resolve_lab_path(vulnerability_type)
 
 
 def labs_hub_url(challenge_id=None) -> str:

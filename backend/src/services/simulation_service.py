@@ -24,7 +24,7 @@ from src.services.simulation_helpers import (
 class SimulationService:
     """Handles simulation platform business logic"""
 
-    def submit_practice_report(
+    async def submit_practice_report(
         self,
         db: Session,
         user_id,
@@ -86,8 +86,30 @@ class SimulationService:
         prog.attempts = (prog.attempts or 0) + 1
         challenge.total_attempts = (challenge.total_attempts or 0) + 1
 
+        if validation["is_correct"]:
+            prog.status = "completed"
+            prog.completed_at = datetime.utcnow()
+            report.status = "validated"
+            report.validated_at = datetime.utcnow()
+            report.points_awarded = validation["points_awarded"]
+            challenge.total_completions = (challenge.total_completions or 0) + 1
+            await self._update_leaderboard(db, user_id, validation["points_awarded"])
+
         db.commit()
         db.refresh(report)
+
+        if validation["is_correct"]:
+            message = (
+                f"Congratulations — you solved the lab! "
+                f"+{validation['points_awarded']} XP awarded. "
+                f"Your report scored {validation['validation_score']}% on automated checks."
+            )
+        else:
+            message = (
+                "Report submitted for review. "
+                f"Automated score: {validation['validation_score']}% — "
+                "add more detail (vulnerability type, PoC, steps) to reach 70% and earn XP."
+            )
 
         return {
             "report_id": str(report.id),
@@ -95,7 +117,8 @@ class SimulationService:
             "automated_score": report.score,
             "automated_feedback": report.feedback,
             "likely_correct": validation["is_correct"],
-            "message": "Report submitted for review. XP is awarded after admin validation.",
+            "xp_awarded": validation["points_awarded"] if validation["is_correct"] else 0,
+            "message": message,
         }
 
     def unlock_hint(

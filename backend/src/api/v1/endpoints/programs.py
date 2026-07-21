@@ -32,11 +32,11 @@ def create_program(
     
     Only verified organizations can create programs.
     """
-    # Check organization verification status
-    if current_user.organization.verification_status != "approved":
+    # Check organization verification status — must be 'active' (set by Admin)
+    if current_user.organization.verification_status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Your organization must be verified before creating programs. Current status: {current_user.organization.verification_status}. Please submit verification documents in your dashboard."
+            detail=f"Your organization must be verified and activated by an Administrator before creating programs. Current status: {current_user.organization.verification_status}."
         )
     
     try:
@@ -258,28 +258,12 @@ def get_program(
     """
     service = ProgramService(db)
     program = service.get_program(program_id)
-    
-    # Check access
-    if program.visibility == "private":
-        # Organization owner can access
-        if current_user.is_organization() and program.organization_id == current_user.organization.id:
-            pass  # Access granted
-        # Invited researchers can access
-        elif current_user.is_researcher():
-            invitation = service.program_repo.check_existing_invitation(
-                program_id, current_user.researcher.id
-            )
-            if not (invitation and invitation.status == "accepted"):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Not authorized to access this program"
-                )
-        # Finance officers and admins can access
-        elif current_user.role not in ['finance_officer', 'admin', 'super_admin']:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this program"
-            )
+
+    if not service.can_user_access_program(program, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this program",
+        )
     
     # If enrich_stats is requested, add statistics
     if enrich_stats and current_user.role in ['finance_officer', 'admin', 'super_admin']:
@@ -388,71 +372,51 @@ def publish_program(
     Supports both GET and POST methods.
     """
     service = ProgramService(db)
-    
+
     # Get program to check reward tiers
     program = service.get_program(program_id)
-    
+
     # Verify ownership
     if program.organization_id != current_user.organization.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to publish this program"
         )
-    
-    # Check wallet balance for bounty programs
+
+    # For bounty programs: check wallet balance (soft-block only if wallet exists)
     if program.type == "bounty":
-        # Get reward tiers
         tiers = service.program_repo.get_reward_tiers_by_program(program_id)
-        
         if not tiers:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot publish bounty program without reward tiers"
             )
-        
-        # Find critical tier (highest max_amount)
-        critical_tier = max(tiers, key=lambda t: t.max_amount)
-        critical_amount = critical_tier.max_amount
-        
-        # Check organization wallet balance
-        from src.services.wallet_service import WalletService
-        wallet_service = WalletService(db)
-        
         try:
+            from src.services.wallet_service import WalletService
+            wallet_service = WalletService(db)
             balance_info = wallet_service.get_balance(
                 owner_id=current_user.id,
                 owner_type="organization"
             )
-            
+            critical_tier = max(tiers, key=lambda t: t.max_amount)
             current_balance = balance_info.get("balance", 0)
-            
-            if current_balance < critical_amount:
+            if current_balance < critical_tier.max_amount:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Insufficient wallet balance. You need at least {critical_amount} ETB (critical tier max reward) to publish this program. Current balance: {current_balance} ETB. Please recharge your wallet."
+                    detail=f"Insufficient wallet balance. You need at least {critical_tier.max_amount} ETB to publish. Current balance: {current_balance} ETB."
                 )
-        except Exception as e:
-            # If wallet doesn't exist or other error, block publish
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unable to verify wallet balance: {str(e)}. Please ensure your wallet is set up and has sufficient funds."
-            )
-    
-    # ── Scope ownership verification gate ───────────────────────────────────
-    from src.services.scope_verification_service import ScopeVerificationService
-    ver_svc = ScopeVerificationService(db)
-    try:
-        ver_svc.assert_all_scopes_verified(program_id)
-    except Exception as ve:
-        raise ve  # Re-raise the 400 HTTPException with clear message
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # No wallet yet — allow publish to proceed; admin will review
 
-    # Proceed with publish
+    # Publish → goes to pending_review for Admin to approve, NOT directly public
     program = service.publish_program(
         program_id,
         current_user.organization.id
     )
 
-    # Notify all admins about the new program
+    # Notify admins
     try:
         from src.services.notification_service import NotificationService
         notification_service = NotificationService(db)
@@ -463,7 +427,7 @@ def publish_program(
             program_id=program.id,
         )
     except Exception:
-        pass  # Notifications are non-blocking
+        pass
 
     return program
 
@@ -512,16 +476,13 @@ def get_scopes(
     """Get all scopes for a program."""
     service = ProgramService(db)
     
-    # Verify access to program
     program = service.get_program(program_id)
-    
-    if program.visibility == "private":
-        if current_user.is_organization() and program.organization_id != current_user.organization.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this program"
-            )
-    
+    if not service.can_user_access_program(program, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this program",
+        )
+
     scopes = service.program_repo.get_scopes_by_program(program_id)
     return scopes
 
@@ -567,16 +528,13 @@ def get_reward_tiers(
     """Get all reward tiers for a program."""
     service = ProgramService(db)
     
-    # Verify access to program
     program = service.get_program(program_id)
-    
-    if program.visibility == "private":
-        if current_user.is_organization() and program.organization_id != current_user.organization.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this program"
-            )
-    
+    if not service.can_user_access_program(program, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this program",
+        )
+
     tiers = service.program_repo.get_reward_tiers_by_program(program_id)
     return tiers
 

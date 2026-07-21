@@ -8,12 +8,18 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from src.domain.models.program import (
-    BountyProgram, ProgramScope, RewardTier, ProgramInvitation
+    BountyProgram,
+    ProgramScope,
+    RewardTier,
+    ProgramInvitation,
+    ProgramParticipation,
 )
+from src.domain.models.user import User
 from src.domain.repositories.program_repository import ProgramRepository
 from src.domain.repositories.organization_repository import OrganizationRepository
 from src.domain.repositories.researcher_repository import ResearcherRepository
 from src.services.audit_service import AuditService
+from src.core.role_access import UserRole, role_of
 
 
 class ProgramService:
@@ -25,7 +31,53 @@ class ProgramService:
         self.org_repo = OrganizationRepository(db)
         self.researcher_repo = ResearcherRepository(db)
         self.audit_service = AuditService(db)
-    
+
+    def can_user_access_program(self, program: BountyProgram, user: User) -> bool:
+        """
+        Whether a user may view program details (scopes, rewards, overview).
+
+        - Public programs: visibility=public OR status=public (joinable listings)
+        - Private programs: org owner, staff roles, accepted invite, or active participation
+        """
+        r = role_of(user)
+        if r in (
+            UserRole.ADMIN,
+            UserRole.SUPER_ADMIN,
+            UserRole.STAFF,
+            UserRole.TRIAGE_SPECIALIST,
+            UserRole.FINANCE_OFFICER,
+        ):
+            return True
+
+        if user.is_organization() and user.organization:
+            if program.organization_id == user.organization.id:
+                return True
+
+        if program.visibility == "public" or program.status == "public":
+            return True
+
+        if not user.is_researcher():
+            return False
+
+        researcher = user.researcher
+        if not researcher:
+            researcher = self.researcher_repo.get_by_user_id(str(user.id))
+        if not researcher:
+            return False
+
+        invitation = self.program_repo.check_existing_invitation(
+            program.id, researcher.id
+        )
+        if invitation and invitation.status == "accepted":
+            return True
+
+        participation = self.db.query(ProgramParticipation).filter(
+            ProgramParticipation.program_id == program.id,
+            ProgramParticipation.researcher_id == researcher.id,
+            ProgramParticipation.status == "active",
+        ).first()
+        return participation is not None
+
     def create_program(
         self,
         organization_id: UUID,
@@ -47,6 +99,13 @@ class ProgramService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Organization not found"
+            )
+            
+        # Verify organization is active (identity verified by admin)
+        if org.verification_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your organization account must be verified and activated by an administrator before you can create programs."
             )
         
         # Validate program type
@@ -330,15 +389,8 @@ class ProgramService:
                 detail="Bounty program must have reward tiers before publishing"
             )
         
-        # Verify organization exists and is active
-        org = self.org_repo.get_by_id(organization_id)
-        if not org or org.verification_status != "active":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your organization account must be activated by an administrator before you can publish programs."
-            )
-        
-        # Update status to pending review (do not make public yet)
+        # Move to pending_review — goes to Admin queue, NOT directly public.
+        # Admin manually verifies the program scopes match the org's submitted domains.
         program.status = "pending_review"
         program.visibility = "private"
         program.start_date = datetime.utcnow()

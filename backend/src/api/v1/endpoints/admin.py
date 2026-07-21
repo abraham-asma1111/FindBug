@@ -355,6 +355,7 @@ def update_program_status(
     
     try:
         program = service.update_program_status(
+            admin_id=current_user.id,
             program_id=program_id,
             new_status=new_status,
             reason=reason
@@ -396,6 +397,74 @@ def delete_program(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
+
+
+@router.get("/programs-queue/pending")
+def get_pending_review_programs(
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all programs in pending_review status with full org verification evidence attached.
+    Admin uses this queue to compare program scopes against org's submitted domain data.
+    """
+    from src.domain.models.program import BountyProgram as _BP, ProgramScope as _PS
+    from src.domain.models.organization import Organization as _Org
+    from src.domain.models.user import User as _User
+    import json
+
+    programs = db.query(_BP).filter(
+        _BP.status == "pending_review",
+        _BP.deleted_at.is_(None)
+    ).order_by(_BP.created_at.desc()).all()
+
+    result = []
+    for prog in programs:
+        org = db.query(_Org).filter(_Org.id == prog.organization_id).first()
+        owner = db.query(_User).filter(_User.id == org.user_id).first() if org else None
+        scopes = db.query(_PS).filter(_PS.program_id == prog.id).all()
+
+        result.append({
+            "id": str(prog.id),
+            "name": prog.name,
+            "description": prog.description,
+            "type": prog.type,
+            "status": prog.status,
+            "visibility": prog.visibility,
+            "created_at": prog.created_at,
+            "scopes": [
+                {
+                    "id": str(s.id),
+                    "asset_type": s.asset_type,
+                    "asset_identifier": s.asset_identifier,
+                    "is_in_scope": s.is_in_scope,
+                    "description": s.description,
+                    "max_severity": s.max_severity,
+                }
+                for s in scopes
+            ],
+            # Full org verification evidence for side-by-side comparison
+            "organization": {
+                "id": str(org.id) if org else None,
+                "company_name": org.company_name if org else None,
+                "legal_name": getattr(org, "legal_name", None),
+                "corporate_email": getattr(org, "corporate_email", None),
+                "phone_number": getattr(org, "phone_number", None),
+                "tax_id": getattr(org, "tax_id", None),
+                "website": org.website if org else None,
+                "industry": org.industry if org else None,
+                "business_license_url": getattr(org, "business_license_url", None),
+                "owned_domains": json.loads(org.owned_domains) if org and getattr(org, "owned_domains", None) else [],
+                "owned_subdomains": json.loads(org.owned_subdomains) if org and getattr(org, "owned_subdomains", None) else [],
+                "dns_txt_record": getattr(org, "domain_verification_token", None),
+                "additional_notes": getattr(org, "additional_notes", None),
+                "verification_status": getattr(org, "verification_status", "pending"),
+                "account_email": owner.email if owner else None,
+            }
+        })
+
+    return {"programs": result, "total": len(result)}
+
 
 @router.post("/programs/{program_id}/approve")
 def approve_program(
@@ -987,7 +1056,17 @@ def get_all_organizations(
                 "id": str(o.id),
                 "user_id": str(o.user_id),
                 "company_name": o.company_name,
+                "legal_name": getattr(o, "legal_name", None),
                 "website": o.website,
+                "corporate_email": getattr(o, "corporate_email", None),
+                "phone_number": getattr(o, "phone_number", None),
+                "tax_id": getattr(o, "tax_id", None),
+                "business_license_url": getattr(o, "business_license_url", None),
+                "owned_domains": getattr(o, "owned_domains", None),
+                "owned_subdomains": getattr(o, "owned_subdomains", None),
+                "dns_txt_record": getattr(o, "domain_verification_token", None),
+                "additional_notes": getattr(o, "additional_notes", None),
+                "industry": getattr(o, "industry", None),
                 "verification_status": getattr(o, "verification_status", "pending"),
                 "is_verified": getattr(o, "verification_status", "pending") == "active",
                 "created_at": o.created_at
@@ -1012,15 +1091,31 @@ def get_pending_verifications(
     
     Admin can view all organizations awaiting verification approval.
     """
-    from src.services.organization_verification_service import OrganizationVerificationService
+    from src.domain.models.organization import Organization as OrgModel
     
-    service = OrganizationVerificationService(db)
+    orgs = db.query(OrgModel).filter(
+        OrgModel.verification_status.in_(["pending", "submitted"])
+    ).order_by(OrgModel.created_at.desc()).limit(limit).offset(offset).all()
     
-    pending_orgs = service.get_pending_verifications(limit=limit, offset=offset)
+    result = []
+    for org in orgs:
+        user = db.query(User).filter(User.id == org.user_id).first()
+        result.append({
+            "id": str(org.id),
+            "company_name": org.company_name,
+            "website": org.website,
+            "verification_status": org.verification_status,
+            "business_license_url": getattr(org, "business_license_url", None),
+            "tax_id": getattr(org, "tax_id", None),
+            "industry": getattr(org, "industry", None),
+            "created_at": org.created_at,
+            "user_id": str(org.user_id),
+            "user_email": user.email if user else None,
+        })
     
     return {
-        "organizations": pending_orgs,
-        "total": len(pending_orgs),
+        "organizations": result,
+        "total": len(result),
         "limit": limit,
         "offset": offset
     }
@@ -1038,35 +1133,28 @@ def approve_organization_verification(
     
     Admin can approve organizations that have submitted verification documents.
     """
-    from src.services.organization_verification_service import OrganizationVerificationService
+    from src.domain.models.organization import Organization as OrgModel
     
-    service = OrganizationVerificationService(db)
+    org = db.query(OrgModel).filter(OrgModel.id == organization_id).first()
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     
-    try:
-        org = service.approve_verification(
-            admin_id=current_user.id,
-            organization_id=organization_id,
-            notes=notes
-        )
-        
-        return {
-            "message": "Organization verification approved successfully",
-            "organization_id": str(org.id),
-            "company_name": org.company_name,
-            "verification_status": org.verification_status
-        }
+    org.verification_status = "active"
+    db.commit()
+    db.refresh(org)
     
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    return {
+        "message": "Organization verified and activated successfully",
+        "organization_id": str(org.id),
+        "company_name": org.company_name,
+        "verification_status": org.verification_status
+    }
 
 
 @router.post("/organizations/{organization_id}/reject-verification")
 def reject_organization_verification(
     organization_id: UUID,
-    reason: str,
+    reason: str = "Does not meet verification requirements",
     current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db)
 ):
@@ -1075,30 +1163,52 @@ def reject_organization_verification(
     
     Admin can reject organizations that don't meet verification requirements.
     """
-    from src.services.organization_verification_service import OrganizationVerificationService
+    from src.domain.models.organization import Organization as OrgModel
     
-    service = OrganizationVerificationService(db)
+    org = db.query(OrgModel).filter(OrgModel.id == organization_id).first()
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     
-    try:
-        org = service.reject_verification(
-            admin_id=current_user.id,
-            organization_id=organization_id,
-            reason=reason
-        )
-        
-        return {
-            "message": "Organization verification rejected",
-            "organization_id": str(org.id),
-            "company_name": org.company_name,
-            "verification_status": org.verification_status,
-            "reason": reason
-        }
+    org.verification_status = "rejected"
+    db.commit()
+    db.refresh(org)
     
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    return {
+        "message": "Organization verification rejected",
+        "organization_id": str(org.id),
+        "company_name": org.company_name,
+        "verification_status": org.verification_status,
+        "reason": reason
+    }
+
+
+@router.post("/organizations/{organization_id}/deactivate")
+def deactivate_organization(
+    organization_id: UUID,
+    reason: Optional[str] = None,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Deactivate an organization - sets status back to inactive so they cannot publish programs.
+    """
+    from src.domain.models.organization import Organization as OrgModel
+    
+    org = db.query(OrgModel).filter(OrgModel.id == organization_id).first()
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+    
+    org.verification_status = "inactive"
+    db.commit()
+    db.refresh(org)
+    
+    return {
+        "message": "Organization deactivated successfully",
+        "organization_id": str(org.id),
+        "company_name": org.company_name,
+        "verification_status": org.verification_status
+    }
+
 
 
 @router.get("/organizations/statistics")

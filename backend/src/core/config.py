@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = os.getenv("MINIO_BUCKET", "bugcrowd-uploads")
 
     # Frontend (portal lab pages live here — port 3000 in dev)
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3001")
 
     # Simulation labs (Docker backend) — never use 3000 (reserved for Next.js frontend)
     SIMULATION_LAB_HOST: str = os.getenv("SIMULATION_LAB_HOST", "127.0.0.1")
